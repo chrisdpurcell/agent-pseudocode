@@ -30,6 +30,10 @@ Instructions for AI agents:
   - Create multiple specification documents if necessary to cover different aspects of the project. Size/scope them appropriately to ensure clarity and comprehensiveness.
   - Ensure the specs comply with the project-spec standard.
 - [ ] Correct naming of markdown files in `docs/` (except README.md) to use lower kebab-case. Ensure all links and references are updated accordingly.
+- [ ] Ensure all markdown files lint and format correctly and do not break.
+- [ ] Create this repo's custom conventions for markdown-frontmatter; do this before updating all frontmatter. This will be an ADR decision. Ensure that the conventions are clear, consistent, and well-documented to facilitate understanding and adoption by all contributors.
+- [ ] Verify all python files lint and format correctly and do not break.
+- [ ] Review .gitignore, ensure it makes sense and entries are reasonable, and reorganize/reorder for clarity.
 
 ## Agent Managed
 

@@ -10,6 +10,7 @@
 
 ## Global Constraints
 
+- **Set `UV_DEFAULT_INDEX=https://pypi.org/simple` for every `uv`/`uvx` invocation in this environment.** The default index (an internal artifactory mirror, `packages.applied-caas-gateway1.internal.api.openai.org`) is unreliable in this sandbox (confirmed: 8 consecutive `uv sync` failures, each timing out on a different package; direct `pypi.org`/`github.com` HTTPS both work fine). Confirmed fix: prefix the env var inline, e.g. `UV_DEFAULT_INDEX=https://pypi.org/simple uv sync --extra dev` or `UV_DEFAULT_INDEX=https://pypi.org/simple uvx --from 'git+https://github.com/L3DigitalNet/project-standards@v4' project-standards ...` — verified working for both `uv sync` and `uvx --from git+...` with the sandbox enabled (no `dangerouslyDisableSandbox` needed).
 - Pin every `project-standards` CLI invocation to `@v4` (the first release carrying `project-spec`; older tags lack it — keep all standards on the same major for consistency).
 - Never run `~/projects/agent-handoff-v3/agent-handoff-v3/scripts/handoff/install-globals.sh` — it defaults to a fleet-wide rollout across all of `~/projects/`. Hand-install this repo's handoff files only.
 - Use `uv` for all dependency changes (`uv add`, `uv sync`) — never hand-edit `uv.lock`.
@@ -113,52 +114,70 @@ git commit -m "chore: adopt markdown-frontmatter standard (scoped to docs/adr/, 
 - Create: `STATUS.md`
 - Modify: `TODO.md` (rename section headings, preserve all content)
 - Create: `.claude/hooks/session_start.py`
+- Create: `.codex/hooks/session_start.py` (separate byte-identical copy — the handoff validator checks this exact path, independent of `.claude/hooks/`)
 - Modify: `.claude/settings.json` (add a second `SessionStart` entry alongside the existing pseudocode-hook entry)
-- Modify: `.codex/hooks.json` (add a second `SessionStart` entry, mirroring `.claude/settings.json` — this repo registers Codex hooks via `.codex/hooks.json`, not a `[hooks]` TOML table, so follow that existing convention rather than the canonical `config.toml` example)
+- Modify: `.codex/config.toml` (add a `[[hooks.SessionStart]]` table — the handoff validator (`scripts/handoff/validate-layout.sh`) specifically parses this file's `[hooks]` structure via `handoff_check_codex_config`; it does not look at `.codex/hooks.json` at all)
+- Modify: `.codex/hooks.json` (ALSO add a third `SessionStart` entry here — this repo's actual working Codex hook mechanism runs through `hooks.json`, demonstrated by the existing apseudo hooks firing through it; `config.toml`'s `[hooks]` table alone would satisfy the formal validator but not necessarily fire in this repo's real Codex setup, so both are needed)
 - Modify: `AGENTS.md` (add the required top-of-file pointer block)
 - Modify: `CLAUDE.md` (repo root — add the required top-of-file pointer block)
 
 **Interfaces:**
 - Produces: `docs/handoff/state.md` etc. — consumed by the `session_start.py` hook (reads `docs/handoff/state.md` first, falling back to `docs/state.md`) and by future sessions per the `handoff-system-v3` skill.
 
-- [ ] **Step 1: Copy the canonical hook script**
+- [ ] **Step 1: Copy the canonical hook script to both harness locations**
+
+The handoff validator (`validate-layout.sh`) checks `.codex/hooks/session_start.py` as a distinct byte-identical file from `.claude/hooks/session_start.py` — it does not accept one script shared by reference. Copy it twice:
 
 ```bash
-mkdir -p .claude/hooks
+mkdir -p .claude/hooks .codex/hooks
 cp ~/projects/agent-handoff-v3/agent-handoff-v3/global/hooks/session_start.py .claude/hooks/session_start.py
+cp ~/projects/agent-handoff-v3/agent-handoff-v3/global/hooks/session_start.py .codex/hooks/session_start.py
 ```
 
 - [ ] **Step 2: Add the SessionStart entry to `.claude/settings.json`**
 
-Add a second object to the existing `hooks.SessionStart[0].hooks` array (same `matcher`, alongside the existing `apseudo-hook.py` entry — do not replace it):
+Add a second object to the existing `hooks.SessionStart[0].hooks` array (same `matcher`, alongside the existing `apseudo-hook.py` entry — do not remove it), with `timeout: 30`, and place it **first** in the array:
 
 ```json
 {
   "type": "command",
   "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.py\"",
-  "timeout": 10,
-  "statusMessage": "Loading handoff state"
-}
-```
-
-Resulting `hooks.SessionStart` array has one matcher object (`"startup|resume|clear|compact"`) containing two hook entries.
-
-- [ ] **Step 3: Add the SessionStart entry to `.codex/hooks.json`**
-
-Add a second object to the existing `hooks.SessionStart[0].hooks` array (same `matcher`, alongside the existing `apseudo-hook.py --host codex` entry):
-
-```json
-{
-  "type": "command",
-  "command": "bash -c 'python3 \"$(git rev-parse --show-toplevel)/.claude/hooks/session_start.py\"'",
   "timeout": 30,
   "statusMessage": "Loading handoff state"
 }
 ```
 
-The hook script is shared between both harnesses (it detects Codex by the *absence* of `$CLAUDE_PROJECT_DIR`), so only one copy is needed at `.claude/hooks/session_start.py`; Codex's registration just points at the same file, git-root-anchored.
+**Both the timeout and the ordering are load-bearing, not stylistic.** `validate-layout.sh`'s `handoff_check_settings` (in `_handoff-lib.sh`) reads the *first* command-type handler in the array and requires the `${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.py` anchor string there specifically — the apseudo-hook entry doesn't contain that string, so the handoff hook must be listed first, not appended second. It also requires `timeout == 30` on *some* handler in the group; the apseudo entry uses `timeout: 10`, so the new handoff entry must be the one carrying 30. Resulting `hooks.SessionStart` array has one matcher object (`"startup|resume|clear|compact"`) containing two hook entries, handoff-hook first.
 
-- [ ] **Step 4: Create `docs/handoff/state.md`** (≤2048 bytes; current in-flight work only)
+- [ ] **Step 3: Add the `[hooks]` table to `.codex/config.toml` (satisfies the formal validator)**
+
+This repo's `.codex/config.toml` currently holds only `[mcp_servers.agent_pseudocode]`. Append (do not replace):
+
+```toml
+[[hooks.SessionStart]]
+[[hooks.SessionStart.hooks]]
+type          = "command"
+command       = "bash -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/session_start.py\"'"
+timeout       = 30
+statusMessage = "Loading handoff state…"
+```
+
+`validate-layout.sh`'s `handoff_check_codex_config` parses this file specifically — it does not look at `.codex/hooks.json`. Point the command at `.codex/hooks/session_start.py` (the copy created in Step 1), matching the canonical template's own convention.
+
+- [ ] **Step 4: ALSO add the SessionStart entry to `.codex/hooks.json` (makes it actually fire in this repo's real Codex setup)**
+
+This repo's existing apseudo hooks demonstrably run through `.codex/hooks.json`, not `config.toml`'s `[hooks]` table — that mechanism is what real Codex invocations in this repo actually execute. Add a second object to the existing `hooks.SessionStart[0].hooks` array (same `matcher`, alongside the existing `apseudo-hook.py --host codex` entry):
+
+```json
+{
+  "type": "command",
+  "command": "bash -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/session_start.py\"'",
+  "timeout": 30,
+  "statusMessage": "Loading handoff state"
+}
+```
+
+- [ ] **Step 5: Create `docs/handoff/state.md`** (≤2048 bytes; current in-flight work only)
 
 ```markdown
 **Last updated:** 2026-07-08
@@ -183,7 +202,7 @@ Adopting agent-handoff-v3 and six project-standards standards per `TODO.md`
   `pyright` → `basedpyright`, `hatchling` → `uv_build`.
 ```
 
-- [ ] **Step 5: Create `docs/handoff/deployed.md`**
+- [ ] **Step 6: Create `docs/handoff/deployed.md`**
 
 ```markdown
 **Last updated:** 2026-07-08
@@ -197,7 +216,7 @@ directly from a checkout — there is no packaged release, hosted service, or
 server component to track here.
 ```
 
-- [ ] **Step 6: Create `docs/handoff/architecture.md`**
+- [ ] **Step 7: Create `docs/handoff/architecture.md`**
 
 ```markdown
 **Last updated:** 2026-07-08
@@ -227,7 +246,7 @@ server component to track here.
   docs/specs → docs/reference/ relocation (Task 6).
 ```
 
-- [ ] **Step 7: Create `docs/handoff/credentials.md`**
+- [ ] **Step 8: Create `docs/handoff/credentials.md`**
 
 ```markdown
 **Last updated:** 2026-07-08
@@ -238,7 +257,7 @@ None. This repo has no external service dependencies, API keys, or deployment
 credentials — it is a local toolkit with no network-facing components.
 ```
 
-- [ ] **Step 8: Create `docs/handoff/conventions.md`**
+- [ ] **Step 9: Create `docs/handoff/conventions.md`**
 
 ```markdown
 **Last updated:** 2026-07-08
@@ -280,7 +299,7 @@ credentials — it is a local toolkit with no network-facing components.
 **Why:** adopted 2026-07-08 (Task 5 of the adoption plan); `usage.md` and `RUNNER-USAGE.md` already followed this shape independently before adoption.
 ```
 
-- [ ] **Step 9: Create `docs/handoff/specs-plans.md`**
+- [ ] **Step 10: Create `docs/handoff/specs-plans.md`**
 
 ```markdown
 **Last updated:** 2026-07-08
@@ -303,7 +322,7 @@ narrower use of that directory name than the pre-migration reference docs.
 | `docs/reference/language/` | Reference (relocated) | Active |
 ```
 
-- [ ] **Step 10: Create `docs/handoff/sessions/2026-07.md`**
+- [ ] **Step 11: Create `docs/handoff/sessions/2026-07.md`**
 
 ```markdown
 **Last updated:** 2026-07-08
@@ -316,7 +335,7 @@ Adopted agent-handoff-v3 and six project-standards standards per TODO.md,
 via `docs/superpowers/plans/2026-07-08-adopt-standards.md`.
 ```
 
-- [ ] **Step 11: Copy the bugs index helper and create an empty index**
+- [ ] **Step 12: Copy the bugs index helper and create an empty index**
 
 ```bash
 mkdir -p docs/handoff/bugs
@@ -326,7 +345,7 @@ python3 docs/handoff/bugs/_regen_index.py
 
 Expected: generates `docs/handoff/bugs/INDEX.md` (empty — no bug records yet).
 
-- [ ] **Step 12: Create `STATUS.md`**
+- [ ] **Step 13: Create `STATUS.md`**
 
 ```markdown
 # Project Status
@@ -348,11 +367,11 @@ Expected: generates `docs/handoff/bugs/INDEX.md` (empty — no bug records yet).
 - `docs/specs/` was relocated to `docs/reference/`; the `project-spec` standard now governs a fresh, forward-looking use of `docs/specs/` for project/feature plans only.
 ```
 
-- [ ] **Step 13: Rename `TODO.md` section headings, preserving content**
+- [ ] **Step 14: Rename `TODO.md` section headings, preserving content**
 
 Change `## User Managed` → `## User Tracked Tasks` and `## Agent Managed` → `## Agent Tracked Tasks` (exact headings the handoff spec's validator checks). Keep all existing bullets and the HTML instructions comment as-is.
 
-- [ ] **Step 14: Add the pointer block to `AGENTS.md`**
+- [ ] **Step 15: Add the pointer block to `AGENTS.md`**
 
 Insert at the top of `AGENTS.md`, before `## Repository purpose`:
 
@@ -362,7 +381,7 @@ Insert at the top of `AGENTS.md`, before `## Repository purpose`:
 **Detailed review workflows:** not configured for this repo.
 ```
 
-- [ ] **Step 15: Add the pointer block to `CLAUDE.md`**
+- [ ] **Step 16: Add the pointer block to `CLAUDE.md`**
 
 Insert at the top of `/home/chris/projects/agent-pseudocode/CLAUDE.md`, before `## Repository purpose`:
 
@@ -370,7 +389,7 @@ Insert at the top of `/home/chris/projects/agent-pseudocode/CLAUDE.md`, before `
 **Session state:** read `docs/handoff/state.md` first — live state and active incidents.
 ```
 
-- [ ] **Step 16: Validate the layout**
+- [ ] **Step 17: Validate the layout**
 
 ```bash
 bash ~/projects/agent-handoff-v3/agent-handoff-v3/scripts/handoff/validate-layout.sh /home/chris/projects/agent-pseudocode
@@ -378,10 +397,10 @@ bash ~/projects/agent-handoff-v3/agent-handoff-v3/scripts/handoff/validate-layou
 
 Expected: exit 0, no missing-file or heading-mismatch errors.
 
-- [ ] **Step 17: Commit**
+- [ ] **Step 18: Commit**
 
 ```bash
-git add docs/handoff STATUS.md TODO.md .claude/hooks/session_start.py .claude/settings.json .codex/hooks.json AGENTS.md CLAUDE.md
+git add docs/handoff STATUS.md TODO.md .claude/hooks/session_start.py .codex/hooks/session_start.py .claude/settings.json .codex/config.toml .codex/hooks.json AGENTS.md CLAUDE.md
 git commit -m "feat: adopt agent-handoff-v3 session-state system"
 ```
 
