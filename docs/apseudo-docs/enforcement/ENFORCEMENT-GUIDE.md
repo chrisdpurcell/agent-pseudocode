@@ -70,7 +70,7 @@ The wrapper also works without package installation:
 ```bash
 scripts/apseudo-lint .
 scripts/apseudo-lint --changed
-scripts/apseudo-lint --format json docs/examples/review-loop.apseudo
+scripts/apseudo-lint --format json docs/apseudo-docs/examples/review-loop.apseudo
 scripts/apseudo-lint --format github examples
 ```
 

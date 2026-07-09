@@ -38,7 +38,7 @@ Version 0.4.0 adds those missing layers:
 | Hooks | Basic SessionStart/PostToolUse/Stop | Missing prompt/pre-tool/permission/subagent checks and bypass policy | Expanded events and bypass blocking for Claude/Codex | Add host-specific JSON decision output if you want richer UI messages |
 | Agent skills | Missing | Agents had to rely on instructions and hooks only | `.claude/skills/agent-pseudocode` and `.agents/skills/agent-pseudocode` | Package as a Claude plugin or Codex plugin for distribution |
 | MCP | Missing | Agents lacked a callable validation/control plane | `apseudo-mcp` with tools, resources, prompts, and server instructions | Add streamable HTTP transport if remote use becomes necessary |
-| Repository enforcement | pre-commit and CI existed | Needed complete agent wording and cross-host hooks | `docs/usage/AGENT-INSTRUCTIONS-WORDING.md` and expanded hooks | Make CI check required in branch protection |
+| Repository enforcement | pre-commit and CI existed | Needed complete agent wording and cross-host hooks | `docs/apseudo-docs/usage/AGENT-INSTRUCTIONS-WORDING.md` and expanded hooks | Make CI check required in branch protection |
 | Project review | Missing | No single command to check completeness | `apseudo-review` | Add machine-readable score thresholds if useful |
 
 ## Important design decisions

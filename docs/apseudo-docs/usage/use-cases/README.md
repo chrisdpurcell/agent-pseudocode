@@ -46,13 +46,13 @@ This folder is usage-oriented. It complements the normative and reference docs:
 
 | Topic | Reference |
 | --- | --- |
-| Language rules | [`../../specs/PYTHONIC_PSEUDOCODE_STANDARD.md`](../../specs/PYTHONIC_PSEUDOCODE_STANDARD.md) |
-| Executable script semantics | [`../../specs/EXECUTABLE-PSEUDOCODE-SPEC.md`](../../specs/EXECUTABLE-PSEUDOCODE-SPEC.md) |
+| Language rules | [`docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md`](../../../specs/PYTHONIC_PSEUDOCODE_STANDARD.md) |
+| Executable script semantics | [`docs/specs/EXECUTABLE-PSEUDOCODE-SPEC.md`](../../../specs/EXECUTABLE-PSEUDOCODE-SPEC.md) |
 | CLI reference | [`../usage.md`](../usage.md) |
 | Runner command reference | [`../RUNNER-USAGE.md`](../RUNNER-USAGE.md) |
-| Enforcement | [`../../enforcement/ENFORCEMENT.md`](../../apseudo-docs/enforcement/ENFORCEMENT.md) |
-| Hooks | [`../../features/HOOKS.md`](../../apseudo-docs/features/HOOKS.md) |
-| MCP | [`../../features/MCP.md`](../../apseudo-docs/features/MCP.md) |
-| Skills | [`../../features/SKILLS.md`](../../apseudo-docs/features/SKILLS.md) |
+| Enforcement | [`docs/apseudo-docs/enforcement/ENFORCEMENT.md`](../../enforcement/ENFORCEMENT.md) |
+| Hooks | [`docs/apseudo-docs/features/HOOKS.md`](../../features/HOOKS.md) |
+| MCP | [`docs/apseudo-docs/features/MCP.md`](../../features/MCP.md) |
+| Skills | [`docs/apseudo-docs/features/SKILLS.md`](../../features/SKILLS.md) |
 | VS Code | [`../VSCODE.md`](../VSCODE.md) |
 | Kate | [`../KATE.md`](../KATE.md) |

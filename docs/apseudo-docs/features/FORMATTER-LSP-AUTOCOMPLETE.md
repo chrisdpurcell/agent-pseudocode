@@ -91,7 +91,7 @@ uv run apseudo-format --diff --check .
 ### Format stdin
 
 ```bash
-cat docs/examples/review-loop.apseudo | uv run apseudo-format --stdin-filename review-loop.apseudo
+cat docs/apseudo-docs/examples/review-loop.apseudo | uv run apseudo-format --stdin-filename review-loop.apseudo
 ```
 
 ## 3. Markdown formatting

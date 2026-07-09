@@ -26,7 +26,7 @@ PY_KATE_XML
 
 1. Open `products/vscode-extension/` in VS Code.
 2. Press `F5`.
-3. Open `docs/examples/review-loop.apseudo`.
+3. Open `docs/apseudo-docs/examples/review-loop.apseudo`.
 4. Confirm language mode is **Agent Pseudocode**.
 5. Run **Developer: Inspect Editor Tokens and Scopes**.
 

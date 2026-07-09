@@ -22,5 +22,5 @@
 | Codex skill | OK | `.agents/skills/agent-pseudocode/SKILL.md` present |
 | pre-commit | OK | `.pre-commit-config.yaml` present |
 | CI | OK | `.github/workflows/apseudo-lint.yml` present |
-| Agent wording | OK | `docs/usage/AGENT-INSTRUCTIONS-WORDING.md` present |
+| Agent wording | OK | `docs/apseudo-docs/usage/AGENT-INSTRUCTIONS-WORDING.md` present |
 | Traceability review | OK | `docs/reviews/PROJECT-TRACEABILITY-REVIEW.md` present |

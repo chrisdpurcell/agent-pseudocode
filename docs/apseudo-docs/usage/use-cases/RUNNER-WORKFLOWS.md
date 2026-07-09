@@ -65,13 +65,13 @@ process review_spec(spec_path):
 Save as:
 
 ```text
-docs/examples/runner/review-spec.apseudo
+docs/apseudo-docs/examples/runner/review-spec.apseudo
 ```
 
 Then run:
 
 ```bash
-uv run apseudo-run --claude --review docs/examples/runner/review-spec.apseudo -- spec_path=docs/spec.md
+uv run apseudo-run --claude --review docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 ## Safe first-run sequence
@@ -81,25 +81,25 @@ Use this sequence before letting a script edit a repo.
 ### 1. Validate the script
 
 ```bash
-uv run apseudo-run --check docs/examples/runner/fix-ruff.apseudo
+uv run apseudo-run --check docs/apseudo-docs/examples/runner/fix-ruff.apseudo
 ```
 
 ### 2. Show script-specific help
 
 ```bash
-uv run apseudo-run docs/examples/runner/fix-ruff.apseudo --help
+uv run apseudo-run docs/apseudo-docs/examples/runner/fix-ruff.apseudo --help
 ```
 
 ### 3. Render the exact prompt
 
 ```bash
-uv run apseudo-run --codex --render-prompt docs/examples/runner/fix-ruff.apseudo -- target=src
+uv run apseudo-run --codex --render-prompt docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
 ### 4. Print the provider command
 
 ```bash
-uv run apseudo-run --codex --print-command docs/examples/runner/fix-ruff.apseudo -- target=src
+uv run apseudo-run --codex --print-command docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
 ### 5. Run in review/plan mode first
@@ -108,7 +108,7 @@ uv run apseudo-run --codex --print-command docs/examples/runner/fix-ruff.apseudo
 uv run apseudo-run --codex --review \
   --require-no-diff \
   --run-dir .apseudo/runs \
-  docs/examples/runner/fix-ruff.apseudo -- target=src
+  docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
 ### 6. Run in apply mode with post-checks
@@ -118,7 +118,7 @@ uv run apseudo-run --codex --apply \
   --run-dir .apseudo/runs \
   --post-check "uv run ruff check src tests integrations/agent-hooks" \
   --post-check "uv run pytest" \
-  docs/examples/runner/fix-ruff.apseudo -- target=src
+  docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
 ## Run records
@@ -128,7 +128,7 @@ Use `--run-dir` for anything non-trivial.
 ```bash
 uv run apseudo-run --codex --apply \
   --run-dir .apseudo/runs \
-  docs/examples/runner/fix-ruff.apseudo -- target=src
+  docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
 Expected run directory contents:
@@ -171,13 +171,13 @@ Run by name:
 
 ```bash
 uv run apseudo run fix-ruff --codex --apply -- target=src
-uv run apseudo run review-spec --claude --review -- spec_path=docs/spec.md
+uv run apseudo run review-spec --claude --review -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 Generate task docs:
 
 ```bash
-uv run apseudo docs generate --output docs/usage/agent-tasks.md
+uv run apseudo docs generate --output docs/apseudo-docs/usage/agent-tasks.md
 ```
 
 Use registered tasks when the repo has a known set of repeatable agent actions.

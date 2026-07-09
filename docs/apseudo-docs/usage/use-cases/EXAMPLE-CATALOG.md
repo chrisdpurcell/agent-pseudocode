@@ -98,7 +98,7 @@ process review_only(target):
 Command:
 
 ```bash
-uv run apseudo-run --claude --review --require-no-diff script.apseudo -- target=docs/spec.md
+uv run apseudo-run --claude --review --require-no-diff script.apseudo -- target=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 ## Pattern: Release approval gate
@@ -193,7 +193,7 @@ Registry entry:
 
 ```toml
 [scripts.fix-ruff]
-path = "docs/examples/runner/fix-ruff.apseudo"
+path = "docs/apseudo-docs/examples/runner/fix-ruff.apseudo"
 description = "Fix Ruff failures in a bounded, verified loop."
 default_agent = "codex"
 default_mode = "apply"

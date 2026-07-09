@@ -13,4 +13,4 @@ uv run apseudo-lint . --format json
 uv run apseudo-lint . --strict
 ```
 
-See `docs/enforcement/ENFORCEMENT.md` for the rule set, install steps, pre-commit integration, GitHub Actions workflow, and Claude/Codex hook behavior.
+See `docs/apseudo-docs/enforcement/ENFORCEMENT.md` for the rule set, install steps, pre-commit integration, GitHub Actions workflow, and Claude/Codex hook behavior.

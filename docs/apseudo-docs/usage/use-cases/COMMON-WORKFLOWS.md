@@ -62,7 +62,7 @@ Use an executable runner script because the workflow needs edits and verificatio
 Existing example:
 
 ```text
-docs/examples/runner/fix-ruff.apseudo
+docs/apseudo-docs/examples/runner/fix-ruff.apseudo
 ```
 
 Command:
@@ -251,11 +251,13 @@ process repair_docs(paths, max_rounds=3):
 
 Command:
 
+After saving the workflow as `repair-docs.apseudo`:
+
 ```bash
 uv run apseudo-run --codex --apply \
   --post-check "uv run apseudo-lint docs" \
   --post-check "uv run apseudo-format --check docs" \
-  docs/examples/runner/repair-docs.apseudo -- paths=docs
+  repair-docs.apseudo -- paths=docs
 ```
 
 Why pseudocode helps:
@@ -274,7 +276,7 @@ Command:
 uv run apseudo-run --claude --review \
   --require-no-diff \
   --run-dir .apseudo/runs \
-  docs/examples/runner/review-spec.apseudo -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
+  docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 Why pseudocode helps:

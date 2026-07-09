@@ -122,7 +122,7 @@ Generate Markdown documentation for registered executable scripts.
 apseudo docs generate [--output <path>]
 ```
 
-Default output: `docs/usage/agent-tasks.md`.
+Default output: `docs/apseudo-docs/usage/agent-tasks.md`.
 
 ## EXIT STATUS
 
@@ -198,7 +198,7 @@ uv run apseudo doctor --json
 ### Generate agent task docs
 
 ```bash
-uv run apseudo docs generate --output docs/usage/agent-tasks.md
+uv run apseudo docs generate --output docs/apseudo-docs/usage/agent-tasks.md
 ```
 
 ## NOTES
@@ -210,7 +210,7 @@ uv run apseudo docs generate --output docs/usage/agent-tasks.md
 
 ## SEE ALSO
 
-- [`docs/usage/RUNNER-USAGE.md`](RUNNER-USAGE.md)
-- [`docs/specs/EXECUTABLE-PSEUDOCODE-SPEC.md`](EXECUTABLE-PSEUDOCODE-SPEC.md)
-- [`docs/usage/AGENT-INSTRUCTIONS-WORDING.md`](AGENT-INSTRUCTIONS-WORDING.md)
-- [`docs/roadmap/FUTURE-VERSIONS.md`](FUTURE-VERSIONS.md)
+- [`docs/apseudo-docs/usage/RUNNER-USAGE.md`](RUNNER-USAGE.md)
+- [`docs/specs/EXECUTABLE-PSEUDOCODE-SPEC.md`](../../specs/EXECUTABLE-PSEUDOCODE-SPEC.md)
+- [`docs/apseudo-docs/usage/AGENT-INSTRUCTIONS-WORDING.md`](AGENT-INSTRUCTIONS-WORDING.md)
+- [`docs/apseudo-docs/roadmap/FUTURE-VERSIONS.md`](../roadmap/FUTURE-VERSIONS.md)

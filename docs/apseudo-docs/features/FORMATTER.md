@@ -10,4 +10,4 @@ uv run apseudo-format --diff --check docs examples
 
 The formatter normalizes whitespace, indentation width, simple Python-like spacing, inline comment spacing, and normative keyword casing inside comments. It is intentionally conservative and does not rewrite control flow.
 
-See `docs/features/FORMATTER-LSP-AUTOCOMPLETE.md` for full details.
+See `docs/apseudo-docs/features/FORMATTER-LSP-AUTOCOMPLETE.md` for full details.

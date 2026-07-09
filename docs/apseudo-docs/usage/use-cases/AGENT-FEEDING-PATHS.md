@@ -119,7 +119,7 @@ Use this when the pseudocode should behave like a command-line task launcher.
 Command:
 
 ```bash
-uv run apseudo-run --codex --apply docs/examples/runner/fix-ruff.apseudo -- target=src
+uv run apseudo-run --codex --apply docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
 Runner flow:
@@ -137,7 +137,7 @@ apseudo-run
 The agent receives the pseudocode through a generated prompt. Use `--render-prompt` to see the exact prompt before running:
 
 ```bash
-uv run apseudo-run --codex --render-prompt docs/examples/runner/fix-ruff.apseudo -- target=src
+uv run apseudo-run --codex --render-prompt docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
 Best for:
@@ -154,7 +154,7 @@ Registry:
 
 ```toml
 [scripts.fix-ruff]
-path = "docs/examples/runner/fix-ruff.apseudo"
+path = "docs/apseudo-docs/examples/runner/fix-ruff.apseudo"
 description = "Fix Ruff failures in a bounded, verified loop."
 default_agent = "codex"
 default_mode = "apply"
@@ -181,7 +181,7 @@ Hooks do not normally feed the pseudocode to the agent. They enforce that the ps
 Example:
 
 ```text
-Claude/Codex edits docs/usage/use-cases/COMMON-WORKFLOWS.md
+Claude/Codex edits docs/apseudo-docs/usage/use-cases/COMMON-WORKFLOWS.md
     ↓
 Post-edit hook runs
     ↓

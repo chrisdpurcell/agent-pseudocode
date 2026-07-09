@@ -89,8 +89,8 @@ process fix_ruff_failures(target="."):
 Run it directly after marking it executable:
 
 ```bash
-chmod +x docs/examples/runner/fix-ruff.apseudo
-docs/examples/runner/fix-ruff.apseudo --codex --apply -- target=src
+chmod +x docs/apseudo-docs/examples/runner/fix-ruff.apseudo
+docs/apseudo-docs/examples/runner/fix-ruff.apseudo --codex --apply -- target=src
 ```
 
 ## QUICK START
@@ -98,25 +98,25 @@ docs/examples/runner/fix-ruff.apseudo --codex --apply -- target=src
 ### Validate a runner script
 
 ```bash
-uv run apseudo-run --check docs/examples/runner/fix-ruff.apseudo
+uv run apseudo-run --check docs/apseudo-docs/examples/runner/fix-ruff.apseudo
 ```
 
 ### Show script-specific help
 
 ```bash
-uv run apseudo-run docs/examples/runner/fix-ruff.apseudo --help
+uv run apseudo-run docs/apseudo-docs/examples/runner/fix-ruff.apseudo --help
 ```
 
 ### Render the exact agent prompt
 
 ```bash
-uv run apseudo-run --codex --render-prompt docs/examples/runner/fix-ruff.apseudo -- target=src
+uv run apseudo-run --codex --render-prompt docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
 ### Preview the external provider command
 
 ```bash
-uv run apseudo-run --codex --print-command docs/examples/runner/fix-ruff.apseudo -- target=src
+uv run apseudo-run --codex --print-command docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
 ### Run with Codex and persist a run record
@@ -126,7 +126,7 @@ uv run apseudo-run --codex --apply \
   --run-dir .apseudo/runs \
   --post-check "uv run ruff check src" \
   --output .apseudo/latest-outcome.json \
-  docs/examples/runner/fix-ruff.apseudo -- target=src
+  docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
 ### Run with Claude in review mode
@@ -134,14 +134,14 @@ uv run apseudo-run --codex --apply \
 ```bash
 uv run apseudo-run --claude --review \
   --require-no-diff \
-  docs/examples/runner/review-spec.apseudo -- spec_path=docs/spec.md
+  docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 ### Use the unified command and script registry
 
 ```bash
 uv run apseudo run --codex --apply fix-ruff -- target=src
-uv run apseudo docs generate --output docs/usage/agent-tasks.md
+uv run apseudo docs generate --output docs/apseudo-docs/usage/agent-tasks.md
 ```
 
 ## OPTIONS
@@ -426,7 +426,7 @@ A repository may register named tasks in `.apseudo/scripts.toml`:
 
 ```toml
 [scripts.fix-ruff]
-path = "docs/examples/runner/fix-ruff.apseudo"
+path = "docs/apseudo-docs/examples/runner/fix-ruff.apseudo"
 description = "Fix Ruff failures in a bounded, verified loop."
 default_agent = "codex"
 default_mode = "apply"
@@ -441,7 +441,7 @@ uv run apseudo run --codex --apply fix-ruff -- target=src
 Generate task documentation from the registry:
 
 ```bash
-uv run apseudo docs generate --output docs/usage/agent-tasks.md
+uv run apseudo docs generate --output docs/apseudo-docs/usage/agent-tasks.md
 ```
 
 ## EXIT STATUS
@@ -485,7 +485,7 @@ uv run apseudo docs generate --output docs/usage/agent-tasks.md
 uv run apseudo-run --claude --review \
   --require-no-diff \
   --run-dir .apseudo/runs \
-  docs/examples/runner/review-spec.apseudo -- spec_path=docs/spec.md
+  docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 ### Run an apply task and require it to make a change
@@ -494,7 +494,7 @@ uv run apseudo-run --claude --review \
 uv run apseudo-run --codex --apply \
   --expect-diff \
   --post-check "uv run pytest" \
-  docs/examples/runner/fix-ruff.apseudo -- target=src
+  docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
 ### Run with persistent artifacts for audit/debugging
@@ -507,14 +507,14 @@ uv run apseudo-run --codex --apply \
   --events .apseudo/latest/events.jsonl \
   --changed-files-out .apseudo/latest/changed-files.txt \
   --diff-out .apseudo/latest/git-diff.patch \
-  docs/examples/runner/fix-ruff.apseudo -- target=src
+  docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
 ### Resume the last provider session
 
 ```bash
-uv run apseudo-run --claude --resume-last docs/examples/runner/review-spec.apseudo -- spec_path=docs/spec.md
-uv run apseudo-run --codex --resume-last docs/examples/runner/fix-ruff.apseudo -- target=src
+uv run apseudo-run --claude --resume-last docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
+uv run apseudo-run --codex --resume-last docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
 ### Re-play a saved run record
@@ -533,16 +533,18 @@ uv run apseudo-run --replay .apseudo/runs/20260709T010203Z-fix-ruff-codex-a1b2c3
 ```
 
 ```bash
-uv run apseudo-run --codex --apply --arg-file args.json docs/examples/runner/fix-ruff.apseudo
+uv run apseudo-run --codex --apply --arg-file args.json docs/apseudo-docs/examples/runner/fix-ruff.apseudo
 ```
 
 ### Run a cross-repository task with extra write directories
+
+For a local cross-repo script named `sync-template.apseudo`:
 
 ```bash
 uv run apseudo-run --codex --apply \
   --add-dir ../project-standards \
   --add-dir ../template-repo \
-  docs/examples/runner/sync-template.apseudo -- template=../template-repo
+  sync-template.apseudo -- template=../template-repo
 ```
 
 ## NOTES
@@ -556,6 +558,6 @@ uv run apseudo-run --codex --apply \
 ## SEE ALSO
 
 - `docs/specs/EXECUTABLE-PSEUDOCODE-SPEC.md` — normative executable script specification.
-- `docs/usage/AGENT-INSTRUCTIONS-WORDING.md` — copy/paste wording for repositories.
-- `docs/roadmap/FUTURE-VERSIONS.md` — future runner and system roadmap.
-- `docs/usage/usage.md` — overall CLI usage reference.
+- `docs/apseudo-docs/usage/AGENT-INSTRUCTIONS-WORDING.md` — copy/paste wording for repositories.
+- `docs/apseudo-docs/roadmap/FUTURE-VERSIONS.md` — future runner and system roadmap.
+- `docs/apseudo-docs/usage/usage.md` — overall CLI usage reference.

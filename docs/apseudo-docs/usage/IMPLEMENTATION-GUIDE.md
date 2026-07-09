@@ -51,8 +51,8 @@ code .
 Press `F5`. In the Extension Development Host, open:
 
 ```text
-docs/examples/review-loop.apseudo
-docs/examples/markdown-fence-demo.md
+docs/apseudo-docs/examples/review-loop.apseudo
+docs/apseudo-docs/examples/markdown-fence-demo.md
 ```
 
 Check:

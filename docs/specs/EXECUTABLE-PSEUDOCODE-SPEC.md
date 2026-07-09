@@ -254,7 +254,7 @@ A repository MAY include `.apseudo/scripts.toml`:
 
 ```toml
 [scripts.fix-ruff]
-path = "docs/examples/runner/fix-ruff.apseudo"
+path = "docs/apseudo-docs/examples/runner/fix-ruff.apseudo"
 description = "Fix Ruff failures in a bounded, verified loop."
 default_agent = "codex"
 default_mode = "apply"

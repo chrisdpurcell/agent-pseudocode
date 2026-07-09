@@ -53,11 +53,11 @@ Set **Validate pseudocode standard** as a required check in branch protection.
 
 ## Agent hooks
 
-See `docs/features/HOOKS.md` for Claude/Codex hook details.
+See `docs/apseudo-docs/features/HOOKS.md` for Claude/Codex hook details.
 
 ## MCP
 
-See `docs/features/MCP.md` for agent-facing MCP tools.
+See `docs/apseudo-docs/features/MCP.md` for agent-facing MCP tools.
 
 ## Failure handling
 

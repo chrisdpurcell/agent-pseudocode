@@ -205,7 +205,7 @@ A mature repo can define these registered tasks:
 Generate a docs page from the registry:
 
 ```bash
-uv run apseudo docs generate --output docs/usage/agent-tasks.md
+uv run apseudo docs generate --output docs/apseudo-docs/usage/agent-tasks.md
 ```
 
 ## Recommended branch protection
