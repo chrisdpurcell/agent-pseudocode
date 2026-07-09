@@ -1,5 +1,7 @@
 # Claude repository instructions
 
+**Session state:** read `docs/handoff/state.md` first — live state and active incidents.
+
 ## Repository purpose
 
 This repository implements the Pythonic Agent Pseudocode convention and its tooling: syntax highlighting, formatter, validator, language server, MCP server, hooks, skills, CI, and documentation.

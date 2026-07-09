@@ -5,3 +5,10 @@ startup_timeout_sec = 10
 tool_timeout_sec = 60
 default_tools_approval_mode = "approve"
 enabled = true
+
+[[hooks.SessionStart]]
+[[hooks.SessionStart.hooks]]
+type          = "command"
+command       = "bash -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/session_start.py\"'"
+timeout       = 30
+statusMessage = "Loading handoff state…"

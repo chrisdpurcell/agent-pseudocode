@@ -12,7 +12,7 @@ Instructions for AI agents:
 - Move completed tasks to the `## Completed Tasks` section at the end of the session, but not before. This allows the user to see what has been completed during the session.
 -->
 
-## User Managed
+## User Tracked Tasks
 
 - [ ] Adopt [agent-handoff-v3](https://github.com/chrisdpurcell/agent-handoff-v3)
 - [ ] Adopt the following standards from [project-standards](https://github.com/L3DigitalNet/project-standards/tree/main/standards) (official releases only, do not adopt from the testing/dev branch):
@@ -25,6 +25,6 @@ Instructions for AI agents:
 - [ ] Ingest/migrate existing specs from `docs/specs` into the project-spec format.
 - [ ]
 
-## Agent Managed
+## Agent Tracked Tasks
 
 ## Completed Tasks

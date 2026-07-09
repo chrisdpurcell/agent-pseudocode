@@ -1,5 +1,9 @@
 # Agent instructions
 
+**Session state:** read `docs/handoff/state.md` first — live state and active work.
+**Full conventions reference:** `docs/handoff/conventions.md`.
+**Detailed review workflows:** not configured for this repo.
+
 ## Repository purpose
 
 This repository implements the Pythonic Agent Pseudocode convention and its tooling: syntax highlighting, formatter, validator, language server, MCP server, hooks, skills, CI, and documentation.
