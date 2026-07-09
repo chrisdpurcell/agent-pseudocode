@@ -11,13 +11,9 @@
 ## Recent Changes
 
 - [2026-07-08] Adopted agent-handoff-v3 and six project-standards standards.
-- [2026-07-09] Merged the standards-adoption branch to `main`; recorded 4
-  pre-existing bugs found (not introduced) during adoption in
-  `docs/handoff/bugs/`.
-- [2026-07-09] Kept agent-handoff-v3 SessionStart hooks active at canonical
-  `.claude/hooks/` and `.codex/hooks/` paths; moved agent-pseudocode lifecycle
-  hook configs under `hooks/` so they stay dormant while MCP wrappers live under
-  `mcp/`.
+- [2026-07-09] Merged the standards-adoption branch to `main`; recorded 4 pre-existing bugs found (not introduced) during adoption in `docs/handoff/bugs/`.
+- [2026-07-09] Kept agent-handoff-v3 SessionStart hooks active at canonical `.claude/hooks/` and `.codex/hooks/` paths; moved agent-pseudocode lifecycle hook configs under `hooks/` so they stay dormant while MCP wrappers live under `mcp/`.
+- [2026-07-09] Accepted ADR-0003, defining the durable Markdown frontmatter corpus, field ownership, consumers, lifecycle, confidence, tags, aliases, and relationship conventions ahead of migration.
 
 ## Notes For The Builder
 

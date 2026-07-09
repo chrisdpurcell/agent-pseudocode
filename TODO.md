@@ -23,7 +23,7 @@ Instructions for AI agents:
 - [ ] Correct naming of markdown files in `docs/` (except README.md) to use lower kebab-case. Ensure all links and references are updated accordingly.
 - [ ] Ensure all markdown files lint and format correctly and do not break.
 - [ ] Create this repo's custom conventions for markdown-frontmatter.
-  - Codify as a proper ADR. Requires my explicit approval before adoption.
+  - [x] Codify as a proper ADR. Accepted as `docs/adr/adr-0003-markdown-frontmatter-scope-and-conventions.md` on 2026-07-09.
   - Fix all existing markdown files to comply with the new conventions.
     - Try to script this as much as possible to save tokens and time.
 - [ ] Verify all python files lint and format correctly and do not break.

@@ -2,13 +2,13 @@
 schema_version: '1.1'
 id: 'adr-0003-agent-pseudocode-markdown-frontmatter-scope-and-conventions'
 title: 'ADR 0003: Govern Durable Markdown Frontmatter Scope and Conventions'
-description: 'Draft decision for which Markdown files in agent-pseudocode are governed by project-standards frontmatter and how they are classified.'
+description: 'Decision for which Markdown files in agent-pseudocode are governed by project-standards frontmatter and how they are classified.'
 doc_type: 'adr'
-status: 'draft'
+status: 'active'
 created: '2026-07-09'
 updated: '2026-07-09'
-reviewed: null
-owner: ''
+reviewed: '2026-07-09'
+owner: 'agent-pseudocode-maintainers'
 consumer: 'mix'
 tags:
   - 'adr'
@@ -29,7 +29,7 @@ source:
   - 'TODO.md'
   - '.project-standards.yml'
   - 'docs/handoff/conventions.md'
-confidence: 'medium'
+confidence: 'high'
 visibility: 'internal'
 license: null
 project:
@@ -74,7 +74,7 @@ Chosen option: "Govern only the durable documentation corpus and explicitly excl
 
 The durable corpus includes ADRs, specs, references, research summaries, operator/user documentation, product documentation, and hook documentation. It excludes handoff state, scratchpads, reviews, implementation plans, root work-queue/status files, agent harness files, templates, fixtures, and generated or vendored content.
 
-This ADR is a draft until explicitly approved. While it is draft, it records the intended convention only; it does not by itself widen `.project-standards.yml` or require existing Markdown files to change.
+This ADR records the accepted convention. It does not by itself widen `.project-standards.yml` or require existing Markdown files to change; those changes happen during the later migration task.
 
 ### Governed scope
 
