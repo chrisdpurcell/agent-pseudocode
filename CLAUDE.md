@@ -4,7 +4,7 @@
 
 ## Repository purpose
 
-This repository implements the Pythonic Agent Pseudocode convention and its tooling: syntax highlighting, formatter, validator, language server, MCP server, hooks, skills, CI, and documentation.
+Implements the Pythonic Agent Pseudocode convention and its tooling: syntax highlighting, formatter, validator, language server, MCP server, hooks, skills, CI, docs.
 
 ## Pythonic Agent Pseudocode
 
@@ -13,12 +13,11 @@ Use the project `agent-pseudocode` skill and local validation tools whenever the
 Hard requirements:
 
 - Follow `docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md`.
-- Treat `apseudo-lint` as the source of truth for structural compliance.
-- Treat `apseudo-format` as the source of truth for formatting.
+- `apseudo-lint`/`apseudo-format` are the source of truth for compliance/formatting.
 - Run `scripts/apseudo-format --check --changed` and `scripts/apseudo-lint --changed` before completion.
-- Use `scripts/apseudo-explain <RULE>` for any unclear diagnostic.
-- Do not claim completion if APSEUDO-\* errors remain.
-- Do not use `git commit --no-verify`, `SKIP=...`, disabled hooks, or other enforcement bypasses.
+- Use `scripts/apseudo-explain <RULE>` for unclear diagnostics.
+- Do not claim completion with APSEUDO-\* errors remaining.
+- No `--no-verify`, `SKIP=...`, disabled hooks, or other enforcement bypasses.
 
 ## Development commands
 
@@ -34,22 +33,16 @@ uv run basedpyright
 
 ## Python code style
 
-Python code in this repository follows the `python-coding` standard
-(project-standards) — code shape, type policy, error handling, and testing
-conventions. Use the `python-expert` skill as the front door to both
-`python-coding` and `python-tooling`; canon (the standards themselves) wins on
-any conflict.
+Follows `python-coding`; use the `python-expert` skill (front door to `python-coding` + `python-tooling` — canon wins on conflict).
 
 ## Tooling architecture
 
-The validator and formatter are the policy source of truth. The language server, MCP server, hooks, pre-commit, CI, VS Code, and Kate integrations must call or reuse those modules rather than reimplementing rules.
+Validator and formatter are the policy source of truth. LSP, MCP, hooks, pre-commit, CI, VS Code, Kate must reuse those modules, never reimplement rules.
 
 ## Key docs
 
-| Doc | When to read |
-| --- | --- |
-| `docs/adr/README.md` | Architecture decision records — index of accepted decisions and their rationale. |
+`docs/adr/README.md` — architecture decision records.
 
 ## Executable Agent Pseudocode runner
 
-Use `apseudo-run` or `apseudo run` for executable `.apseudo` task scripts. Before trusting a new or edited runner script, run `uv run apseudo-run --check`, `--render-prompt`, and `--print-command`. Prefer `--run-dir .apseudo/runs` for auditable runs. Do not bypass runner post-checks, diff policy, hooks, pre-commit, or CI.
+Use `apseudo-run`/`apseudo run` for executable `.apseudo` scripts. Before trusting a new/edited runner script, run `uv run apseudo-run --check`, `--render-prompt`, `--print-command`. Prefer `--run-dir .apseudo/runs`. Do not bypass runner post-checks, diff policy, hooks, pre-commit, or CI.

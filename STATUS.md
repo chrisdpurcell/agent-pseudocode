@@ -11,6 +11,9 @@
 ## Recent Changes
 
 - [2026-07-08] Adopted agent-handoff-v3 and six project-standards standards.
+- [2026-07-09] Merged the standards-adoption branch to `main`; recorded 4
+  pre-existing bugs found (not introduced) during adoption in
+  `docs/handoff/bugs/`.
 
 ## Notes For The Builder
 

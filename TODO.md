@@ -74,4 +74,17 @@ Instructions for AI agents:
   passing vacuously, so wiring CI before any spec exists would fail every
   run).
 
+- [ ] Fix 4 pre-existing bugs found (not introduced) during the 2026-07-09
+  standards-adoption session, recorded in `docs/handoff/bugs/`:
+  - [bug 001](docs/handoff/bugs/001-mcp-resource-map-stale-paths.md) — `mcp.py`'s
+    resource map references 4 `docs/*.md` paths that never existed.
+  - [bug 002](docs/handoff/bugs/002-review-completeness-stale-paths.md) —
+    `review.py`'s completeness checks hard-code stale `docs/usage/`/`docs/roadmap/`
+    paths from an earlier reorg (one of two reasons `apseudo-review .` exits 1).
+  - [bug 003](docs/handoff/bugs/003-pre-migration-transcript-lint-errors.md) —
+    the pre-migration ChatGPT transcript trips real APSEUDO lint errors on
+    illustrative fences (the other reason `apseudo-review .` exits 1).
+  - [bug 004](docs/handoff/bugs/004-lsp-serve-unhandled-read-message.md) —
+    `lsp.py`'s `serve()` loop leaves `_read_message` unguarded by try/except.
+
 ## Completed Tasks
