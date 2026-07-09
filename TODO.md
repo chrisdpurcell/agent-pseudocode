@@ -31,7 +31,10 @@ Instructions for AI agents:
   - Ensure the specs comply with the project-spec standard.
 - [ ] Correct naming of markdown files in `docs/` (except README.md) to use lower kebab-case. Ensure all links and references are updated accordingly.
 - [ ] Ensure all markdown files lint and format correctly and do not break.
-- [ ] Create this repo's custom conventions for markdown-frontmatter; do this before updating all frontmatter. This will be an ADR decision. Ensure that the conventions are clear, consistent, and well-documented to facilitate understanding and adoption by all contributors.
+- [ ] Create this repo's custom conventions for markdown-frontmatter.
+  - Codify as a proper ADR. Requires my explicit approval before adoption.
+  - Fix all existing markdown files to comply with the new conventions.
+    - Try to script this as much as possible to save tokens and time.
 - [ ] Verify all python files lint and format correctly and do not break.
 - [ ] Review .gitignore, ensure it makes sense and entries are reasonable, and reorganize/reorder for clarity.
 
