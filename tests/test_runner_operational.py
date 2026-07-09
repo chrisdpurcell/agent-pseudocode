@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from apseudo_lint.executable import parse_executable_file
 from apseudo_lint.main_cli import main as apseudo_main
 from apseudo_lint.runner import RunnerOptions, build_agent_command, load_invocation, script_help
@@ -127,7 +129,7 @@ def test_script_specific_help_uses_arg_schema(tmp_path: Path) -> None:
     assert "Target path" in text
 
 
-def test_unified_cli_doctor_and_registry_docs(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_unified_cli_doctor_and_registry_docs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     script = _script(tmp_path / "demo.apseudo")
     registry_dir = tmp_path / ".apseudo"
     registry_dir.mkdir()

@@ -20,7 +20,7 @@ Instructions for AI agents:
   - [ ] markdown-tooling
   - [ ] cli-documentation
   - [ ] project-spec
-  - [ ] python-tooling
+  - [x] python-tooling
   - [ ] python-coding
 - [ ] Ingest/migrate existing specs from `docs/reference` into the project-spec format.
 - [ ]
@@ -34,5 +34,17 @@ Instructions for AI agents:
   `.github/workflows/lint-markdown.yml` (deleted after the adopt CLI wrote
   it) and flip `.github/workflows/format.yml`'s `prettier` input from
   `false` to `true`.
+
+- [ ] Task 10: Raise test coverage to the `python-tooling` standard's
+  `fail_under = 85` floor. Actual coverage as of the python-tooling adoption
+  is **60%** (`src/apseudo_lint` total, `coverage report` output), with the
+  weakest modules at or near 0%: `__main__.py` (0%), `explain_cli.py` (0%),
+  `output.py` (0%), `template_cli.py` (0%), `discover.py` (16%),
+  `cli.py` (16%), `format_cli.py` (13%), `mermaid.py` (20%),
+  `mermaid_cli.py` (29%), `lsp.py` (42%), `mcp.py` (39%). `apseudo-lint.yml`'s
+  new `Run coverage` step (added by the python-tooling adoption) will fail
+  CI on every push/PR until this gap is closed — writing the missing tests
+  is a substantial, separate body of work, out of scope for a tooling-config
+  adoption task.
 
 ## Completed Tasks

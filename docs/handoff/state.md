@@ -1,14 +1,22 @@
-**Last updated:** 2026-07-08
+**Last updated:** 2026-07-09
 
 ## In flight
 
 Adopting agent-handoff-v3 and six project-standards standards per `TODO.md`
 (User Managed section), via a single implementation plan at
 `docs/superpowers/plans/2026-07-08-adopt-standards.md`. Executing task-by-task.
+`python-tooling` (Task 7) now done; `project-spec` and `python-coding` remain.
 
 ## Recently landed
 
 - `docs/adr/` created, scoped `markdown-frontmatter` adopted as prerequisite.
+- `python-tooling` adopted (Task 7, ADR-0002): `requires-python = ">=3.14"`,
+  `hatchling` → `uv_build` (with `[tool.uv.build-backend] module-name =
+  "apseudo_lint"` override for the project-name/module-name mismatch),
+  `pyright` → `basedpyright`, `[dependency-groups].dev` replaces the `dev`
+  extra, coverage + pip-audit added. All 12 `[project.scripts]` entry points
+  verified working (`uv build` + smoke-run each). `apseudo-lint.yml` updated
+  in place per ADR-0002 rather than adding a separate `check.yml`.
 
 ## Watch out for
 
@@ -16,8 +24,15 @@ Adopting agent-handoff-v3 and six project-standards standards per `TODO.md`
   scoped to `docs/adr/**` only — do not widen it to the whole repo without a
   separate decision; this repo has ~150 pre-existing Markdown files with no
   frontmatter.
-- `python-tooling` adoption bumps `requires-python` to `>=3.14` and swaps
-  `pyright` → `basedpyright`, `hatchling` → `uv_build`.
+- **`apseudo-lint.yml`'s new `Run coverage` step will fail CI**: actual
+  coverage is 60% against the `python-tooling` standard's `fail_under = 85`
+  floor (`[tool.coverage.report]` in `pyproject.toml`). Do not silence this
+  by lowering `fail_under` or removing the CI step — see TODO.md's "Task 10"
+  entry for the module-by-module breakdown; closing the gap requires writing
+  real tests, not a config change.
+- `uv sync --extra dev` no longer works (that extra was replaced by
+  `[dependency-groups].dev`) — use bare `uv sync` (the `dev` group syncs by
+  default) or `uv sync --all-groups`.
 - `markdown-tooling` adopted with lint+format CI **deliberately deferred**:
   `.markdownlint.json` / `.prettierrc.json` / `.markdownlint-cli2.jsonc` are
   seeded, but `.github/workflows/lint-markdown.yml` was deleted after the

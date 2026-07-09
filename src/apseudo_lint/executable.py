@@ -10,13 +10,13 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, TypeAlias, cast
+from typing import Literal, cast
 
-JsonScalar: TypeAlias = str | int | float | bool | None
-JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
-AgentName: TypeAlias = Literal["claude", "codex"]
-RunMode: TypeAlias = Literal["plan", "review", "apply", "danger"]
-WorkspaceMode: TypeAlias = Literal["cwd", "script_dir", "git_root"]
+type JsonScalar = str | int | float | bool | None
+type JsonValue = JsonScalar | list[JsonValue] | dict[str, JsonValue]
+type AgentName = Literal["claude", "codex"]
+type RunMode = Literal["plan", "review", "apply", "danger"]
+type WorkspaceMode = Literal["cwd", "script_dir", "git_root"]
 
 VALID_AGENTS: frozenset[str] = frozenset({"claude", "codex"})
 VALID_MODES: frozenset[str] = frozenset({"plan", "review", "apply", "danger"})

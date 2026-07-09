@@ -260,8 +260,7 @@ def _normalize_keyword_argument_spacing(code: str) -> str:
     if "(" not in code or ")" not in code:
         return code
     result = re.sub(r"(?<=\()\s*([A-Za-z_]\w*)\s=\s", r"\1=", code)
-    result = re.sub(r",\s*([A-Za-z_]\w*)\s=\s", r", \1=", result)
-    return result
+    return re.sub(r",\s*([A-Za-z_]\w*)\s=\s", r", \1=", result)
 
 
 def _format_spacing_segment(segment: str) -> str:
@@ -273,8 +272,7 @@ def _format_spacing_segment(segment: str) -> str:
     result = COMPARE_RE.sub(r" \1 ", result)
     result = HEADER_COLON_RE.sub(":", result)
     result = MULTISPACE_RE.sub(" ", result)
-    result = _normalize_parenthesized_spacing(result)
-    return result
+    return _normalize_parenthesized_spacing(result)
 
 
 def _normalize_parenthesized_spacing(text: str) -> str:

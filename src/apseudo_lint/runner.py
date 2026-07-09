@@ -16,7 +16,7 @@ from collections.abc import Generator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final, Literal, TypeAlias, cast
+from typing import Final, Literal, cast
 
 from . import __version__
 from .config import load_config
@@ -32,7 +32,7 @@ from .lint import lint_snippet
 from .model import Diagnostic, LintConfig, Severity, Snippet
 from .runner_logging import get_runner_logger
 
-RunnerAction: TypeAlias = Literal[
+type RunnerAction = Literal[
     "run",
     "check",
     "render-prompt",
@@ -41,8 +41,8 @@ RunnerAction: TypeAlias = Literal[
     "rerun",
     "resume-run",
 ]
-OutcomeFormat: TypeAlias = Literal["json", "markdown", "text"]
-ApprovalPolicy: TypeAlias = Literal["untrusted", "on-request", "never", "auto-approved-tools"]
+type OutcomeFormat = Literal["json", "markdown", "text"]
+type ApprovalPolicy = Literal["untrusted", "on-request", "never", "auto-approved-tools"]
 
 OUTCOMES: Final[tuple[str, ...]] = ("Accepted", "Blocked", "NeedsUserDecision")
 EXIT_ACCEPTED: Final[int] = 0
@@ -1368,7 +1368,7 @@ def _safe_lock_name(name: str) -> bool:
 
 
 @contextlib.contextmanager
-def _workspace_lock(invocation: RunnerInvocation) -> Generator[None, None, None]:
+def _workspace_lock(invocation: RunnerInvocation) -> Generator[None]:
     lock_name = invocation.options.lock_name
     if not lock_name:
         yield

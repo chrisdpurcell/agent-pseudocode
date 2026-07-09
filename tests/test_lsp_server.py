@@ -15,14 +15,14 @@ def test_lsp_lints_open_text() -> None:
         text="process demo():\n    while True:\n        do_work()\n    return Accepted(reason=\"done\")\n",
     )
 
-    diagnostics = server._lint_document(document)
+    diagnostics = server._lint_document(document)  # pyright: ignore[reportPrivateUsage]
 
     assert any(diag.code == "APSEUDO-WHILE-001" for diag in diagnostics)
 
 
 def test_lsp_initialize_advertises_expected_capabilities() -> None:
     server = APseudoLanguageServer()
-    result = server._initialize({"rootUri": "file:///tmp"})
+    result = server._initialize({"rootUri": "file:///tmp"})  # pyright: ignore[reportPrivateUsage]
 
     capabilities = result["capabilities"]
     assert capabilities["completionProvider"]
@@ -41,7 +41,7 @@ def test_lsp_completion_returns_configured_outcomes() -> None:
         text="process demo():\n    return ",
     )
 
-    result = server._completion(
+    result = server._completion(  # pyright: ignore[reportPrivateUsage]
         {
             "textDocument": {"uri": uri},
             "position": {"line": 1, "character": 11},
@@ -64,7 +64,9 @@ def test_lsp_formatting_returns_whole_document_edit() -> None:
         text="PROCESS demo( a,b ) :\n    return Accepted(reason=\"ok\")\n",
     )
 
-    edits = server._formatting({"textDocument": {"uri": uri}, "options": {"tabSize": 4}})
+    edits = server._formatting(  # pyright: ignore[reportPrivateUsage]
+        {"textDocument": {"uri": uri}, "options": {"tabSize": 4}}
+    )
 
     assert edits
     assert edits[0]["newText"].startswith("process demo(a, b):")
@@ -88,7 +90,7 @@ def test_lsp_code_action_adds_else_fallback() -> None:
         version=1,
         text=text,
     )
-    actions = server._code_action(
+    actions = server._code_action(  # pyright: ignore[reportPrivateUsage]
         {
             "textDocument": {"uri": uri},
             "context": {
@@ -116,12 +118,16 @@ def test_lsp_symbols_folding_definition_and_references() -> None:
         text=text,
     )
 
-    symbols = server._document_symbol({"textDocument": {"uri": uri}})
-    folds = server._folding_range({"textDocument": {"uri": uri}})
-    definition = server._definition(
+    symbols = server._document_symbol(  # pyright: ignore[reportPrivateUsage]
+        {"textDocument": {"uri": uri}}
+    )
+    folds = server._folding_range(  # pyright: ignore[reportPrivateUsage]
+        {"textDocument": {"uri": uri}}
+    )
+    definition = server._definition(  # pyright: ignore[reportPrivateUsage]
         {"textDocument": {"uri": uri}, "position": {"line": 1, "character": 14}}
     )
-    references = server._references(
+    references = server._references(  # pyright: ignore[reportPrivateUsage]
         {"textDocument": {"uri": uri}, "position": {"line": 1, "character": 14}}
     )
 
