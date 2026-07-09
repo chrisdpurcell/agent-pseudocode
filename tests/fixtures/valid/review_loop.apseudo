@@ -1,0 +1,23 @@
+# Valid bounded review loop.
+process amend_document(document, reviewer, max_rounds=5):
+    round = 1
+    blockers = []
+
+    while round <= max_rounds:
+        review = reviewer.review(document)
+
+        if review.status == "approved":
+            return Accepted(reason="approved")
+
+        elif review.status == "rejected" and review.blockers:
+            blockers = review.blockers
+            document = revise_using_blockers(document, blockers)
+            round += 1
+            continue
+
+        else:
+            return Blocked(reason="ambiguous review result")
+
+    return Blocked(reason="round cap reached", unresolved_blockers=blockers)
+
+# Rule: The agent MUST NOT exceed max_rounds.

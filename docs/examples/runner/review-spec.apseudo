@@ -1,0 +1,34 @@
+#!/usr/bin/env apseudo-run
+---
+name: review_spec
+description: Review one specification file and return structured findings.
+default_agent: claude
+mode: review
+workspace: git_root
+requires_clean_git: false
+claude:
+  bare: false
+  allowed_tools:
+    - Read
+    - Bash(git status *)
+  output_format: json
+codex:
+  sandbox: read-only
+---
+
+process review_spec(spec_path):
+    if spec_path is None:
+        return NeedsUserDecision(reason="spec_path argument is missing")
+
+    spec = read_file(spec_path)
+
+    if spec.empty:
+        return Blocked(reason="spec file is empty")
+
+    findings = review_against_project_standards(spec)
+
+    if findings.blockers:
+        return Blocked(reason="blocking spec findings found", evidence=findings.summary)
+
+    else:
+        return Accepted(reason="spec review passed")

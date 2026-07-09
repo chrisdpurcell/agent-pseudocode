@@ -1,0 +1,12 @@
+interface:
+  display_name: Agent Pseudocode
+  short_description: Create, validate, format, and repair Pythonic Agent Pseudocode workflows.
+  default_prompt: Use the agent-pseudocode skill and validate with apseudo-lint before completion.
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools:
+    - type: mcp
+      value: agent_pseudocode
+      description: Local Agent Pseudocode MCP server exposed by scripts/apseudo-mcp.
+      transport: stdio

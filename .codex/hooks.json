@@ -1,0 +1,92 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event session-start",
+            "timeout": 10,
+            "statusMessage": "Loading pseudocode enforcement context"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event user-prompt-submit",
+            "timeout": 10,
+            "statusMessage": "Checking pseudocode prompt context"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event pre-tool-use",
+            "timeout": 20,
+            "statusMessage": "Checking pseudocode enforcement bypass policy"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event permission-request",
+            "timeout": 20,
+            "statusMessage": "Checking pseudocode permission request"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event post-tool-use",
+            "timeout": 60,
+            "statusMessage": "Validating changed pseudocode"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event subagent-stop",
+            "timeout": 60,
+            "statusMessage": "Checking pseudocode after subagent work"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event stop",
+            "timeout": 60,
+            "statusMessage": "Checking pseudocode before final response"
+          }
+        ]
+      }
+    ]
+  }
+}

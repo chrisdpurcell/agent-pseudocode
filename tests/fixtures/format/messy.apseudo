@@ -1,0 +1,12 @@
+PROCESS messy( document ):
+	# agent must not skip validation
+	round=1
+
+
+
+	while round<=max_rounds:
+		review=review_document(document)#must check blockers
+		if review.status=="approved":
+			return Accepted(reason="approved")
+		round+=1
+	return Blocked(reason="round cap reached")

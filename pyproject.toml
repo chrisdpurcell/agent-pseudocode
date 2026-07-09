@@ -1,0 +1,108 @@
+[project]
+name = "agent-pseudocode-syntax-toolkit"
+version = "0.6.1"
+description = "Syntax highlighting, formatting, LSP, MCP, agent hooks, enforcement tooling, and executable agent-backed runners for Pythonic Agent Pseudocode."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Chris Purcell" }]
+dependencies = []
+keywords = ["pseudocode", "agent", "runner", "linter", "formatter", "language-server", "markdown", "vscode", "kate"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Text Editors",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pre-commit>=4.0",
+  "ruff>=0.12.0",
+  "pyright>=1.1",
+]
+
+[project.scripts]
+apseudo = "apseudo_lint.main_cli:main"
+apseudo-lint = "apseudo_lint.cli:main"
+apseudo-format = "apseudo_lint.format_cli:main"
+apseudo-lsp = "apseudo_lint.lsp:main"
+apseudo-explain = "apseudo_lint.explain_cli:main"
+apseudo-template = "apseudo_lint.template_cli:main"
+apseudo-mermaid = "apseudo_lint.mermaid_cli:main"
+apseudo-mcp = "apseudo_lint.mcp:main"
+apseudo-review = "apseudo_lint.review_cli:main"
+apseudo-run = "apseudo_lint.runner_cli:main"
+apseudo-claude = "apseudo_lint.runner_cli:claude_main"
+apseudo-codex = "apseudo_lint.runner_cli:codex_main"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/apseudo_lint"]
+
+[tool.apseudo_lint]
+max_nesting = 4
+strict = false
+fail_on_warning = false
+allowed_outcomes = [
+  "Accepted",
+  "Approved",
+  "Blocked",
+  "Deferred",
+  "Failed",
+  "NeedsInput",
+  "NeedsUserDecision",
+  "OpenIssue",
+  "Rejected",
+  "Skipped",
+]
+markdown_fence_languages = [
+  "apseudo",
+  "agent-pseudocode",
+  "agent_pseudocode",
+  "pythonic-pseudocode",
+  "pseudocode-pythonic",
+]
+ignore_codes = []
+
+exclude = [
+  ".git",
+  ".hg",
+  ".svn",
+  ".venv",
+  "node_modules",
+  "dist",
+  "build",
+  "tests/fixtures/invalid",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "integrations/agent-hooks"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+include = ["src"]
+venvPath = "."
+venv = ".venv"

@@ -1,0 +1,15 @@
+{
+  "servers": {
+    "agent-pseudocode": {
+      "command": ["apseudo-lsp", "--stdio"],
+      "url": "https://github.com/l3digital/agent-pseudocode-syntax",
+      "highlightingModeRegex": "^Agent Pseudocode$",
+      "rootIndicationFileNames": [
+        ".apseudo-lint.toml",
+        "apseudo.toml",
+        "pyproject.toml",
+        ".git"
+      ]
+    }
+  }
+}

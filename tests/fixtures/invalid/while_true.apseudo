@@ -1,0 +1,4 @@
+process forever():
+    while True:
+        perform_work()
+    return Accepted(reason="done")

@@ -1,0 +1,44 @@
+{
+  "Agent pseudocode fenced process": {
+    "prefix": "apseudo-fence",
+    "body": [
+      "```apseudo",
+      "process ${1:name}(${2:inputs}):",
+      "    if ${3:missing_required_input}:",
+      "        return Blocked(reason=\"${4:missing required input}\")",
+      "",
+      "    ${5:perform_action}(${2:inputs})",
+      "    return Accepted(reason=\"${6:complete}\")",
+      "```"
+    ],
+    "description": "Markdown fenced Agent Pseudocode process."
+  },
+  "Agent pseudocode fenced review loop": {
+    "prefix": "apseudo-review-fence",
+    "body": [
+      "```apseudo",
+      "process ${1:review_loop}(${2:document}, max_rounds=${3:5}):",
+      "    round = 1",
+      "    blockers = []",
+      "",
+      "    while round <= max_rounds:",
+      "        review = ${4:review_document}(${2:document})",
+      "",
+      "        if review.status == \"approved\":",
+      "            return Accepted(reason=\"approved\")",
+      "",
+      "        elif review.blockers:",
+      "            blockers = review.blockers",
+      "            ${2:document} = ${5:revise_using_blockers}(${2:document}, blockers)",
+      "            round += 1",
+      "            continue",
+      "",
+      "        else:",
+      "            return Blocked(reason=\"ambiguous review result\")",
+      "",
+      "    return Blocked(reason=\"round cap reached\", unresolved_blockers=blockers)",
+      "```"
+    ],
+    "description": "Markdown fenced bounded review/revision loop."
+  }
+}

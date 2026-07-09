@@ -1,0 +1,4 @@
+process bad_loop():
+    while not approved:
+        review_document()
+    return Accepted(reason="done")

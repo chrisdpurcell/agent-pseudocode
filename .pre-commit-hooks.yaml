@@ -1,0 +1,22 @@
+- id: apseudo-format
+  name: Agent Pseudocode Formatter
+  description: Check Pythonic agent pseudocode formatting.
+  entry: apseudo-format
+  language: python
+  files: '\.(apseudo|agentpseudo|pseudocode|md|markdown)$'
+  pass_filenames: true
+
+- id: apseudo-lint
+  name: Agent Pseudocode Validator
+  description: Validate Pythonic agent pseudocode files and Markdown fenced blocks.
+  entry: apseudo-lint
+  language: python
+  files: '\.(apseudo|agentpseudo|pseudocode|md|markdown)$'
+  pass_filenames: true
+
+- id: apseudo-review
+  name: Agent Pseudocode Project Review
+  description: Review project-level pseudocode/tooling completeness.
+  entry: apseudo-review
+  language: python
+  pass_filenames: false

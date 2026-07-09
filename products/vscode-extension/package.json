@@ -1,0 +1,152 @@
+{
+  "name": "agent-pseudocode",
+  "displayName": "Agent Pseudocode",
+  "description": "Syntax highlighting, snippets, formatting, diagnostics, hover, completion, navigation, and executable runner helpers for Pythonic agent pseudocode.",
+  "version": "0.6.1",
+  "publisher": "l3digital",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Formatters",
+    "Linters",
+    "Programming Languages",
+    "Snippets"
+  ],
+  "keywords": [
+    "agent",
+    "pseudocode",
+    "python",
+    "textmate",
+    "markdown",
+    "formatter",
+    "lsp",
+    "autocomplete",
+    "diagnostics"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "agent-pseudocode",
+        "aliases": [
+          "Agent Pseudocode",
+          "apseudo",
+          "Pythonic Agent Pseudocode"
+        ],
+        "extensions": [
+          ".apseudo",
+          ".agentpseudo",
+          ".pseudocode"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "agent-pseudocode",
+        "scopeName": "source.agent-pseudocode",
+        "path": "./syntaxes/agent-pseudocode.tmLanguage.json"
+      },
+      {
+        "scopeName": "markdown.agent-pseudocode.codeblock",
+        "path": "./syntaxes/markdown-agent-pseudocode.tmLanguage.json",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "embeddedLanguages": {
+          "source.agent-pseudocode": "agent-pseudocode"
+        }
+      }
+    ],
+    "snippets": [
+      {
+        "language": "agent-pseudocode",
+        "path": "./snippets/agent-pseudocode.code-snippets"
+      },
+      {
+        "language": "markdown",
+        "path": "./snippets/markdown.code-snippets"
+      }
+    ],
+    "commands": [
+      {
+        "command": "agentPseudocode.restartLanguageServer",
+        "title": "Agent Pseudocode: Restart Language Server"
+      },
+      {
+        "command": "agentPseudocode.showLanguageServerOutput",
+        "title": "Agent Pseudocode: Show Language Server Output"
+      },
+      {
+        "command": "agentPseudocode.formatDocument",
+        "title": "Agent Pseudocode: Format Document"
+      },
+      {
+        "command": "agentPseudocode.explainRule",
+        "title": "Agent Pseudocode: Explain Rule"
+      },
+      {
+        "command": "agentPseudocode.reviewProject",
+        "title": "Agent Pseudocode: Review Project"
+      }
+    ],
+    "configuration": {
+      "title": "Agent Pseudocode",
+      "properties": {
+        "agentPseudocode.server.command": {
+          "type": "string",
+          "default": "",
+          "description": "Command used to launch apseudo-lsp. Empty means auto-detect repo script, then `uv run apseudo-lsp`, then PATH `apseudo-lsp`."
+        },
+        "agentPseudocode.server.args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Arguments passed to the Agent Pseudocode language server when server.command is set."
+        },
+        "agentPseudocode.server.cwd": {
+          "type": "string",
+          "default": "",
+          "description": "Working directory for the language server. Empty means first workspace folder."
+        },
+        "agentPseudocode.server.trace": {
+          "type": "boolean",
+          "default": false,
+          "description": "Pass --trace to apseudo-lsp and log protocol flow to the language server output channel."
+        },
+        "agentPseudocode.server.enableMarkdown": {
+          "type": "boolean",
+          "default": true,
+          "description": "Attach the Agent Pseudocode language server to Markdown documents so apseudo fenced blocks receive diagnostics, completion, hover, and formatting."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node ./scripts/compile-grammars.mjs",
+    "check": "npm run build && node --check ./extension.js && node ./scripts/check-extension.mjs",
+    "package": "npm run check && vsce package",
+    "install:local": "npm run package && code --install-extension agent-pseudocode-0.6.1.vsix --force"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.0.0",
+    "js-yaml": "^4.1.0"
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:agent-pseudocode",
+    "onLanguage:markdown",
+    "onCommand:agentPseudocode.restartLanguageServer",
+    "onCommand:agentPseudocode.showLanguageServerOutput",
+    "onCommand:agentPseudocode.formatDocument",
+    "onCommand:agentPseudocode.explainRule",
+    "onCommand:agentPseudocode.reviewProject"
+  ],
+  "dependencies": {
+    "vscode-languageclient": "^10.0.1"
+  }
+}

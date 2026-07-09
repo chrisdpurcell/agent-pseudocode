@@ -1,0 +1,51 @@
+[apseudo_lint]
+# Internal convention defaults for Pythonic Agent Pseudocode.
+# Runtime has no third-party dependencies; this file is read with Python tomllib.
+strict = false
+max_nesting = 4
+require_process_declaration = true
+require_verification_after_mutation = false
+
+allowed_outcomes = [
+  "Accepted",
+  "Approved",
+  "Blocked",
+  "Rejected",
+  "NeedsUserDecision",
+  "NeedsInput",
+  "OpenIssue",
+  "Skipped",
+  "Deferred",
+  "Failed",
+]
+
+markdown_fence_languages = [
+  "apseudo",
+  "agent-pseudocode",
+  "agent_pseudocode",
+  "agentpseudo",
+  "pythonic-pseudocode",
+  "python-pseudocode",
+  "pseudocode-python",
+]
+
+file_extensions = [".apseudo", ".agentpseudo", ".pseudocode"]
+markdown_extensions = [".md", ".markdown", ".mdown"]
+
+disabled_rules = []
+
+exclude = [
+  ".git",
+  ".hg",
+  ".svn",
+  ".venv",
+  "venv",
+  "node_modules",
+  "dist",
+  "build",
+  "coverage",
+  "tests/fixtures/invalid",
+  "tests/fixtures/format",
+  ".mypy_cache",
+  ".pytest_cache",
+]

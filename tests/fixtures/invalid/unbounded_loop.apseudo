@@ -1,0 +1,5 @@
+process revise_until_done(document):
+    while not approved:
+        document = revise(document)
+
+    return Done(reason="looks okay")

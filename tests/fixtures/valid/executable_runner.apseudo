@@ -1,0 +1,13 @@
+#!/usr/bin/env apseudo-run
+---
+name: executable_demo
+default_agent: codex
+mode: plan
+workspace: script_dir
+---
+
+process executable_demo(target="."):
+    if target is None:
+        return NeedsUserDecision(reason="target is missing")
+
+    return Accepted(reason="demo complete")

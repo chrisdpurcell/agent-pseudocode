@@ -1,0 +1,11 @@
+[scripts.fix-ruff]
+path = "docs/examples/runner/fix-ruff.apseudo"
+description = "Fix Ruff failures in a bounded, verified loop."
+default_agent = "codex"
+default_mode = "apply"
+
+[scripts.review-spec]
+path = "docs/examples/runner/review-spec.apseudo"
+description = "Review a specification document with bounded agent behavior."
+default_agent = "claude"
+default_mode = "review"

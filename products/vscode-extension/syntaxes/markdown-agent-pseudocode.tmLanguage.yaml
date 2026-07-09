@@ -1,0 +1,17 @@
+name: Agent Pseudocode Markdown Fenced Code Block
+scopeName: markdown.agent-pseudocode.codeblock
+injectionSelector: L:text.html.markdown
+patterns:
+- name: markup.fenced_code.block.agent-pseudocode.markdown
+  begin: (^|\G)(\s*)(`{3,}|~{3,})\s*(?i:(agent-pseudocode|apseudo|agentpseudo|python-pseudocode|py-pseudocode))\s*$
+  beginCaptures:
+    '3':
+      name: punctuation.definition.markdown
+    '4':
+      name: fenced_code.block.language.agent-pseudocode
+  end: (^|\G)(\s*)(\3)\s*$
+  endCaptures:
+    '3':
+      name: punctuation.definition.markdown
+  patterns:
+  - include: source.agent-pseudocode

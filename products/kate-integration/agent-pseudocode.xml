@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE language SYSTEM "language.dtd">
+<language
+    name="Agent Pseudocode"
+    section="Scripts"
+    extensions="*.apseudo;*.agentpseudo;*.pseudocode"
+    version="1"
+    kateversion="5.0"
+    casesensitive="1"
+    priority="5"
+    author="Chris Purcell"
+    license="MIT"
+    indenter="python">
+
+  <highlighting>
+    <list name="declaration_keywords">
+      <item>process</item>
+      <item>def</item>
+    </list>
+
+    <list name="control_keywords">
+      <item>if</item><item>elif</item><item>else</item><item>while</item><item>for</item>
+      <item>return</item><item>continue</item><item>break</item><item>try</item><item>except</item>
+      <item>finally</item><item>raise</item><item>assert</item><item>with</item><item>as</item>
+      <item>match</item><item>case</item><item>yield</item><item>pass</item><item>from</item><item>import</item>
+    </list>
+
+    <list name="logical_keywords">
+      <item>and</item><item>or</item><item>not</item><item>is</item><item>in</item>
+    </list>
+
+    <list name="normative_keywords">
+      <item>MUST</item><item>SHOULD</item><item>SHALL</item><item>MAY</item>
+      <item>REQUIRED</item><item>OPTIONAL</item><item>RECOMMENDED</item>
+    </list>
+
+    <list name="outcomes">
+      <item>Accepted</item><item>Approved</item><item>Blocked</item><item>Rejected</item>
+      <item>NeedsUserDecision</item><item>NeedsRevision</item><item>Skipped</item><item>Failed</item>
+      <item>Succeeded</item><item>Retry</item><item>Escalated</item><item>Done</item>
+      <item>Complete</item><item>Incomplete</item><item>Cancelled</item><item>Deferred</item>
+    </list>
+
+    <list name="types">
+      <item>Outcome</item><item>Review</item><item>Decision</item><item>State</item><item>Action</item>
+      <item>Rule</item><item>Invariant</item><item>Guard</item><item>Input</item><item>Output</item>
+      <item>Blocker</item><item>Finding</item><item>Result</item><item>Process</item><item>Actor</item>
+      <item>Event</item><item>Condition</item>
+    </list>
+
+    <list name="constants">
+      <item>True</item><item>False</item><item>None</item><item>Unknown</item>
+    </list>
+
+    <contexts>
+      <context name="Normal" attribute="Normal Text" lineEndContext="#stay">
+        <StringDetect attribute="Documentation" context="TripleDoubleString" String="&quot;&quot;&quot;" />
+        <StringDetect attribute="Documentation" context="TripleSingleString" String="'''" />
+        <DetectChar attribute="Comment" context="Comment" char="#" />
+        <RegExpr attribute="Annotation" context="#stay" String="^\s*@[A-Za-z_][A-Za-z0-9_\.]*" />
+        <RegExpr attribute="String" context="#stay" String="&quot;([^&quot;\\]|\\.)*&quot;" />
+        <RegExpr attribute="String" context="#stay" String="'([^'\\]|\\.)*'" />
+        <RegExpr attribute="Normative" context="#stay" String="\b(MUST NOT|SHOULD NOT|SHALL NOT|NOT RECOMMENDED)\b" />
+        <keyword attribute="Declaration" context="#stay" String="declaration_keywords" />
+        <keyword attribute="ControlFlow" context="#stay" String="control_keywords" />
+        <keyword attribute="Operator" context="#stay" String="logical_keywords" />
+        <keyword attribute="Normative" context="#stay" String="normative_keywords" />
+        <keyword attribute="Outcome" context="#stay" String="outcomes" />
+        <keyword attribute="Type" context="#stay" String="types" />
+        <keyword attribute="Constant" context="#stay" String="constants" />
+        <RegExpr attribute="Function" context="#stay" String="\b[a-z_][A-Za-z0-9_]*(?=\()" />
+        <RegExpr attribute="Float" context="#stay" String="\b\d+\.\d+\b" />
+        <RegExpr attribute="Number" context="#stay" String="\b\d+\b" />
+        <RegExpr attribute="Operator" context="#stay" String="(\+=|-=|\*=|/=|//=|%=|==|!=|&lt;=|&gt;=|:=|-&gt;|=&gt;|=|\+|-|\*|/|//|%|&lt;|&gt;)" />
+      </context>
+
+      <context name="Comment" attribute="Comment" lineEndContext="#pop">
+        <RegExpr attribute="Normative" context="#stay" String="\b(MUST NOT|SHOULD NOT|SHALL NOT|NOT RECOMMENDED|MUST|SHOULD|SHALL|MAY|REQUIRED|OPTIONAL|RECOMMENDED)\b" />
+      </context>
+
+      <context name="TripleDoubleString" attribute="Documentation" lineEndContext="#stay">
+        <StringDetect attribute="Documentation" context="#pop" String="&quot;&quot;&quot;" />
+      </context>
+
+      <context name="TripleSingleString" attribute="Documentation" lineEndContext="#stay">
+        <StringDetect attribute="Documentation" context="#pop" String="'''" />
+      </context>
+    </contexts>
+
+    <itemDatas>
+      <itemData name="Normal Text" defStyleNum="dsNormal" />
+      <itemData name="Comment" defStyleNum="dsComment" />
+      <itemData name="Documentation" defStyleNum="dsDocumentation" />
+      <itemData name="String" defStyleNum="dsString" />
+      <itemData name="Declaration" defStyleNum="dsKeyword" />
+      <itemData name="ControlFlow" defStyleNum="dsControlFlow" />
+      <itemData name="Operator" defStyleNum="dsOperator" />
+      <itemData name="Normative" defStyleNum="dsAlert" />
+      <itemData name="Outcome" defStyleNum="dsDataType" />
+      <itemData name="Type" defStyleNum="dsDataType" />
+      <itemData name="Constant" defStyleNum="dsConstant" />
+      <itemData name="Number" defStyleNum="dsDecVal" />
+      <itemData name="Float" defStyleNum="dsFloat" />
+      <itemData name="Function" defStyleNum="dsFunction" />
+      <itemData name="Annotation" defStyleNum="dsAnnotation" />
+    </itemDatas>
+  </highlighting>
+
+  <general>
+    <comments>
+      <comment name="singleLine" start="#" position="afterwhitespace" />
+    </comments>
+    <keywords casesensitive="1" />
+    <folding indentationsensitive="1" />
+    <emptyLines>
+      <emptyLine regexpr="\s+" />
+      <emptyLine regexpr="\s*#.*" />
+    </emptyLines>
+  </general>
+</language>

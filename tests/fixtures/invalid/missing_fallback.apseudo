@@ -1,0 +1,5 @@
+process ambiguous_branch(value):
+    if value.ready:
+        prepare(value)
+
+    return Accepted(reason="prepared")

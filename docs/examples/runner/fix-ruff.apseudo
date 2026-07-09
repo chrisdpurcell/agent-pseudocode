@@ -1,0 +1,47 @@
+#!/usr/bin/env apseudo-run
+---
+name: fix_ruff_failures
+description: Fix Ruff failures in a bounded, verified loop.
+default_agent: codex
+mode: apply
+workspace: git_root
+requires_clean_git: false
+args:
+  target:
+    type: path
+    required: false
+    default: .
+    description: Path to run Ruff against.
+codex:
+  sandbox: workspace-write
+claude:
+  bare: false
+  allowed_tools:
+    - Read
+    - Edit
+    - Bash
+  output_format: json
+  max_turns: 8
+---
+
+process fix_ruff_failures(target="."):
+    diagnostics = run_command("uv run ruff check {target}")
+
+    if diagnostics.empty:
+        return Accepted(reason="ruff already passes")
+
+    else:
+        for diagnostic in diagnostics:  # @finite_collection
+            fix_diagnostic(diagnostic)
+            targeted_result = run_command("uv run ruff check {diagnostic.file}")
+
+            if targeted_result.failed:
+                return Blocked(reason="targeted Ruff check still fails", evidence=targeted_result.output)
+
+        final_result = run_command("uv run ruff check {target}")
+
+        if final_result.passed:
+            return Accepted(reason="all Ruff failures fixed")
+
+        else:
+            return Blocked(reason="full Ruff check still fails", evidence=final_result.output)

@@ -1,0 +1,132 @@
+{
+  "Process skeleton": {
+    "prefix": "process",
+    "body": [
+      "process ${1:name}(${2:inputs}):",
+      "    ${3:state} = ${4:initialize_state}(${2:inputs})",
+      "",
+      "    if ${5:missing_required_input}:",
+      "        return Blocked(reason=\"${6:missing required input}\")",
+      "",
+      "    ${7:perform_action}(${3:state})",
+      "    return Accepted(reason=\"${8:complete}\")"
+    ],
+    "description": "Agent pseudocode process skeleton with guard clause and terminal outcome."
+  },
+  "Bounded review loop": {
+    "prefix": "review-loop",
+    "body": [
+      "process ${1:review_loop}(${2:document}, max_rounds=${3:5}):",
+      "    round = 1",
+      "    blockers = []",
+      "",
+      "    while round <= max_rounds:",
+      "        review = ${4:review_document}(${2:document})",
+      "",
+      "        if review.status == \"approved\":",
+      "            return Accepted(reason=\"approved\")",
+      "",
+      "        elif review.blockers:",
+      "            blockers = review.blockers",
+      "            ${2:document} = ${5:revise_using_blockers}(${2:document}, blockers)",
+      "            round += 1",
+      "            continue",
+      "",
+      "        else:",
+      "            return Blocked(reason=\"ambiguous review result\")",
+      "",
+      "    return Blocked(reason=\"round cap reached\", unresolved_blockers=blockers)"
+    ],
+    "description": "Bounded review/revision loop with explicit terminal outcomes."
+  },
+  "If elif else": {
+    "prefix": "ifelse",
+    "body": [
+      "if ${1:condition}:",
+      "    ${2:action}()",
+      "elif ${3:other_condition}:",
+      "    ${4:other_action}()",
+      "else:",
+      "    return Blocked(reason=\"${5:unhandled case}\")"
+    ],
+    "description": "Branch chain with explicit fallback."
+  },
+  "Bounded while": {
+    "prefix": "while-bounded",
+    "body": [
+      "attempt = 1",
+      "while attempt <= ${1:max_attempts}:",
+      "    ${2:result} = ${3:perform_action}()",
+      "",
+      "    if ${2:result}.${4:success}:",
+      "        return Accepted(reason=\"${5:success}\")",
+      "",
+      "    attempt += 1",
+      "",
+      "return Blocked(reason=\"attempt cap reached\")"
+    ],
+    "description": "Bounded while loop with cap and terminal fallback."
+  },
+  "Normative rule": {
+    "prefix": "rule",
+    "body": [
+      "# Rule: The agent MUST ${1:do the required thing}.",
+      "# Rule: The agent MUST NOT ${2:do the prohibited thing}."
+    ],
+    "description": "RFC-style normative rules in comments."
+  },
+  "Mutation with verification": {
+    "prefix": "mutate-verify",
+    "body": [
+      "${1:commit_changes}(${2:artifact})",
+      "${3:verify_changes}(${2:artifact})",
+      "if not ${3:verify_changes}_result.ok:",
+      "    return Blocked(reason=\"${4:verification failed}\")"
+    ],
+    "description": "Mutating action followed by explicit verification."
+  },
+  "Exhaustive branch annotation": {
+    "prefix": "@exhaustive",
+    "body": [
+      "# @exhaustive",
+      "if ${1:condition}:",
+      "    ${2:action}()",
+      "elif ${3:other_condition}:",
+      "    ${4:other_action}()"
+    ],
+    "description": "Annotate an if/elif chain as exhaustive when no else fallback is needed."
+  },
+  "External stop condition annotation": {
+    "prefix": "@external_stop_condition",
+    "body": [
+      "# @external_stop_condition: ${1:describe who/what stops the loop}",
+      "while ${2:condition}:",
+      "    ${3:action}()"
+    ],
+    "description": "Annotate a loop that is bounded by an external stop condition."
+  },
+  "Executable runner script": {
+    "prefix": "runner-script",
+    "body": [
+      "#!/usr/bin/env apseudo-run",
+      "---",
+      "name: ${1:script_name}",
+      "description: ${2:Describe the task.}",
+      "default_agent: ${3|codex,claude|}",
+      "mode: ${4|plan,review,apply,danger|}",
+      "workspace: git_root",
+      "requires_clean_git: false",
+      "---",
+      "",
+      "process ${1:script_name}(${5:target=\".\"}):",
+      "    ${6:result} = ${7:inspect_target}(target)",
+      "",
+      "    if ${6:result}.ok:",
+      "        return Accepted(reason=\"${8:completed}\")",
+      "",
+      "    else:",
+      "        return Blocked(reason=\"${9:blocked}\", evidence=${6:result}.summary)"
+    ],
+    "description": "Create an executable Agent Pseudocode runner script."
+  }
+}

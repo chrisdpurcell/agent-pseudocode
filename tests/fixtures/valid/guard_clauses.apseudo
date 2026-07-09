@@ -1,0 +1,22 @@
+process deploy_candidate(candidate, environment):
+    if candidate is None:
+        return Blocked(reason="missing candidate")
+
+    if environment not in ["dev", "stage", "prod"]:
+        return Blocked(reason="invalid environment")
+
+    if environment == "prod" and not candidate.has_approval:
+        return NeedsUserDecision(reason="production deployment requires approval")
+
+    run_preflight_checks(candidate, environment)
+
+    if preflight_checks_failed():
+        return Blocked(reason="preflight checks failed")
+
+    deploy(candidate, environment)
+    verify_deployment(candidate, environment)
+
+    if deployment_verified():
+        return Accepted(reason="deployment verified")
+
+    return Blocked(reason="deployment verification failed")

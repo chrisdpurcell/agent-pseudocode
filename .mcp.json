@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "agent-pseudocode": {
+      "type": "stdio",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "cd \"${CLAUDE_PROJECT_DIR:-$(pwd)}\" && exec ./scripts/apseudo-mcp"
+      ]
+    }
+  }
+}

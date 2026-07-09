@@ -1,0 +1,3 @@
+process missing_return(document):
+    if document:
+        review_document(document)
