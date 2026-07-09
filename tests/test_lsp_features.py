@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 from apseudo_lint.completions import completion_specs, token_at_position
 from apseudo_lint.config import load_config
@@ -16,7 +17,7 @@ def test_completion_items_include_outcome_snippet() -> None:
     items = [item.as_lsp() for item in completion_specs(config)]
     accepted = next(item for item in items if item["label"] == "Accepted")
     assert accepted["insertTextFormat"] == 2
-    assert "Accepted" in accepted["insertText"]
+    assert "Accepted" in cast(str, accepted["insertText"])
 
 
 def test_lsp_lints_document_text() -> None:

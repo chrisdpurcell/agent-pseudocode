@@ -71,7 +71,7 @@ docs/apseudo-docs/examples/runner/review-spec.apseudo
 Then run:
 
 ```bash
-uv run apseudo-run --claude --review docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
+uv run apseudo-run --claude --review docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 ## Safe first-run sequence
@@ -171,7 +171,7 @@ Run by name:
 
 ```bash
 uv run apseudo run fix-ruff --codex --apply -- target=src
-uv run apseudo run review-spec --claude --review -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
+uv run apseudo run review-spec --claude --review -- spec_path=docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 Generate task docs:

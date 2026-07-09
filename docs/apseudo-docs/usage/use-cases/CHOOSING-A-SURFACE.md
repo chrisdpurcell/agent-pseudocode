@@ -147,7 +147,7 @@ Then run:
 
 ```bash
 uv run apseudo run fix-ruff --codex --apply -- target=src
-uv run apseudo run review-spec --claude --review -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
+uv run apseudo run review-spec --claude --review -- spec_path=docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 The registry is useful when you want a small set of known agent tasks that behave like `make` targets or `just` recipes.

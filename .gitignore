@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Node (markdown-tooling standard: root package.json pins Prettier)
+node_modules/

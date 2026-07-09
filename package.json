@@ -1,0 +1,7 @@
+{
+  "name": "agent-pseudocode-syntax-toolkit",
+  "private": true,
+  "devDependencies": {
+    "prettier": "3.8.3"
+  }
+}

@@ -1,5 +1,11 @@
 # agent-pseudocode-syntax-toolkit
 
+> **CLI documentation profile:** Packaged (per the `cli-documentation` standard).
+> The unified `apseudo` dispatcher exposes 9 subcommands, which exceeds the
+> "~5-7 top-level subcommands" Packaged-deep signal on count alone, but the
+> standard is explicit that nesting/count alone never forces the deep tier —
+> this repo stays Packaged as a deliberate tailoring.
+
 ## NAME
 
 `apseudo` — lint, format, review, serve, document, and execute Pythonic Agent Pseudocode.
@@ -124,6 +130,116 @@ apseudo docs generate [--output <path>]
 
 Default output: `docs/apseudo-docs/usage/agent-tasks.md`.
 
+## apseudo-lint (standalone entry point)
+
+`apseudo-lint` is a standalone console-script alias for `apseudo lint` — see
+the `apseudo lint` entry above for the full `NAME`/`SYNOPSIS`/`OPTIONS`/`EXIT
+STATUS` contract, which applies identically to the standalone invocation.
+
+## apseudo-format (standalone entry point)
+
+`apseudo-format` is a standalone console-script alias for `apseudo format` —
+see the `apseudo format` entry above for the full `NAME`/`SYNOPSIS`/`OPTIONS`/
+`EXIT STATUS` contract, which applies identically to the standalone
+invocation.
+
+## apseudo-lsp
+
+`apseudo-lsp` has no `apseudo <subcommand>` equivalent — it is a standalone
+`[project.scripts]` entry point only, documented here in full.
+
+### NAME
+
+`apseudo-lsp` — Agent Pseudocode language server.
+
+### SYNOPSIS
+
+```text
+apseudo-lsp [--stdio] [--trace]
+apseudo-lsp {--help | --version}
+```
+
+### DESCRIPTION
+
+`apseudo-lsp` implements a minimal Language Server Protocol server over
+stdio for Agent Pseudocode and Markdown `apseudo` fenced blocks. It delegates
+all semantic checks to the same formatter/linter used by the CLI, hooks, CI,
+and MCP server, and provides diagnostics, completion, hover, document
+formatting, code actions, document symbols, folding ranges, definitions,
+references, and workspace symbols. It is launched by editor LSP clients
+(VS Code, Kate) rather than invoked directly by users.
+
+### OPTIONS
+
+#### `--stdio`
+
+Run the server over stdio. This is the default transport and exists for
+editor-client compatibility; the flag is accepted but has no effect beyond
+documenting client intent.
+
+#### `--trace`
+
+Log LSP message flow (method names for incoming/outgoing messages) to
+stderr.
+
+#### `--version`
+
+Print the `apseudo-lsp` version and exit.
+
+### EXIT STATUS
+
+| Code | Meaning |
+| ---: | --- |
+| `0` | Clean shutdown — the client sent `shutdown` followed by `exit`. |
+| `1` | The client sent `exit` without a prior `shutdown` request. |
+| `2` | Invalid CLI usage (`argparse` error). |
+
+## apseudo-explain
+
+`apseudo-explain` has no `apseudo <subcommand>` equivalent — it is a
+standalone `[project.scripts]` entry point only, documented here in full.
+
+### NAME
+
+`apseudo-explain` — explain `APSEUDO-*` linter rules and approved convention
+guidance.
+
+### SYNOPSIS
+
+```text
+apseudo-explain [<code>...] [--json]
+apseudo-explain {--help | --version}
+```
+
+### DESCRIPTION
+
+`apseudo-explain` prints human-readable (or, with `--json`, machine-readable)
+guidance for one or more `APSEUDO-*` rule codes emitted by `apseudo lint`.
+Omitting all rule codes lists every known rule with its code, severity, and
+title.
+
+### OPTIONS
+
+#### `<code>...`
+
+Zero or more rule codes to explain (for example `APSEUDO-BRANCH-001`). Case
+insensitive. Omit to list all rules.
+
+#### `--json`
+
+Emit JSON instead of Markdown/text.
+
+#### `--version`
+
+Print the `apseudo-explain` version and exit.
+
+### EXIT STATUS
+
+| Code | Meaning |
+| ---: | --- |
+| `0` | Success — rules listed or explained. |
+| `2` | One or more requested rule codes are unknown, or invalid CLI usage (`argparse` error). |
+
 ## EXIT STATUS
 
 | Code | Meaning |
@@ -211,6 +327,6 @@ uv run apseudo docs generate --output docs/apseudo-docs/usage/agent-tasks.md
 ## SEE ALSO
 
 - [`docs/apseudo-docs/usage/RUNNER-USAGE.md`](RUNNER-USAGE.md)
-- [`docs/specs/EXECUTABLE-PSEUDOCODE-SPEC.md`](../../specs/EXECUTABLE-PSEUDOCODE-SPEC.md)
+- [`docs/reference/EXECUTABLE-PSEUDOCODE-SPEC.md`](../../reference/EXECUTABLE-PSEUDOCODE-SPEC.md)
 - [`docs/apseudo-docs/usage/AGENT-INSTRUCTIONS-WORDING.md`](AGENT-INSTRUCTIONS-WORDING.md)
 - [`docs/apseudo-docs/roadmap/FUTURE-VERSIONS.md`](../roadmap/FUTURE-VERSIONS.md)

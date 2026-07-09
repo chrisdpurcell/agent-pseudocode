@@ -46,8 +46,8 @@ This folder is usage-oriented. It complements the normative and reference docs:
 
 | Topic | Reference |
 | --- | --- |
-| Language rules | [`docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md`](../../../specs/PYTHONIC_PSEUDOCODE_STANDARD.md) |
-| Executable script semantics | [`docs/specs/EXECUTABLE-PSEUDOCODE-SPEC.md`](../../../specs/EXECUTABLE-PSEUDOCODE-SPEC.md) |
+| Language rules | [`docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md`](../../../reference/PYTHONIC_PSEUDOCODE_STANDARD.md) |
+| Executable script semantics | [`docs/reference/EXECUTABLE-PSEUDOCODE-SPEC.md`](../../../reference/EXECUTABLE-PSEUDOCODE-SPEC.md) |
 | CLI reference | [`../usage.md`](../usage.md) |
 | Runner command reference | [`../RUNNER-USAGE.md`](../RUNNER-USAGE.md) |
 | Enforcement | [`docs/apseudo-docs/enforcement/ENFORCEMENT.md`](../../enforcement/ENFORCEMENT.md) |

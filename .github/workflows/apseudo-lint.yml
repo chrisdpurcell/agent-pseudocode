@@ -54,16 +54,23 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.14"
 
       - name: Install uv
         run: python -m pip install --upgrade pip uv
 
       - name: Install project and dev tooling
-        run: uv sync --extra dev
+        run: uv sync
 
       - name: Run unit tests
         run: uv run pytest
+
+      # Advisory only: fail_under = 85 (pyproject.toml) is not yet met (60%
+      # actual). Deferred-enforcement pattern per TODO.md Task 10 — flip
+      # continue-on-error off once coverage closes the gap.
+      - name: Run coverage (advisory, non-blocking pending Task 10)
+        continue-on-error: true
+        run: uv run coverage run -m pytest && uv run coverage report
 
       - name: Check pseudocode formatting
         run: uv run apseudo-format --check .
@@ -80,7 +87,7 @@ jobs:
           uv run apseudo-mcp --version
           uv run apseudo-explain APSEUDO-WHILE-001 >/dev/null
           uv run apseudo-template bounded-review-loop >/dev/null
-          uv run apseudo-mermaid docs/examples/review-loop.apseudo --no-fence >/dev/null
+          uv run apseudo-mermaid docs/reference/language/examples/review-loop.apseudo --no-fence >/dev/null
 
       - name: Validate JSON/TOML configs
         run: |
@@ -96,5 +103,8 @@ jobs:
       - name: Lint Python implementation
         run: uv run ruff check src tests integrations/agent-hooks
 
-      - name: Run pyright strict type check
-        run: uv run pyright
+      - name: Run basedpyright strict type check
+        run: uv run basedpyright
+
+      - name: Audit dependencies
+        run: uv run pip-audit

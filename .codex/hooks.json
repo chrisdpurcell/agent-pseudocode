@@ -9,6 +9,12 @@
             "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event session-start",
             "timeout": 10,
             "statusMessage": "Loading pseudocode enforcement context"
+          },
+          {
+            "type": "command",
+            "command": "bash -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/session_start.py\"'",
+            "timeout": 30,
+            "statusMessage": "Loading handoff state"
           }
         ]
       }

@@ -36,6 +36,8 @@ apseudo run [AGENT] [MODE] [OPTIONS] <script-or-registry-name> [-- <key=value>..
 
 Use the runner for repeatable AI-assisted workflows that require judgment and repository edits, such as lint repair, bounded spec review, docs repair, issue triage, and template synchronization. Use Bash or Python instead for deterministic operations such as file moves, secret rotation, backups, production deploys, or irreversible infrastructure actions.
 
+**Relationship to `apseudo run`:** `apseudo-run` is the standalone `[project.scripts]` entry point that owns the full option contract documented on this page. `apseudo run` (a leaf command of the unified `apseudo` dispatcher — see [`usage.md`](usage.md)) is a thin front end over it: it resolves a script argument that is either a filesystem path or a `.apseudo/scripts.toml` registry name, then delegates to `apseudo-run` with the resolved path. The two accept the same `[AGENT] [MODE] [OPTIONS]` surface; `apseudo run` adds only registry-name resolution on top. `apseudo-claude` and `apseudo-codex` are further standalone aliases that pin `apseudo-run`'s agent selection to `claude` or `codex` respectively. Unified equivalent: `apseudo run` runs this entry point after resolving the script argument.
+
 ## EXECUTABLE SCRIPT FORMAT
 
 A script may include a shebang and frontmatter before the normal Agent Pseudocode body:
@@ -134,7 +136,7 @@ uv run apseudo-run --codex --apply \
 ```bash
 uv run apseudo-run --claude --review \
   --require-no-diff \
-  docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
+  docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 ### Use the unified command and script registry
@@ -485,7 +487,7 @@ uv run apseudo docs generate --output docs/apseudo-docs/usage/agent-tasks.md
 uv run apseudo-run --claude --review \
   --require-no-diff \
   --run-dir .apseudo/runs \
-  docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
+  docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 ### Run an apply task and require it to make a change
@@ -513,7 +515,7 @@ uv run apseudo-run --codex --apply \
 ### Resume the last provider session
 
 ```bash
-uv run apseudo-run --claude --resume-last docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
+uv run apseudo-run --claude --resume-last docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md
 uv run apseudo-run --codex --resume-last docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
@@ -557,7 +559,7 @@ uv run apseudo-run --codex --apply \
 
 ## SEE ALSO
 
-- `docs/specs/EXECUTABLE-PSEUDOCODE-SPEC.md` — normative executable script specification.
+- `docs/reference/EXECUTABLE-PSEUDOCODE-SPEC.md` — normative executable script specification.
 - `docs/apseudo-docs/usage/AGENT-INSTRUCTIONS-WORDING.md` — copy/paste wording for repositories.
 - `docs/apseudo-docs/roadmap/FUTURE-VERSIONS.md` — future runner and system roadmap.
 - `docs/apseudo-docs/usage/usage.md` — overall CLI usage reference.

@@ -1,5 +1,7 @@
 # Claude repository instructions
 
+**Session state:** read `docs/handoff/state.md` first — live state and active incidents.
+
 ## Repository purpose
 
 This repository implements the Pythonic Agent Pseudocode convention and its tooling: syntax highlighting, formatter, validator, language server, MCP server, hooks, skills, CI, and documentation.
@@ -10,7 +12,7 @@ Use the project `agent-pseudocode` skill and local validation tools whenever the
 
 Hard requirements:
 
-- Follow `docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md`.
+- Follow `docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md`.
 - Treat `apseudo-lint` as the source of truth for structural compliance.
 - Treat `apseudo-format` as the source of truth for formatting.
 - Run `scripts/apseudo-format --check --changed` and `scripts/apseudo-lint --changed` before completion.
@@ -21,18 +23,32 @@ Hard requirements:
 ## Development commands
 
 ```bash
-uv sync --extra dev
+uv sync
 uv run pytest
 uv run apseudo-format --check .
 uv run apseudo-lint .
 uv run apseudo-review .
 uv run ruff check src tests integrations/agent-hooks
-uv run pyright
+uv run basedpyright
 ```
+
+## Python code style
+
+Python code in this repository follows the `python-coding` standard
+(project-standards) — code shape, type policy, error handling, and testing
+conventions. Use the `python-expert` skill as the front door to both
+`python-coding` and `python-tooling`; canon (the standards themselves) wins on
+any conflict.
 
 ## Tooling architecture
 
 The validator and formatter are the policy source of truth. The language server, MCP server, hooks, pre-commit, CI, VS Code, and Kate integrations must call or reuse those modules rather than reimplementing rules.
+
+## Key docs
+
+| Doc | When to read |
+| --- | --- |
+| `docs/adr/README.md` | Architecture decision records — index of accepted decisions and their rationale. |
 
 ## Executable Agent Pseudocode runner
 
