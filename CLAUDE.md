@@ -32,6 +32,14 @@ uv run ruff check src tests integrations/agent-hooks
 uv run pyright
 ```
 
+## Python code style
+
+Python code in this repository follows the `python-coding` standard
+(project-standards) — code shape, type policy, error handling, and testing
+conventions. Use the `python-expert` skill as the front door to both
+`python-coding` and `python-tooling`; canon (the standards themselves) wins on
+any conflict.
+
 ## Tooling architecture
 
 The validator and formatter are the policy source of truth. The language server, MCP server, hooks, pre-commit, CI, VS Code, and Kate integrations must call or reuse those modules rather than reimplementing rules.
