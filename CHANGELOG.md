@@ -7,7 +7,6 @@
 - Documented how pseudocode reaches agents through prompts, repo context, runner scripts, hooks, MCP, skills, and editor tooling.
 - Added workflow examples for review loops, lint repair, handoff-size control, upstream bug reporting, release gates, template sync, documentation repair, and policy audit.
 
-
 ## 0.6.1 - 2026-07-09
 
 - Restructured repository layout to reduce root sprawl.

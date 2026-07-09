@@ -1,7 +1,6 @@
 # Agent Pseudocode Use-Case Guide
 
-Date: 2026-07-09  
-Applies to: Agent Pseudocode Toolkit `0.6.1`
+Date: 2026-07-09 Applies to: Agent Pseudocode Toolkit `0.6.1`
 
 This folder explains how to use Agent Pseudocode as a practical agent-instruction system. The focus is not only the language syntax, but how the files, runner, hooks, language server, MCP server, skills, and editor integrations work together.
 
@@ -51,9 +50,9 @@ This folder is usage-oriented. It complements the normative and reference docs:
 | Executable script semantics | [`../../specs/EXECUTABLE-PSEUDOCODE-SPEC.md`](../../specs/EXECUTABLE-PSEUDOCODE-SPEC.md) |
 | CLI reference | [`../usage.md`](../usage.md) |
 | Runner command reference | [`../RUNNER-USAGE.md`](../RUNNER-USAGE.md) |
-| Enforcement | [`../../enforcement/ENFORCEMENT.md`](../../enforcement/ENFORCEMENT.md) |
-| Hooks | [`../../features/HOOKS.md`](../../features/HOOKS.md) |
-| MCP | [`../../features/MCP.md`](../../features/MCP.md) |
-| Skills | [`../../features/SKILLS.md`](../../features/SKILLS.md) |
+| Enforcement | [`../../enforcement/ENFORCEMENT.md`](../../apseudo-docs/enforcement/ENFORCEMENT.md) |
+| Hooks | [`../../features/HOOKS.md`](../../apseudo-docs/features/HOOKS.md) |
+| MCP | [`../../features/MCP.md`](../../apseudo-docs/features/MCP.md) |
+| Skills | [`../../features/SKILLS.md`](../../apseudo-docs/features/SKILLS.md) |
 | VS Code | [`../VSCODE.md`](../VSCODE.md) |
 | Kate | [`../KATE.md`](../KATE.md) |

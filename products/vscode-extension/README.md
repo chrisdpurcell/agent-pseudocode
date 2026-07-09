@@ -8,7 +8,7 @@ This extension provides syntax highlighting, Markdown fenced-block highlighting,
 - Markdown injection grammar for `apseudo`, `agent-pseudocode`, `agent_pseudocode`, `pythonic-pseudocode`, and `pseudocode-pythonic` fences.
 - Snippets for common workflow shapes.
 - `apseudo-lsp` client with diagnostics, completion, hover, formatting, code actions, symbols, folding, definition, references, and workspace symbols.
-- Commands for explaining APSEUDO-* rules and reviewing the project.
+- Commands for explaining APSEUDO-\* rules and reviewing the project.
 
 ## Development
 

@@ -1,15 +1,13 @@
 # Agent Pseudocode Syntax Toolkit
 
-**Version:** 0.6.1  
-**Date:** 2026-07-08  
-**Status:** Working prototype / internal convention
+**Version:** 0.6.1 **Date:** 2026-07-08 **Status:** Working prototype / internal convention
 
 This repository contains a complete editor and enforcement toolkit for the Pythonic Agent Pseudocode convention.
 
 Included layers:
 
 - VS Code extension with TextMate syntax highlighting.
-- VS Code Markdown injection grammar for fenced blocks such as ```` ```apseudo ````.
+- VS Code Markdown injection grammar for fenced blocks such as ` ```apseudo `.
 - YAML-to-JSON grammar compiler because VS Code loads JSON grammars while YAML is easier to maintain.
 - VS Code snippets and Markdown fenced-block snippets.
 - VS Code language-client integration for diagnostics, completion, hover, and formatting.
@@ -83,7 +81,7 @@ apseudo-codex     Runner alias that selects Codex CLI.
 ## Docs
 
 | Topic | Document |
-|---|---|
+| --- | --- |
 | Documentation index | `docs/README.md` |
 | Repository layout | `docs/usage/REPOSITORY-LAYOUT.md` |
 | Products index | `products/README.md` |

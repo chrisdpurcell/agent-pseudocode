@@ -6,7 +6,7 @@ This repository implements the Pythonic Agent Pseudocode convention and its tool
 
 ## Pythonic Agent Pseudocode
 
-Use the project `agent-pseudocode` skill and local validation tools whenever the task mentions pseudocode, APSEUDO-* rules, process specs, agent workflows, bounded retry loops, or Markdown `apseudo` fences.
+Use the project `agent-pseudocode` skill and local validation tools whenever the task mentions pseudocode, APSEUDO-\* rules, process specs, agent workflows, bounded retry loops, or Markdown `apseudo` fences.
 
 Hard requirements:
 
@@ -15,7 +15,7 @@ Hard requirements:
 - Treat `apseudo-format` as the source of truth for formatting.
 - Run `scripts/apseudo-format --check --changed` and `scripts/apseudo-lint --changed` before completion.
 - Use `scripts/apseudo-explain <RULE>` for any unclear diagnostic.
-- Do not claim completion if APSEUDO-* errors remain.
+- Do not claim completion if APSEUDO-\* errors remain.
 - Do not use `git commit --no-verify`, `SKIP=...`, disabled hooks, or other enforcement bypasses.
 
 ## Development commands

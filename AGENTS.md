@@ -14,7 +14,7 @@ Required behavior:
 2. Use the `agent_pseudocode` MCP server when available for validation, rule explanations, templates, and project review.
 3. Run `scripts/apseudo-template --list` before drafting a new workflow unless the user supplied a complete structure.
 4. Run `scripts/apseudo-format --check --changed` before `scripts/apseudo-lint --changed`.
-5. Do not finish while APSEUDO-* errors remain.
+5. Do not finish while APSEUDO-\* errors remain.
 6. Do not bypass `pre-commit`, CI, hooks, or validation.
 7. If a rule appears inappropriate, surface the rule ID, rationale, and proposed standard change instead of suppressing it.
 
