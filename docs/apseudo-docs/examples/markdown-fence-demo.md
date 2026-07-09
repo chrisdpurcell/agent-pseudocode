@@ -1,3 +1,27 @@
+---
+schema_version: '1.1'
+id: 'reference-mbn9ms-markdown-fence-demo'
+title: 'Markdown Fence Demo'
+description: 'Example Markdown document showing Pythonic Agent Pseudocode fenced blocks.'
+doc_type: 'reference'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'agent-pseudocode-maintainers'
+consumer: 'mix'
+tags:
+  - 'reference'
+  - 'language'
+  - 'usage'
+aliases: []
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Markdown Fence Demo
 
 This file tests VS Code Markdown injection for Agent Pseudocode.

@@ -1,3 +1,27 @@
+---
+schema_version: '1.1'
+id: 'reference-y3sfgy-agent-pseudocode-formatter'
+title: 'Agent Pseudocode Formatter'
+description: 'Reference for the apseudo-format formatter and its formatting contract.'
+doc_type: 'reference'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'mix'
+tags:
+  - 'reference'
+  - 'formatter'
+aliases:
+  - 'apseudo-format'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Agent Pseudocode Formatter
 
 Use `apseudo-format` to normalize standalone `.apseudo` files and recognized pseudocode fences in Markdown.

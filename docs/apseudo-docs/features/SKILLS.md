@@ -1,3 +1,28 @@
+---
+schema_version: '1.1'
+id: 'reference-xicitp-agent-skills'
+title: 'Agent Skills'
+description: 'Reference for the agent skills that package Pythonic Agent Pseudocode guidance.'
+doc_type: 'reference'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'mix'
+tags:
+  - 'reference'
+  - 'agent-workflow'
+aliases:
+  - 'APSEUDO skill'
+  - 'agent-pseudocode skill'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Agent Skills
 
 This repository includes skills for both Claude Code and Codex.

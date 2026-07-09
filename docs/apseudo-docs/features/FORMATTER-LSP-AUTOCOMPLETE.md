@@ -1,3 +1,28 @@
+---
+schema_version: '1.1'
+id: 'reference-39qpu0-formatter-language-server-and-autocomplete-guide'
+title: 'Formatter, Language Server, and Autocomplete Guide'
+description: 'Guide to formatter, language server, and autocomplete support for Pythonic Agent Pseudocode.'
+doc_type: 'reference'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'product-maintainers'
+consumer: 'mix'
+tags:
+  - 'reference'
+  - 'formatter'
+  - 'lsp'
+  - 'editor-integration'
+aliases: []
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Formatter, Language Server, and Autocomplete Guide
 
 **Date:** 2026-07-08  
@@ -130,7 +155,7 @@ The formatter changes only the fenced pseudocode body.
 Implemented LSP features:
 
 | Feature | Method | Behavior |
-|---|---|---|
+| --- | --- | --- |
 | Diagnostics | `textDocument/publishDiagnostics` | Runs the same linter used by `apseudo-lint`. |
 | Completion | `textDocument/completion` | Keywords, outcomes, annotations, and snippets. |
 | Hover | `textDocument/hover` | Short docs for normative terms, outcomes, and annotations. |
@@ -204,16 +229,16 @@ Example `.vscode/settings.json`:
 
 ```json
 {
-  "agentPseudocode.server.command": "",
-  "agentPseudocode.server.args": [],
-  "agentPseudocode.server.cwd": "",
-  "agentPseudocode.server.trace": false,
-  "agentPseudocode.server.enableMarkdown": true,
-  "editor.formatOnSave": false,
-  "[agent-pseudocode]": {
-    "editor.defaultFormatter": "l3digital.agent-pseudocode",
-    "editor.formatOnSave": true
-  }
+	"agentPseudocode.server.command": "",
+	"agentPseudocode.server.args": [],
+	"agentPseudocode.server.cwd": "",
+	"agentPseudocode.server.trace": false,
+	"agentPseudocode.server.enableMarkdown": true,
+	"editor.formatOnSave": false,
+	"[agent-pseudocode]": {
+		"editor.defaultFormatter": "l3digital.agent-pseudocode",
+		"editor.formatOnSave": true
+	}
 }
 ```
 
@@ -226,9 +251,7 @@ The language server attaches to Markdown by default so diagnostics and formattin
 To disable Markdown LSP attachment, set:
 
 ```json
-{
-  "agentPseudocode.server.enableMarkdown": false
-}
+{ "agentPseudocode.server.enableMarkdown": false }
 ```
 
 ## 6. Kate setup
@@ -276,19 +299,19 @@ Default standalone `.apseudo` configuration:
 
 ```json
 {
-  "servers": {
-    "agent-pseudocode": {
-      "command": ["apseudo-lsp", "--stdio"],
-      "url": "https://github.com/l3digital/agent-pseudocode-syntax",
-      "highlightingModeRegex": "^Agent Pseudocode$",
-      "rootIndicationFileNames": [
-        ".apseudo-lint.toml",
-        "apseudo.toml",
-        "pyproject.toml",
-        ".git"
-      ]
-    }
-  }
+	"servers": {
+		"agent-pseudocode": {
+			"command": ["apseudo-lsp", "--stdio"],
+			"url": "https://github.com/l3digital/agent-pseudocode-syntax",
+			"highlightingModeRegex": "^Agent Pseudocode$",
+			"rootIndicationFileNames": [
+				".apseudo-lint.toml",
+				"apseudo.toml",
+				"pyproject.toml",
+				".git"
+			]
+		}
+	}
 }
 ```
 
@@ -313,7 +336,7 @@ That maps both `Agent Pseudocode` and `Markdown` modes to the server. This is in
 The language server completion list includes:
 
 | Category | Examples |
-|---|---|
+| --- | --- |
 | Control flow | `process`, `if`, `elif`, `else`, `while`, `for`, `return` |
 | Outcomes | `Accepted(...)`, `Blocked(...)`, `NeedsUserDecision(...)`, `NeedsInput(...)` |
 | Annotations | `# @bounded`, `# @external_stop_condition`, `# @exhaustive` |

@@ -44,6 +44,7 @@ exclude = [
   "dist",
   "build",
   "coverage",
+  "docs/reference/pre-migration",
   "tests/fixtures/invalid",
   "tests/fixtures/format",
   ".mypy_cache",

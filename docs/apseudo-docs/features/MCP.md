@@ -1,3 +1,28 @@
+---
+schema_version: '1.1'
+id: 'reference-ag9okc-agent-pseudocode-mcp-server'
+title: 'Agent Pseudocode MCP Server'
+description: 'Reference for the Pythonic Agent Pseudocode MCP server.'
+doc_type: 'reference'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'mix'
+tags:
+  - 'reference'
+  - 'mcp'
+aliases:
+  - 'MCP server'
+  - 'apseudo-mcp'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Agent Pseudocode MCP Server
 
 **Command:** `scripts/apseudo-mcp`  
@@ -10,17 +35,17 @@ The MCP server exposes the same validator, formatter, rule catalog, templates, M
 
 ## Tools
 
-| Tool | Purpose |
-|---|---|
-| `validate_text` | Validate raw pseudocode or Markdown text. |
-| `validate_file` | Validate one file. |
-| `format_text` | Format raw pseudocode or Markdown text. |
-| `format_file` | Format one file; writes only when `write=true`. |
-| `explain_rule` | Explain an APSEUDO-* diagnostic. |
-| `list_rules` | List rule metadata. |
-| `generate_template` | Emit a named process template. |
-| `render_mermaid` | Render a visualization aid. |
-| `review_project` | Review project completeness and diagnostics. |
+| Tool                | Purpose                                         |
+| ------------------- | ----------------------------------------------- |
+| `validate_text`     | Validate raw pseudocode or Markdown text.       |
+| `validate_file`     | Validate one file.                              |
+| `format_text`       | Format raw pseudocode or Markdown text.         |
+| `format_file`       | Format one file; writes only when `write=true`. |
+| `explain_rule`      | Explain an APSEUDO-\* diagnostic.               |
+| `list_rules`        | List rule metadata.                             |
+| `generate_template` | Emit a named process template.                  |
+| `render_mermaid`    | Render a visualization aid.                     |
+| `review_project`    | Review project completeness and diagnostics.    |
 
 ## Claude Code configuration
 
@@ -28,16 +53,16 @@ The repository includes `.mcp.json`:
 
 ```json
 {
-  "mcpServers": {
-    "agent-pseudocode": {
-      "type": "stdio",
-      "command": "bash",
-      "args": [
-        "-lc",
-        "cd \"${CLAUDE_PROJECT_DIR:-$(pwd)}\" && exec ./scripts/apseudo-mcp"
-      ]
-    }
-  }
+	"mcpServers": {
+		"agent-pseudocode": {
+			"type": "stdio",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd \"${CLAUDE_PROJECT_DIR:-$(pwd)}\" && exec ./scripts/apseudo-mcp"
+			]
+		}
+	}
 }
 ```
 

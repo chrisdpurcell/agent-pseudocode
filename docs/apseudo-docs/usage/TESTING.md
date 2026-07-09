@@ -1,3 +1,28 @@
+---
+schema_version: '1.1'
+id: 'runbook-x8cn51-testing-guide'
+title: 'Testing Guide'
+description: 'Guide to testing Pythonic Agent Pseudocode tooling and examples.'
+doc_type: 'runbook'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'user'
+tags:
+  - 'runbook'
+  - 'usage'
+  - 'validator'
+aliases:
+  - 'test guide'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Testing Guide
 
 **Date:** 2026-07-08
@@ -32,13 +57,13 @@ PY_KATE_XML
 
 Representative expected scope fragments:
 
-| Token | Scope fragment |
-|---|---|
-| `process` | `keyword.declaration.function.agent-pseudocode` |
-| `while` | `keyword.control.agent-pseudocode` |
-| `MUST NOT` | `keyword.other.normative.agent-pseudocode` |
-| `Accepted` | `support.class.outcome.agent-pseudocode` |
-| `review_document` | `entity.name.function.call.agent-pseudocode` |
+| Token             | Scope fragment                                  |
+| ----------------- | ----------------------------------------------- |
+| `process`         | `keyword.declaration.function.agent-pseudocode` |
+| `while`           | `keyword.control.agent-pseudocode`              |
+| `MUST NOT`        | `keyword.other.normative.agent-pseudocode`      |
+| `Accepted`        | `support.class.outcome.agent-pseudocode`        |
+| `review_document` | `entity.name.function.call.agent-pseudocode`    |
 
 ## Manual Kate test
 

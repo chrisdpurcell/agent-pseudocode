@@ -1,7 +1,30 @@
 ---
-title: "Explaining Processes to AI"
-source: "https://chatgpt.com/c/6a4eb43a-2924-83ea-9262-6deed8788054"
+schema_version: '1.1'
+id: 'research-xai2pj-explaining-processes-to-ai'
+title: 'Explaining Processes to AI'
+description: 'Historical source conversation about explaining processes to AI agents.'
+doc_type: 'research'
+status: 'archived'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'mix'
+tags:
+  - 'research'
+  - 'agent-workflow'
+aliases: []
+related: []
+source:
+  - 'https://chatgpt.com/c/6a4eb43a-2924-83ea-9262-6deed8788054'
+confidence: 'medium'
+visibility: 'internal'
+license: null
 ---
+
+# Explaining Processes to AI
+
+<!-- prettier-ignore-start -->
 
 **You:**
 
@@ -3929,3 +3952,5 @@ ZIP integrity check passed.
 ```
 
 The package excludes local `.venv`, `node_modules`, caches, and other generated working directories.
+
+<!-- prettier-ignore-end -->

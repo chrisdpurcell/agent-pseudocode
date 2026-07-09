@@ -1,10 +1,35 @@
+---
+schema_version: '1.1'
+id: 'reference-mjgn5w-pythonic-pseudocode-standard-for-ai-agent-instructions'
+title: 'Pythonic Pseudocode Standard for AI Agent Instructions'
+description: 'Normative reference for the Pythonic Agent Pseudocode language convention.'
+doc_type: 'reference'
+status: 'active'
+created: '2026-07-09'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'mix'
+tags:
+  - 'reference'
+  - 'language'
+aliases:
+  - 'APSEUDO standard'
+  - 'Pythonic Agent Pseudocode'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Pythonic Pseudocode Standard for AI Agent Instructions
 
 **Version:** 1.0.0  
 **Date:** 2026-07-08  
 **Status:** Proposed internal convention  
 **Audience:** Human authors, AI coding agents, AI reviewers, automation agents  
-**Primary use:** Deterministic process instructions, agent workflows, implementation plans, review loops, decision logic, and bounded retry behavior  
+**Primary use:** Deterministic process instructions, agent workflows, implementation plans, review loops, decision logic, and bounded retry behavior
 
 ---
 
@@ -171,7 +196,7 @@ The goal is not to simulate Python. The goal is to express:
 Use the following labels when writing or reviewing this standard:
 
 | Label | Meaning | Example |
-|---|---|---|
+| --- | --- | --- |
 | **[Sourced]** | Directly grounded in an external source | Python `if`, `while`, and `for` are traditional control-flow constructs. |
 | **[Adapted]** | Inspired by an external source but modified for this standard | RFC-style MUST/SHOULD terms used outside IETF specs. |
 | **[Internal Convention]** | Locally defined rule for this standard | `Blocked(...)` is the required outcome for unresolved agent blockers. |
@@ -188,7 +213,7 @@ A rule marked **[Internal Convention]** may still be mandatory inside projects t
 This standard is built from the following published foundations and local conventions.
 
 | Area | Source status | Foundation | How this standard uses it |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Python block structure | **[Sourced]** | Python Language Reference: compound statements | Uses Python-style indentation, clause headers, colons, and block suites. |
 | Python readability | **[Sourced]** | PEP 8 | Uses Python naming and readability conventions where appropriate. |
 | Python type notation | **[Sourced]** | PEP 484 and `typing` docs | Allows type-hint-like annotations for clarity, without requiring runtime-valid code. |
@@ -237,13 +262,13 @@ Example:
 
 Avoid weak or ambiguous instruction verbs when writing agent pseudocode.
 
-| Avoid | Prefer |
-|---|---|
-| try to reduce size | reduce size until `size <= limit` or return `Blocked` |
-| make sure tests pass | run tests and require `tests.status == "passed"` |
-| handle errors | return `Blocked(reason=..., evidence=...)` |
-| if needed | define the condition that makes it needed |
-| continue until good | continue until `approved == True` or cap reached |
+| Avoid                | Prefer                                                |
+| -------------------- | ----------------------------------------------------- |
+| try to reduce size   | reduce size until `size <= limit` or return `Blocked` |
+| make sure tests pass | run tests and require `tests.status == "passed"`      |
+| handle errors        | return `Blocked(reason=..., evidence=...)`            |
+| if needed            | define the condition that makes it needed             |
+| continue until good  | continue until `approved == True` or cap reached      |
 
 ---
 
@@ -410,36 +435,47 @@ A process document that uses this standard SHOULD use the following structure.
 # Process: <process name>
 
 ## Purpose
+
 Explain the outcome in one paragraph.
 
 ## Scope
+
 State what the process covers and excludes.
 
 ## Actors
+
 List the roles or agents.
 
 ## Inputs
+
 List required and optional inputs.
 
 ## Outputs
+
 List allowed outcomes and artifacts.
 
 ## Pseudocode
+
 Provide the Pythonic pseudocode block.
 
 ## Decision Tables
+
 Add tables for broad branching logic.
 
 ## Invariants
+
 List requirements that must remain true throughout the process.
 
 ## Stop Conditions
+
 List all normal and abnormal exits.
 
 ## Acceptance Checks
+
 List checks used to determine completion.
 
 ## Examples
+
 Provide concrete examples when behavior could be misunderstood.
 ```
 
@@ -606,13 +642,13 @@ If the pseudocode contains many non-Python extensions, use `text` instead of `py
 
 Use Python-style names:
 
-| Thing | Convention | Example |
-|---|---|---|
-| Variables | `snake_case` | `review_result` |
-| Functions/actions | `snake_case` verb phrase | `run_tests()` |
-| Constants | `UPPER_SNAKE_CASE` | `MAX_REVIEW_ROUNDS` |
-| Types/records/outcomes | `PascalCase` | `ReviewResult` |
-| Booleans | Predicate-like names | `has_blockers`, `is_approved` |
+| Thing                  | Convention               | Example                       |
+| ---------------------- | ------------------------ | ----------------------------- |
+| Variables              | `snake_case`             | `review_result`               |
+| Functions/actions      | `snake_case` verb phrase | `run_tests()`                 |
+| Constants              | `UPPER_SNAKE_CASE`       | `MAX_REVIEW_ROUNDS`           |
+| Types/records/outcomes | `PascalCase`             | `ReviewResult`                |
+| Booleans               | Predicate-like names     | `has_blockers`, `is_approved` |
 
 ### 10.2 Action names
 
@@ -789,7 +825,7 @@ Agent workflows need explicit terminal states. This standard defines a default o
 Every process MUST eventually return one of these categories or a project-defined equivalent:
 
 | Outcome | Meaning |
-|---|---|
+| --- | --- |
 | `Accepted(...)` | The process completed successfully and acceptance checks passed. |
 | `Blocked(...)` | The process cannot proceed without correction, missing input, or external resolution. |
 | `NeedsUserDecision(...)` | The process can continue only after a user decision. |
@@ -1766,14 +1802,14 @@ commit_changes()
 
 Names SHOULD imply side effects.
 
-| Side effect | Preferred verb |
-|---|---|
-| Writes a file | `write_*`, `update_*`, `rewrite_*` |
-| Deletes content | `delete_*`, `remove_*` |
-| Creates external item | `create_*`, `open_*` |
-| Sends communication | `send_*`, `notify_*` |
-| Reads information | `read_*`, `fetch_*`, `query_*` |
-| Checks condition | `validate_*`, `verify_*`, `check_*` |
+| Side effect           | Preferred verb                      |
+| --------------------- | ----------------------------------- |
+| Writes a file         | `write_*`, `update_*`, `rewrite_*`  |
+| Deletes content       | `delete_*`, `remove_*`              |
+| Creates external item | `create_*`, `open_*`                |
+| Sends communication   | `send_*`, `notify_*`                |
+| Reads information     | `read_*`, `fetch_*`, `query_*`      |
+| Checks condition      | `validate_*`, `verify_*`, `check_*` |
 
 Example:
 
@@ -1995,7 +2031,7 @@ Use a decision table when:
 ### 28.2 Basic decision table
 
 | Condition | Required action | Outcome |
-|---|---|---|
+| --- | --- | --- |
 | Missing required input | Ask user for input | `NeedsUserDecision` |
 | Tests failed | Stop and report failures | `Blocked` |
 | Tests passed and approval required | Ask user for approval | `NeedsUserDecision` |
@@ -2033,8 +2069,8 @@ A decision table SHOULD include either:
 
 Example default row:
 
-| Condition | Required action | Outcome |
-|---|---|---|
+| Condition      | Required action                       | Outcome               |
+| -------------- | ------------------------------------- | --------------------- |
 | No row matches | Stop and surface specification defect | `SpecificationDefect` |
 
 ---
@@ -2048,7 +2084,7 @@ Use state transition tables when the process is best understood as states and tr
 ### 29.1 Basic state transition table
 
 | Current state | Event / condition | Guard | Action | Next state |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `DraftReady` | Review requested | `round <= max_rounds` | Reviewer reviews draft | `ReviewComplete` |
 | `ReviewComplete` | Approved | — | Mark accepted | `Accepted` |
 | `ReviewComplete` | Rejected | `round < max_rounds` | Revise and increment round | `DraftReady` |
@@ -2093,15 +2129,15 @@ A Mermaid diagram MAY be generated from a state transition table. The table rema
 
 Use each representation for what it does best.
 
-| Need | Best format |
-|---|---|
-| Main procedural flow | Pythonic pseudocode |
-| Many condition combinations | Decision table |
-| Lifecycle states | State transition table |
-| Human intent | Short narrative |
-| Acceptance examples | Given/When/Then |
-| Requirements | MUST/SHOULD rules or EARS-style sentences |
-| Visual overview | Mermaid or BPMN generated from the source table |
+| Need                        | Best format                                     |
+| --------------------------- | ----------------------------------------------- |
+| Main procedural flow        | Pythonic pseudocode                             |
+| Many condition combinations | Decision table                                  |
+| Lifecycle states            | State transition table                          |
+| Human intent                | Short narrative                                 |
+| Acceptance examples         | Given/When/Then                                 |
+| Requirements                | MUST/SHOULD rules or EARS-style sentences       |
+| Visual overview             | Mermaid or BPMN generated from the source table |
 
 ### 30.1 Recommended order
 
@@ -2183,7 +2219,7 @@ These rules can be used manually or implemented by an agent as a pseudocode lint
 ### 32.1 Structural rules
 
 | Rule ID | Requirement |
-|---|---|
+| --- | --- |
 | PSEUDO001 | Every non-trivial block MUST include the pseudocode sentinel. |
 | PSEUDO002 | Every process MUST return a terminal outcome. |
 | PSEUDO003 | Every `while` loop MUST have a cap, timeout, or explicit stop condition. |
@@ -2624,7 +2660,7 @@ Key features:
 Decision table:
 
 | Tests | Review | User approval required? | User decision | Action | Outcome |
-|---|---|---:|---|---|---|
+| --- | --- | --: | --- | --- | --- |
 | Failed | Any | Any | Any | Stop | `Blocked` |
 | Passed | Rejected | Any | Any | Stop | `Blocked` |
 | Passed | Approved | No | N/A | Merge | `Accepted` |
@@ -2677,6 +2713,7 @@ The process reviews a document, allows bounded amendment rounds, commits the fin
 
 ```md
 State:
+
 - `document`
 - `round_number`
 - `review`
@@ -2688,6 +2725,7 @@ State:
 
 ```md
 Outcomes:
+
 - `Accepted(document, review_history)`
 - `Blocked(reason, unresolved_blockers, review_history)`
 - `SpecificationDefect(reason)`
@@ -2762,16 +2800,16 @@ Rules:
 
 ### 37.1 Preferred control-flow patterns
 
-| Need | Use |
-|---|---|
-| Bounded retry | `for attempt in range(1, max_attempts + 1)` |
-| Review loop | `for round_number in range(1, max_rounds + 1)` |
-| Unknown-length loop | `while condition and cap_not_reached` |
-| Immediate success | `return Accepted(...)` |
-| Missing input | `return Blocked(...)` or `NeedsUserDecision(...)` |
-| User choice | `approval = ask_user_for_approval(...)` |
-| Too many branches | Decision table |
-| State lifecycle | State transition table |
+| Need                | Use                                               |
+| ------------------- | ------------------------------------------------- |
+| Bounded retry       | `for attempt in range(1, max_attempts + 1)`       |
+| Review loop         | `for round_number in range(1, max_rounds + 1)`    |
+| Unknown-length loop | `while condition and cap_not_reached`             |
+| Immediate success   | `return Accepted(...)`                            |
+| Missing input       | `return Blocked(...)` or `NeedsUserDecision(...)` |
+| User choice         | `approval = ask_user_for_approval(...)`           |
+| Too many branches   | Decision table                                    |
+| State lifecycle     | State transition table                            |
 
 ### 37.2 Standard outcome constructors
 
@@ -2847,7 +2885,7 @@ return Blocked(reason="user requested changes or response was ambiguous", approv
 **Source status:** **[Internal Convention]** unless noted.
 
 | Term | Meaning |
-|---|---|
+| --- | --- |
 | Agent | An AI or automation actor expected to follow the instruction. |
 | Artifact | A file, document, plan, spec, commit, PR, issue, or other output. |
 | Blocker | A condition that prevents safe continuation. |
@@ -2871,13 +2909,9 @@ return Blocked(reason="user requested changes or response was ambiguous", approv
 
 ### 39.1 Python language and style
 
-1. Python Software Foundation. “Compound statements.” *Python Language Reference*.  
-   <https://docs.python.org/3/reference/compound_stmts.html>  
-   Used for the sourced foundation that Python compound statements include `if`, `while`, `for`, `try`, `with`, function definitions, clause headers, colons, and indented suites.
+1. Python Software Foundation. “Compound statements.” _Python Language Reference_. <https://docs.python.org/3/reference/compound_stmts.html> Used for the sourced foundation that Python compound statements include `if`, `while`, `for`, `try`, `with`, function definitions, clause headers, colons, and indented suites.
 
-2. Python Software Foundation. “Lexical analysis: Indentation.” *Python Language Reference*.  
-   <https://docs.python.org/3/reference/lexical_analysis.html>  
-   Used for the sourced foundation that indentation determines grouping in Python.
+2. Python Software Foundation. “Lexical analysis: Indentation.” _Python Language Reference_. <https://docs.python.org/3/reference/lexical_analysis.html> Used for the sourced foundation that indentation determines grouping in Python.
 
 3. van Rossum, Guido; Warsaw, Barry; Coghlan, Nick. “PEP 8 – Style Guide for Python Code.”  
    <https://peps.python.org/pep-0008/>  
@@ -2891,9 +2925,7 @@ return Blocked(reason="user requested changes or response was ambiguous", approv
    <https://peps.python.org/pep-0484/>  
    Used for the sourced foundation of Python type-annotation syntax. This standard adapts annotations descriptively for pseudocode.
 
-6. Python Software Foundation. “typing — Support for type hints.” *Python Standard Library*.  
-   <https://docs.python.org/3/library/typing.html>  
-   Used as a reference for type-hint vocabulary.
+6. Python Software Foundation. “typing — Support for type hints.” _Python Standard Library_. <https://docs.python.org/3/library/typing.html> Used as a reference for type-hint vocabulary.
 
 ### 39.2 Normative language
 

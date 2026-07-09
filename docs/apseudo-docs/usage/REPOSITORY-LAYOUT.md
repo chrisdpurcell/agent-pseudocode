@@ -1,3 +1,26 @@
+---
+schema_version: '1.1'
+id: 'runbook-uzku0w-repository-layout'
+title: 'Repository Layout'
+description: 'Guide to the repository layout for Pythonic Agent Pseudocode tooling and documentation.'
+doc_type: 'runbook'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'user'
+tags:
+  - 'runbook'
+  - 'usage'
+aliases: []
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Repository Layout
 
 This repository is arranged for standalone GitHub development while keeping the later `project-standards` conversion path clean.

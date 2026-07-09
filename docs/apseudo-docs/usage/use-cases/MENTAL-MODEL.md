@@ -1,3 +1,28 @@
+---
+schema_version: '1.1'
+id: 'concept-9ab8lr-mental-model-what-agent-pseudocode-is-for'
+title: 'Mental Model: What Agent Pseudocode Is For'
+description: 'Conceptual model for understanding what Pythonic Agent Pseudocode is for.'
+doc_type: 'concept'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'user'
+tags:
+  - 'concept'
+  - 'usage'
+  - 'agent-workflow'
+aliases:
+  - 'APSEUDO mental model'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Mental Model: What Agent Pseudocode Is For
 
 Date: 2026-07-09  
@@ -101,14 +126,14 @@ Do not use pseudocode to describe everything.
 
 Use this split:
 
-| Need | Best format |
-| --- | --- |
-| Explain why the process exists | Markdown prose |
-| Define exact branches and loops | Agent Pseudocode |
+| Need                             | Best format                       |
+| -------------------------------- | --------------------------------- |
+| Explain why the process exists   | Markdown prose                    |
+| Define exact branches and loops  | Agent Pseudocode                  |
 | Define non-negotiable invariants | RFC-style `MUST` / `SHOULD` rules |
-| Define large condition matrices | Markdown decision tables |
-| Show user commands | Bash examples |
-| Execute deterministic operations | Python or Bash |
+| Define large condition matrices  | Markdown decision tables          |
+| Show user commands               | Bash examples                     |
+| Execute deterministic operations | Python or Bash                    |
 
 Agent Pseudocode is strongest when it is the **control-flow kernel** inside a broader standard.
 

@@ -1,3 +1,25 @@
+---
+schema_version: '1.1'
+id: 'note-9axn0p-future-versions'
+title: 'Future Versions'
+description: 'Roadmap note for future Pythonic Agent Pseudocode versioning.'
+doc_type: 'note'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'agent-pseudocode-maintainers'
+consumer: 'mix'
+tags:
+  - 'documentation'
+aliases: []
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Future Versions
 
 Date: 2026-07-09  

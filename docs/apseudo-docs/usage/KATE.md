@@ -1,3 +1,29 @@
+---
+schema_version: '1.1'
+id: 'runbook-1vj2iz-kate-integration'
+title: 'Kate Integration'
+description: 'User guide for configuring Kate with Pythonic Agent Pseudocode support.'
+doc_type: 'runbook'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'product-maintainers'
+consumer: 'user'
+tags:
+  - 'runbook'
+  - 'usage'
+  - 'kate'
+  - 'product'
+aliases:
+  - 'Kate integration'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Kate Integration
 
 ## Files

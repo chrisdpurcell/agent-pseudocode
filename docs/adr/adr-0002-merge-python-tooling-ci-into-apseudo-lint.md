@@ -2,26 +2,29 @@
 schema_version: '1.1'
 id: 'adr-0002-agent-pseudocode-merge-python-tooling-ci-into-apseudo-lint'
 title: 'ADR 0002: Merge python-tooling CI Expectations into apseudo-lint.yml Instead of a Separate check.yml'
-description: 'Decision record for updating the existing apseudo-lint.yml workflow in place with python-tooling standard steps rather than adding a second, overlapping CI workflow.'
+description: 'Decision to merge python-tooling CI checks into the existing apseudo-lint workflow.'
 doc_type: 'adr'
 status: 'active'
 created: '2026-07-09'
 updated: '2026-07-09'
 reviewed: null
-owner: ''
+owner: 'agent-pseudocode-maintainers'
 consumer: 'mix'
 tags:
+  - 'adr'
   - 'ci'
   - 'python-tooling'
-  - 'adr'
   - 'exception'
-aliases: []
+aliases:
+  - 'ADR 0002'
+  - 'Merged python-tooling CI'
 related:
   - 'docs/adr/adr-0001-relocate-language-reference-docs.md'
 supersedes: []
 superseded_by: null
 source:
-  - '.superpowers/sdd/task-7-brief.md'
+  - '.github/workflows/apseudo-lint.yml'
+  - 'docs/superpowers/plans/2026-07-08-adopt-standards.md'
 confidence: 'high'
 visibility: 'internal'
 license: null
@@ -79,4 +82,4 @@ Compliance is confirmed by `apseudo-lint.yml` containing, in one job: `uv run py
 
 ## More Information
 
-This deviation is scoped to workflow *file layout* only; the standard's required *checks* (`ruff check`, `basedpyright`, `pytest`, `coverage`, `pip-audit`) are all present, just inside `apseudo-lint.yml` rather than a dedicated `check.yml`. Revisit this decision if the pseudocode-specific and Python-tooling checks ever need independent trigger conditions (e.g., different `paths:` filters) or a matrix build, at which point splitting them back into two workflows would resolve the "Bad" consequences above.
+This deviation is scoped to workflow _file layout_ only; the standard's required _checks_ (`ruff check`, `basedpyright`, `pytest`, `coverage`, `pip-audit`) are all present, just inside `apseudo-lint.yml` rather than a dedicated `check.yml`. Revisit this decision if the pseudocode-specific and Python-tooling checks ever need independent trigger conditions (e.g., different `paths:` filters) or a matrix build, at which point splitting them back into two workflows would resolve the "Bad" consequences above.

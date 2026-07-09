@@ -14,6 +14,8 @@
 - [2026-07-09] Merged the standards-adoption branch to `main`; recorded 4 pre-existing bugs found (not introduced) during adoption in `docs/handoff/bugs/`.
 - [2026-07-09] Kept agent-handoff-v3 SessionStart hooks active at canonical `.claude/hooks/` and `.codex/hooks/` paths; moved agent-pseudocode lifecycle hook configs under `hooks/` so they stay dormant while MCP wrappers live under `mcp/`.
 - [2026-07-09] Accepted ADR-0003, defining the durable Markdown frontmatter corpus, field ownership, consumers, lifecycle, confidence, tags, aliases, and relationship conventions ahead of migration.
+- [2026-07-09] Migrated the ADR-0003-covered durable Markdown corpus to standard frontmatter and widened `.project-standards.yml` frontmatter validation to that corpus.
+- [2026-07-09] Fixed bug 003 by excluding verbatim pre-migration transcripts from APSEUDO Markdown-fence linting.
 
 ## Notes For The Builder
 

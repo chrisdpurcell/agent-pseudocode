@@ -1,3 +1,27 @@
+---
+schema_version: '1.1'
+id: 'note-et386x-linter-status-apseudo-lint'
+title: 'Linter Status: `apseudo-lint`'
+description: 'Roadmap note for future apseudo-lint validation behavior.'
+doc_type: 'note'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'agent-pseudocode-maintainers'
+consumer: 'mix'
+tags:
+  - 'rules'
+  - 'validator'
+aliases:
+  - 'apseudo-lint'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Linter Status: `apseudo-lint`
 
 **Date:** 2026-07-08  

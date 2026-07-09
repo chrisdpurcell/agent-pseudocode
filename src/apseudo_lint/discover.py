@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from .extract import is_lintable_path
+from .extract import collect_paths
 from .model import LintConfig
 
 
@@ -38,8 +38,8 @@ def discover_changed_paths(config: LintConfig) -> list[Path]:
             if not stripped:
                 continue
             path = root / stripped
-            if path.exists() and path.is_file() and is_lintable_path(path, config):
-                files.add(path)
+            if path.exists() and path.is_file():
+                files.update(collect_paths([path], config))
     return sorted(files, key=lambda item: str(item))
 
 

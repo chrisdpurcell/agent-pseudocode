@@ -1,3 +1,27 @@
+---
+schema_version: '1.1'
+id: 'concept-cpiz72-how-pseudocode-is-fed-to-agents'
+title: 'How Pseudocode Is Fed to Agents'
+description: 'Concept guide for how Pythonic Agent Pseudocode reaches AI agents.'
+doc_type: 'concept'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'user'
+tags:
+  - 'concept'
+  - 'usage'
+  - 'agent-workflow'
+aliases: []
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # How Pseudocode Is Fed to Agents
 
 Date: 2026-07-09  

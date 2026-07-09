@@ -1,3 +1,29 @@
+---
+schema_version: '1.1'
+id: 'reference-b42p3m-executable-agent-pseudocode-specification'
+title: 'Executable Agent Pseudocode Specification'
+description: 'Reference specification for executable Pythonic Agent Pseudocode runner semantics.'
+doc_type: 'reference'
+status: 'active'
+created: '2026-07-09'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'mix'
+tags:
+  - 'reference'
+  - 'language'
+  - 'runner'
+aliases:
+  - 'Runner spec'
+  - 'apseudo-run'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Executable Agent Pseudocode Specification
 
 Date: 2026-07-09  
@@ -37,7 +63,7 @@ The pseudocode body begins after the closing frontmatter delimiter. The body fol
 ## 3. Frontmatter fields
 
 | Field | Type | Required | Meaning |
-| --- | --- | ---: | --- |
+| --- | --- | --: | --- |
 | `name` | string | no | Human-readable script/process name. |
 | `description` | string | no | One-line user-facing purpose. |
 | `default_agent` | `claude` or `codex` | no | Agent selected when no CLI flag or `APSEUDO_AGENT` is set. |
@@ -97,12 +123,12 @@ Agent resolution order:
 
 ## 6. Execution modes
 
-| Mode | Intended use | Default provider posture |
-| --- | --- | --- |
-| `plan` | Proposal only | read-oriented |
-| `review` | Analysis/review | read-oriented |
-| `apply` | Workspace edits | edit-capable within sandbox/tool limits |
-| `danger` | Explicit high-risk run | requires `--i-understand-danger` |
+| Mode     | Intended use           | Default provider posture                |
+| -------- | ---------------------- | --------------------------------------- |
+| `plan`   | Proposal only          | read-oriented                           |
+| `review` | Analysis/review        | read-oriented                           |
+| `apply`  | Workspace edits        | edit-capable within sandbox/tool limits |
+| `danger` | Explicit high-risk run | requires `--i-understand-danger`        |
 
 `danger` MUST NOT be selected implicitly by a script alone. The operator must pass `--i-understand-danger`.
 
@@ -168,34 +194,32 @@ Required fields:
 
 ```json
 {
-  "outcome": "Accepted | Blocked | NeedsUserDecision",
-  "reason": "short reason",
-  "summary": "human-readable summary",
-  "checks_run": ["check command or check label"],
-  "artifacts": ["path or URL"]
+	"outcome": "Accepted | Blocked | NeedsUserDecision",
+	"reason": "short reason",
+	"summary": "human-readable summary",
+	"checks_run": ["check command or check label"],
+	"artifacts": ["path or URL"]
 }
 ```
 
 Optional field:
 
 ```json
-{
-  "evidence": "supporting output or reason"
-}
+{ "evidence": "supporting output or reason" }
 ```
 
 Exit-code mapping:
 
 | Outcome / condition | Exit code |
-| --- | ---: |
-| `Accepted` | `0` |
-| `NeedsUserDecision` | `10` |
-| `Blocked` | `20` |
-| validation failed | `30` |
-| config invalid | `31` |
-| provider failed | `40` |
-| output invalid | `41` |
-| safety blocked | `50` |
+| ------------------- | --------: |
+| `Accepted`          |       `0` |
+| `NeedsUserDecision` |      `10` |
+| `Blocked`           |      `20` |
+| validation failed   |      `30` |
+| config invalid      |      `31` |
+| provider failed     |      `40` |
+| output invalid      |      `41` |
+| safety blocked      |      `50` |
 
 ## 10. Run records
 

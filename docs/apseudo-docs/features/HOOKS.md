@@ -1,3 +1,30 @@
+---
+schema_version: '1.1'
+id: 'reference-utd7v6-claude-code-and-codex-hook-enforcement'
+title: 'Claude Code and Codex Hook Enforcement'
+description: 'Reference for Claude Code and Codex hook enforcement behavior.'
+doc_type: 'reference'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'mix'
+tags:
+  - 'reference'
+  - 'hooks'
+  - 'agent-hooks'
+aliases:
+  - 'pre-commit hooks'
+  - 'CI gate'
+  - 'agent hooks'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Claude Code and Codex Hook Enforcement
 
 **Shared hook script:** `integrations/agent-hooks/apseudo-hook.py`
@@ -5,7 +32,7 @@
 ## Events covered
 
 | Event | Claude Code | Codex CLI | Behavior |
-|---|---:|---:|---|
+| --- | --: | --: | --- |
 | SessionStart | Yes | Yes | Injects pseudocode enforcement context. |
 | UserPromptSubmit | Yes | Yes | Adds context when the prompt appears pseudocode-related. |
 | PreToolUse | Yes | Yes | Blocks common enforcement bypass attempts before tools run. |

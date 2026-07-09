@@ -1,3 +1,29 @@
+---
+schema_version: '1.1'
+id: 'runbook-r72igm-vs-code-integration'
+title: 'VS Code Integration'
+description: 'User guide for configuring the VS Code extension for Pythonic Agent Pseudocode.'
+doc_type: 'runbook'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'product-maintainers'
+consumer: 'user'
+tags:
+  - 'runbook'
+  - 'usage'
+  - 'vscode'
+  - 'product'
+aliases:
+  - 'VS Code extension'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # VS Code Integration
 
 ## Features

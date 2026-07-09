@@ -1,3 +1,27 @@
+---
+schema_version: '1.1'
+id: 'concept-9wm7rl-example-catalog'
+title: 'Example Catalog'
+description: 'Catalog of example Pythonic Agent Pseudocode patterns and artifacts.'
+doc_type: 'concept'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'user'
+tags:
+  - 'concept'
+  - 'usage'
+  - 'agent-workflow'
+aliases: []
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Example Catalog
 
 Date: 2026-07-09  

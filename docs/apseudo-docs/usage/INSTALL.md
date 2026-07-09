@@ -1,3 +1,28 @@
+---
+schema_version: '1.1'
+id: 'runbook-cxnpvn-installation-guide'
+title: 'Installation Guide'
+description: 'Installation guide for the Pythonic Agent Pseudocode toolkit and editor integrations.'
+doc_type: 'runbook'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'user'
+tags:
+  - 'runbook'
+  - 'usage'
+  - 'install'
+aliases:
+  - 'setup guide'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Installation Guide
 
 **Toolkit version:** 0.6.1

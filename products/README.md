@@ -1,3 +1,27 @@
+---
+schema_version: '1.1'
+id: 'index-8t70up-products-and-editor-integrations'
+title: 'Products and Editor Integrations'
+description: 'Index for product and editor integration assets in the agent-pseudocode repository.'
+doc_type: 'index'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'product-maintainers'
+consumer: 'user'
+tags:
+  - 'product'
+  - 'index'
+  - 'editor-integration'
+aliases: []
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Products and Editor Integrations
 
 This folder contains distributable or editor-facing product assets. They are kept together to avoid root-level sprawl while preserving the build/test behavior of each product.

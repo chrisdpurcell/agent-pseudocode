@@ -3,13 +3,16 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from apseudo_lint.config import load_config
+from apseudo_lint.discover import discover_changed_paths
 from apseudo_lint.extract import collect_paths, extract_snippets
 from apseudo_lint.lint import lint_paths
-from apseudo_lint.model import Severity
+from apseudo_lint.model import LintConfig, Severity
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures"
@@ -70,6 +73,34 @@ class APseudoLintTests(unittest.TestCase):
         paths = collect_paths([FIXTURES / "valid"], self.config)
         self.assertTrue(any(path.name == "review_loop.apseudo" for path in paths))
         self.assertTrue(any(path.name == "fenced.md" for path in paths))
+
+    def test_changed_path_discovery_respects_excludes(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = Path(raw_root)
+            skipped = root / "skip" / "example.md"
+            kept = root / "keep" / "example.md"
+            skipped.parent.mkdir()
+            kept.parent.mkdir()
+            skipped.write_text("# skip\n", encoding="utf-8")
+            kept.write_text("# keep\n", encoding="utf-8")
+
+            def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+                del args, kwargs
+                return subprocess.CompletedProcess(
+                    args=["git"],
+                    returncode=0,
+                    stdout="skip/example.md\nkeep/example.md\n",
+                    stderr="",
+                )
+
+            config = LintConfig(exclude=["skip"])
+            with (
+                patch("apseudo_lint.discover.git_root", return_value=root),
+                patch("apseudo_lint.discover.subprocess.run", side_effect=fake_run),
+            ):
+                paths = discover_changed_paths(config)
+
+        self.assertEqual(paths, [kept])
 
     def test_cli_json_output(self) -> None:
         result = subprocess.run(
@@ -135,7 +166,7 @@ class APseudoCompletionTests(unittest.TestCase):
     def test_hover_token_lookup(self) -> None:
         from apseudo_lint.completions import hover_markdown, token_at_position
 
-        text = "return Blocked(reason=\"no\")"
+        text = 'return Blocked(reason="no")'
         token = token_at_position(text, 0, 10)
         self.assertEqual(token, "Blocked")
         self.assertIsNotNone(hover_markdown("Blocked", self.config))

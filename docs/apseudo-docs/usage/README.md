@@ -1,3 +1,26 @@
+---
+schema_version: '1.1'
+id: 'index-bffqbw-usage-documentation'
+title: 'Usage Documentation'
+description: 'Index for Pythonic Agent Pseudocode usage documentation.'
+doc_type: 'index'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'docs-maintainers'
+consumer: 'user'
+tags:
+  - 'index'
+  - 'usage'
+aliases: []
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Usage Documentation
 
 Date: 2026-07-09  

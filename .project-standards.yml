@@ -6,8 +6,20 @@ markdown:
     schema: "markdown-frontmatter"
     required: true
     include:
-      - "docs/adr/**/*.md"
+      - "docs/**/*.md"
+      - "docs/research/*.md"
+      - "products/**/*.md"
+      - "hooks/**/*.md"
     exclude:
+      - "docs/scratchpad.md"
+      - "docs/handoff/**"
+      - "docs/reviews/**"
+      - "docs/plans/**"
+      - "docs/superpowers/plans/**"
+      - "tests/fixtures/**"
+      - "README.md"
+      - "TODO.md"
+      - "STATUS.md"
       - "**/*.template.md"
       - "CHANGELOG.md"
       - "LICENSE.md"
@@ -30,5 +42,5 @@ cli_documentation:
 
 spec:
   include:
-    - 'docs/specs/**/*.md'
+    - "docs/specs/**/*.md"
   exclude: []

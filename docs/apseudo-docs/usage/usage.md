@@ -1,10 +1,34 @@
+---
+schema_version: '1.1'
+id: 'runbook-6j08dn-agent-pseudocode-syntax-toolkit'
+title: 'agent-pseudocode-syntax-toolkit'
+description: 'Usage guide for the Pythonic Agent Pseudocode command-line toolkit.'
+doc_type: 'runbook'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'user'
+tags:
+  - 'runbook'
+  - 'usage'
+  - 'cli'
+aliases:
+  - 'apseudo'
+  - 'apseudo-lint'
+  - 'apseudo-format'
+  - 'apseudo-template'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # agent-pseudocode-syntax-toolkit
 
-> **CLI documentation profile:** Packaged (per the `cli-documentation` standard).
-> The unified `apseudo` dispatcher exposes 9 subcommands, which exceeds the
-> "~5-7 top-level subcommands" Packaged-deep signal on count alone, but the
-> standard is explicit that nesting/count alone never forces the deep tier —
-> this repo stays Packaged as a deliberate tailoring.
+> **CLI documentation profile:** Packaged (per the `cli-documentation` standard). The unified `apseudo` dispatcher exposes 9 subcommands, which exceeds the "~5-7 top-level subcommands" Packaged-deep signal on count alone, but the standard is explicit that nesting/count alone never forces the deep tier — this repo stays Packaged as a deliberate tailoring.
 
 ## NAME
 
@@ -132,21 +156,15 @@ Default output: `docs/apseudo-docs/usage/agent-tasks.md`.
 
 ## apseudo-lint (standalone entry point)
 
-`apseudo-lint` is a standalone console-script alias for `apseudo lint` — see
-the `apseudo lint` entry above for the full `NAME`/`SYNOPSIS`/`OPTIONS`/`EXIT
-STATUS` contract, which applies identically to the standalone invocation.
+`apseudo-lint` is a standalone console-script alias for `apseudo lint` — see the `apseudo lint` entry above for the full `NAME`/`SYNOPSIS`/`OPTIONS`/`EXIT STATUS` contract, which applies identically to the standalone invocation.
 
 ## apseudo-format (standalone entry point)
 
-`apseudo-format` is a standalone console-script alias for `apseudo format` —
-see the `apseudo format` entry above for the full `NAME`/`SYNOPSIS`/`OPTIONS`/
-`EXIT STATUS` contract, which applies identically to the standalone
-invocation.
+`apseudo-format` is a standalone console-script alias for `apseudo format` — see the `apseudo format` entry above for the full `NAME`/`SYNOPSIS`/`OPTIONS`/ `EXIT STATUS` contract, which applies identically to the standalone invocation.
 
 ## apseudo-lsp
 
-`apseudo-lsp` has no `apseudo <subcommand>` equivalent — it is a standalone
-`[project.scripts]` entry point only, documented here in full.
+`apseudo-lsp` has no `apseudo <subcommand>` equivalent — it is a standalone `[project.scripts]` entry point only, documented here in full.
 
 ### NAME
 
@@ -161,26 +179,17 @@ apseudo-lsp {--help | --version}
 
 ### DESCRIPTION
 
-`apseudo-lsp` implements a minimal Language Server Protocol server over
-stdio for Agent Pseudocode and Markdown `apseudo` fenced blocks. It delegates
-all semantic checks to the same formatter/linter used by the CLI, hooks, CI,
-and MCP server, and provides diagnostics, completion, hover, document
-formatting, code actions, document symbols, folding ranges, definitions,
-references, and workspace symbols. It is launched by editor LSP clients
-(VS Code, Kate) rather than invoked directly by users.
+`apseudo-lsp` implements a minimal Language Server Protocol server over stdio for Agent Pseudocode and Markdown `apseudo` fenced blocks. It delegates all semantic checks to the same formatter/linter used by the CLI, hooks, CI, and MCP server, and provides diagnostics, completion, hover, document formatting, code actions, document symbols, folding ranges, definitions, references, and workspace symbols. It is launched by editor LSP clients (VS Code, Kate) rather than invoked directly by users.
 
 ### OPTIONS
 
 #### `--stdio`
 
-Run the server over stdio. This is the default transport and exists for
-editor-client compatibility; the flag is accepted but has no effect beyond
-documenting client intent.
+Run the server over stdio. This is the default transport and exists for editor-client compatibility; the flag is accepted but has no effect beyond documenting client intent.
 
 #### `--trace`
 
-Log LSP message flow (method names for incoming/outgoing messages) to
-stderr.
+Log LSP message flow (method names for incoming/outgoing messages) to stderr.
 
 #### `--version`
 
@@ -188,21 +197,19 @@ Print the `apseudo-lsp` version and exit.
 
 ### EXIT STATUS
 
-| Code | Meaning |
-| ---: | --- |
-| `0` | Clean shutdown — the client sent `shutdown` followed by `exit`. |
-| `1` | The client sent `exit` without a prior `shutdown` request. |
-| `2` | Invalid CLI usage (`argparse` error). |
+| Code | Meaning                                                         |
+| ---: | --------------------------------------------------------------- |
+|  `0` | Clean shutdown — the client sent `shutdown` followed by `exit`. |
+|  `1` | The client sent `exit` without a prior `shutdown` request.      |
+|  `2` | Invalid CLI usage (`argparse` error).                           |
 
 ## apseudo-explain
 
-`apseudo-explain` has no `apseudo <subcommand>` equivalent — it is a
-standalone `[project.scripts]` entry point only, documented here in full.
+`apseudo-explain` has no `apseudo <subcommand>` equivalent — it is a standalone `[project.scripts]` entry point only, documented here in full.
 
 ### NAME
 
-`apseudo-explain` — explain `APSEUDO-*` linter rules and approved convention
-guidance.
+`apseudo-explain` — explain `APSEUDO-*` linter rules and approved convention guidance.
 
 ### SYNOPSIS
 
@@ -213,17 +220,13 @@ apseudo-explain {--help | --version}
 
 ### DESCRIPTION
 
-`apseudo-explain` prints human-readable (or, with `--json`, machine-readable)
-guidance for one or more `APSEUDO-*` rule codes emitted by `apseudo lint`.
-Omitting all rule codes lists every known rule with its code, severity, and
-title.
+`apseudo-explain` prints human-readable (or, with `--json`, machine-readable) guidance for one or more `APSEUDO-*` rule codes emitted by `apseudo lint`. Omitting all rule codes lists every known rule with its code, severity, and title.
 
 ### OPTIONS
 
 #### `<code>...`
 
-Zero or more rule codes to explain (for example `APSEUDO-BRANCH-001`). Case
-insensitive. Omit to list all rules.
+Zero or more rule codes to explain (for example `APSEUDO-BRANCH-001`). Case insensitive. Omit to list all rules.
 
 #### `--json`
 
@@ -236,14 +239,14 @@ Print the `apseudo-explain` version and exit.
 ### EXIT STATUS
 
 | Code | Meaning |
-| ---: | --- |
+| --: | --- |
 | `0` | Success — rules listed or explained. |
 | `2` | One or more requested rule codes are unknown, or invalid CLI usage (`argparse` error). |
 
 ## EXIT STATUS
 
 | Code | Meaning |
-| ---: | --- |
+| --: | --- |
 | `0` | Success. |
 | `1` | Findings, failed provider availability check, or semantic runner outcome such as findings. |
 | `2` | Invalid CLI usage for commands using `argparse`. |
@@ -257,12 +260,12 @@ Print the `apseudo-explain` version and exit.
 
 ## ENVIRONMENT
 
-| Variable | Meaning |
-| --- | --- |
-| `APSEUDO_AGENT` | Default executable runner agent: `claude` or `codex`. |
-| `APSEUDO_RUN_ID` | Set inside provider subprocesses when `--run-dir` is active. |
+| Variable          | Meaning                                                      |
+| ----------------- | ------------------------------------------------------------ |
+| `APSEUDO_AGENT`   | Default executable runner agent: `claude` or `codex`.        |
+| `APSEUDO_RUN_ID`  | Set inside provider subprocesses when `--run-dir` is active. |
 | `APSEUDO_RUN_DIR` | Set inside provider subprocesses when `--run-dir` is active. |
-| `PYTHONPATH` | Used by source-tree wrapper scripts under `scripts/`. |
+| `PYTHONPATH`      | Used by source-tree wrapper scripts under `scripts/`.        |
 
 ## FILES
 

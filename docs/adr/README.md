@@ -2,16 +2,23 @@
 schema_version: '1.1'
 id: 'index-s3eicj-adr'
 title: 'Architecture Decision Records'
-description: 'Index of ADRs for the agent-pseudocode repository.'
+description: 'Index of architecture decision records for the agent-pseudocode repository.'
 doc_type: 'index'
 status: 'active'
 created: '2026-07-09'
 updated: '2026-07-09'
+reviewed: null
+owner: 'docs-maintainers'
+consumer: 'mix'
 tags:
   - 'adr'
   - 'index'
 aliases: []
 related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
 ---
 
 # Architecture Decision Records

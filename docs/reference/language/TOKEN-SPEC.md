@@ -1,3 +1,27 @@
+---
+schema_version: '1.1'
+id: 'reference-ucipiw-agent-pseudocode-token-specification'
+title: 'Agent Pseudocode Token Specification'
+description: 'Reference specification for Pythonic Agent Pseudocode tokens.'
+doc_type: 'reference'
+status: 'active'
+created: '2026-07-09'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'mix'
+tags:
+  - 'reference'
+  - 'language'
+aliases:
+  - 'token spec'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Agent Pseudocode Token Specification
 
 **Version:** 0.1.0  
@@ -9,7 +33,7 @@ This document is the source-of-truth token map for the VS Code and Kate syntax h
 ## File identity
 
 | Concept | Value | Status |
-|---|---|---|
+| --- | --- | --- |
 | Language name | Agent Pseudocode | Internal convention |
 | VS Code language ID | `agent-pseudocode` | Internal convention |
 | Primary file extension | `.apseudo` | Internal convention |
@@ -19,7 +43,7 @@ This document is the source-of-truth token map for the VS Code and Kate syntax h
 ## Token classes
 
 | Token class | Examples | Purpose | Internal or sourced? |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Process declaration | `process review_loop(...):`, `def helper(...):` | Defines workflow/subroutine | Internal convention based on Python shape |
 | Control keyword | `if`, `elif`, `else`, `while`, `for`, `return`, `continue`, `break` | Structural flow | Borrowed from Python control-flow vocabulary |
 | Logical operator | `and`, `or`, `not`, `is`, `in` | Conditions | Borrowed from Python vocabulary |

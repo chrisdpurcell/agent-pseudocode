@@ -1,3 +1,26 @@
+---
+schema_version: '1.1'
+id: 'runbook-xs0ktm-chris-implementation-guide-agent-pseudocode-syntax-toolkit'
+title: 'Chris Implementation Guide: Agent Pseudocode Syntax Toolkit'
+description: 'Implementation guide for the Pythonic Agent Pseudocode syntax toolkit.'
+doc_type: 'runbook'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'user'
+tags:
+  - 'runbook'
+  - 'usage'
+aliases: []
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Chris Implementation Guide: Agent Pseudocode Syntax Toolkit
 
 **Date:** 2026-07-08  

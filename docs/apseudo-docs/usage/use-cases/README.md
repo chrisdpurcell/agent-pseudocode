@@ -1,3 +1,27 @@
+---
+schema_version: '1.1'
+id: 'index-xn9abu-agent-pseudocode-use-case-guide'
+title: 'Agent Pseudocode Use-Case Guide'
+description: 'Index for Pythonic Agent Pseudocode use-case guides.'
+doc_type: 'index'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'docs-maintainers'
+consumer: 'user'
+tags:
+  - 'index'
+  - 'usage'
+  - 'agent-workflow'
+aliases: []
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Agent Pseudocode Use-Case Guide
 
 Date: 2026-07-09 Applies to: Agent Pseudocode Toolkit `0.6.1`

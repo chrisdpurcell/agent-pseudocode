@@ -2,20 +2,23 @@
 schema_version: '1.1'
 id: 'adr-0001-agent-pseudocode-relocate-language-reference-docs'
 title: 'ADR 0001: Relocate normative language reference docs out of docs/specs'
-description: 'Decision to move the normative pseudocode language references out of docs/specs/ into docs/reference/, freeing docs/specs/ for the forward-looking project-spec standard.'
+description: 'Decision to keep normative language references in docs/reference instead of docs/specs.'
 doc_type: 'adr'
 status: 'active'
 created: '2026-07-09'
 updated: '2026-07-09'
 reviewed: null
-owner: ''
+owner: 'agent-pseudocode-maintainers'
 consumer: 'mix'
 tags:
   - 'adr'
   - 'docs'
   - 'standards-adoption'
-aliases: []
-related: []
+aliases:
+  - 'ADR 0001'
+  - 'Language reference relocation'
+related:
+  - 'docs/reference/README.md'
 supersedes: []
 superseded_by: null
 source: []
@@ -32,9 +35,9 @@ project:
 
 ## Context and Problem Statement
 
-This repository is mid-way through a plan to adopt several `project-standards` standards (markdown-frontmatter, agent-handoff-v3, adr, python-coding/python-tooling, and — in a later task — `project-spec`). The `project-spec` standard treats `docs/specs/` as the home for forward-looking, project-scoped specs: documents that describe planned or in-progress work for *this* repository (e.g. a design for a new feature, a state-machine spec for a script).
+This repository is mid-way through a plan to adopt several `project-standards` standards (markdown-frontmatter, agent-handoff-v3, adr, python-coding/python-tooling, and — in a later task — `project-spec`). The `project-spec` standard treats `docs/specs/` as the home for forward-looking, project-scoped specs: documents that describe planned or in-progress work for _this_ repository (e.g. a design for a new feature, a state-machine spec for a script).
 
-`docs/specs/` currently holds a different kind of content: `PYTHONIC_PSEUDOCODE_STANDARD.md` (the Pythonic Agent Pseudocode language standard), `EXECUTABLE-PSEUDOCODE-SPEC.md` (the executable `.apseudo` runner spec), `RULES.md` (the APSEUDO-\* rule catalog, generated from `src/apseudo_lint/rules.py`), and `docs/specs/language/` (`TOKEN-SPEC.md`, `SCOPE-MAP.md`, `README.md`, and `examples/`). These are normative reference material this repository *implements and ships* — they define the pseudocode convention itself, not a plan for building something. They are durable, versioned artifacts consumed by the formatter, linter, language server, MCP server, and this repo's own `CLAUDE.md` ("Follow `docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md`"), not project-planning documents that get superseded once the described work ships.
+`docs/specs/` currently holds a different kind of content: `PYTHONIC_PSEUDOCODE_STANDARD.md` (the Pythonic Agent Pseudocode language standard), `EXECUTABLE-PSEUDOCODE-SPEC.md` (the executable `.apseudo` runner spec), `RULES.md` (the APSEUDO-\* rule catalog, generated from `src/apseudo_lint/rules.py`), and `docs/specs/language/` (`TOKEN-SPEC.md`, `SCOPE-MAP.md`, `README.md`, and `examples/`). These are normative reference material this repository _implements and ships_ — they define the pseudocode convention itself, not a plan for building something. They are durable, versioned artifacts consumed by the formatter, linter, language server, MCP server, and this repo's own `CLAUDE.md` ("Follow `docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md`"), not project-planning documents that get superseded once the described work ships.
 
 Adopting `project-spec` on top of the current `docs/specs/` layout would conflate two unrelated meanings of "spec" in one directory: the language/DSL reference the tooling implements, and forward-looking task/feature specs the `project-spec` standard is designed to manage. Where should the normative language reference material live so that `docs/specs/` can be handed cleanly to the `project-spec` standard?
 

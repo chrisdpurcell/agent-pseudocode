@@ -1,7 +1,31 @@
+---
+schema_version: '1.1'
+id: 'reference-8rgc2s-scope-map-agent-pseudocode'
+title: 'Scope Map: Agent Pseudocode'
+description: 'Reference map for scopes in Pythonic Agent Pseudocode.'
+doc_type: 'reference'
+status: 'active'
+created: '2026-07-09'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'mix'
+tags:
+  - 'reference'
+  - 'language'
+aliases:
+  - 'scope map'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Scope Map: Agent Pseudocode
 
 | Token class | Examples | VS Code TextMate scope | Kate item style |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Comment | `# explain intent` | `comment.line.number-sign.agent-pseudocode` | `dsComment` |
 | Docstring | `"""notes"""` | `string.quoted.docstring.multi.agent-pseudocode` | `dsDocumentation` |
 | String | `"approved"` | `string.quoted.double.agent-pseudocode` | `dsString` |

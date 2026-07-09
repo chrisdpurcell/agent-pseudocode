@@ -1,3 +1,29 @@
+---
+schema_version: '1.1'
+id: 'runbook-vvyp1a-enforcement-guide'
+title: 'Enforcement Guide'
+description: 'Reference for repository enforcement layers that protect Pythonic Agent Pseudocode files.'
+doc_type: 'runbook'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'mix'
+tags:
+  - 'runbook'
+  - 'enforcement'
+  - 'agent-workflow'
+aliases:
+  - 'pre-commit hooks'
+  - 'CI gate'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Enforcement Guide
 
 ## Enforcement architecture
@@ -64,7 +90,7 @@ See `docs/apseudo-docs/features/MCP.md` for agent-facing MCP tools.
 When validation fails, the correct response is one of:
 
 1. Fix the pseudocode.
-2. Explain the APSEUDO-* diagnostic and why the source is blocked.
+2. Explain the APSEUDO-\* diagnostic and why the source is blocked.
 3. Propose a standard change with rationale.
 
 Do not bypass hooks, pre-commit, or CI.

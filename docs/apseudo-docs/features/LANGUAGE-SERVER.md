@@ -1,3 +1,28 @@
+---
+schema_version: '1.1'
+id: 'reference-hwxn4n-language-server'
+title: 'Language Server'
+description: 'Reference for the Pythonic Agent Pseudocode language server.'
+doc_type: 'reference'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'mix'
+tags:
+  - 'reference'
+  - 'lsp'
+aliases:
+  - 'Language server'
+  - 'apseudo-lsp'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Language Server
 
 **Command:** `scripts/apseudo-lsp`  
@@ -7,10 +32,10 @@
 ## Capabilities
 
 | Capability | Status | Notes |
-|---|---:|---|
+| --- | --: | --- |
 | Diagnostics | Implemented | Uses `apseudo-lint` logic. |
 | Completion | Implemented | Keywords, outcomes, annotations, templates. |
-| Hover | Implemented | Keywords, outcomes, annotations, APSEUDO-* rules. |
+| Hover | Implemented | Keywords, outcomes, annotations, APSEUDO-\* rules. |
 | Formatting | Implemented | Uses `apseudo-format` logic. |
 | Code actions | Implemented | Quick fixes for common diagnostics plus format/fix-all. |
 | Document symbols | Implemented | Process declarations. |
@@ -31,7 +56,7 @@ The server provides conservative quick fixes:
 - Add terminal `Blocked(...)` outcome.
 - Insert bounded-loop or finite-collection annotation placeholders.
 - Insert loop-control update reminder.
-- Explain APSEUDO-* rules through the VS Code command bridge when available.
+- Explain APSEUDO-\* rules through the VS Code command bridge when available.
 
 Code actions do not prove business logic. They repair convention shape and make missing intent visible.
 

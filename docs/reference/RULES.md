@@ -1,3 +1,30 @@
+---
+schema_version: '1.1'
+id: 'reference-syjjuy-apseudo-rule-catalog'
+title: 'APSEUDO Rule Catalog'
+description: 'Reference catalog for APSEUDO validation rules.'
+doc_type: 'reference'
+status: 'active'
+created: '2026-07-09'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'mix'
+tags:
+  - 'reference'
+  - 'language'
+  - 'rules'
+  - 'validator'
+aliases:
+  - 'APSEUDO rules'
+  - 'Rule catalog'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # APSEUDO Rule Catalog
 
 This file is generated from `src/apseudo_lint/rules.py`. It is the shared explanatory layer for the CLI, language server, MCP server, hooks, and documentation.

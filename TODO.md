@@ -22,9 +22,9 @@ Instructions for AI agents:
   - Ensure the specs comply with the project-spec standard.
 - [ ] Correct naming of markdown files in `docs/` (except README.md) to use lower kebab-case. Ensure all links and references are updated accordingly.
 - [ ] Ensure all markdown files lint and format correctly and do not break.
-- [ ] Create this repo's custom conventions for markdown-frontmatter.
+- [x] Create this repo's custom conventions for markdown-frontmatter.
   - [x] Codify as a proper ADR. Accepted as `docs/adr/adr-0003-markdown-frontmatter-scope-and-conventions.md` on 2026-07-09.
-  - Fix all existing markdown files to comply with the new conventions.
+  - [x] Fix all existing covered markdown files to comply with the new conventions.
     - Try to script this as much as possible to save tokens and time.
 - [ ] Verify all python files lint and format correctly and do not break.
 - [ ] Review .gitignore, ensure it makes sense and entries are reasonable, and reorganize/reorder for clarity.
@@ -37,10 +37,10 @@ Instructions for AI agents:
 
 - [ ] Author the first project-spec-conformant spec under `docs/specs/` and add `.github/workflows/validate-specs.yml` (deferred from project-spec adoption, 2026-07-08 — the standard refuses an empty corpus rather than passing vacuously, so wiring CI before any spec exists would fail every run).
 
-- [ ] Fix 4 pre-existing bugs found (not introduced) during the 2026-07-09 standards-adoption session, recorded in `docs/handoff/bugs/`:
+- [ ] Fix 3 remaining pre-existing bugs found (not introduced) during the 2026-07-09 standards-adoption session, recorded in `docs/handoff/bugs/`:
   - [bug 001](docs/handoff/bugs/001-mcp-resource-map-stale-paths.md) — `mcp.py`'s resource map references 4 `docs/*.md` paths that never existed.
   - [bug 002](docs/handoff/bugs/002-review-completeness-stale-paths.md) — `review.py`'s completeness checks hard-code stale `docs/usage/`/`docs/roadmap/` paths from an earlier reorg (one of two reasons `apseudo-review .` exits 1).
-  - [bug 003](docs/handoff/bugs/003-pre-migration-transcript-lint-errors.md) — the pre-migration ChatGPT transcript trips real APSEUDO lint errors on illustrative fences (the other reason `apseudo-review .` exits 1).
+  - [x] [bug 003](docs/handoff/bugs/003-pre-migration-transcript-lint-errors.md) — fixed by excluding historical pre-migration transcripts from APSEUDO Markdown-fence linting.
   - [bug 004](docs/handoff/bugs/004-lsp-serve-unhandled-read-message.md) — `lsp.py`'s `serve()` loop leaves `_read_message` unguarded by try/except.
 
 ## Completed Tasks

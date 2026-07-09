@@ -1,3 +1,26 @@
+---
+schema_version: '1.1'
+id: 'reference-4phm6g-sources'
+title: 'Sources'
+description: 'Reference index of source material used by Pythonic Agent Pseudocode documentation.'
+doc_type: 'reference'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'mix'
+tags:
+  - 'reference'
+  - 'language'
+aliases: []
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Sources
 
 **Date:** 2026-07-08

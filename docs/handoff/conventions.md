@@ -9,7 +9,7 @@
 | C-001 | Adding a new pseudocode rule | Define it in `src/apseudo_lint/rules.py`; `docs/reference/RULES.md` is generated from it, never hand-edited. |
 | C-002 | Editing validator/formatter behavior | The validator and formatter are the policy source of truth — LSP, MCP, hooks, pre-commit, CI, VS Code, and Kate integrations must call or reuse `src/apseudo_lint`, never reimplement rules. |
 | C-003 | Adding a CLI entry point | Add it to `[project.scripts]` in `pyproject.toml` and document it per the `cli-documentation` standard (`docs/apseudo-docs/usage/usage.md`). |
-| C-004 | Widening `.project-standards.yml`'s `markdown.frontmatter.include` | Keep enforcement scoped to `docs/adr/**` until the ADR-0003 migration is executed; use ADR-0003 for the approved corpus and field conventions. |
+| C-004 | Editing `.project-standards.yml`'s `markdown.frontmatter` block | Keep enforcement on the ADR-0003 durable-doc corpus and preserve its exclusions for temporary, operational, harness-owned, and fixture files. |
 | C-005 | Installing/syncing Python deps | Use bare `uv sync` (or `uv sync --all-groups`), never `uv sync --extra dev` — `dev` is a `[dependency-groups]` entry, not an extra, since the python-tooling adoption. |
 
 ## C-001: Rule catalog is generated, not authored
@@ -38,13 +38,13 @@
 
 **Why:** adopted 2026-07-08 (Task 5 of the adoption plan); `usage.md` and `RUNNER-USAGE.md` already followed this shape independently before adoption.
 
-## C-004: markdown-frontmatter scope stays narrow
+## C-004: markdown-frontmatter follows ADR-0003 corpus scope
 
 **Applies when:** editing `.project-standards.yml`'s `markdown.frontmatter` block, or adopting frontmatter elsewhere in the repo.
 
-**Rule:** `include` remains deliberately `docs/adr/**/*.md` until the ADR-0003 migration is executed. Use `docs/adr/adr-0003-markdown-frontmatter-scope-and-conventions.md` as the approved corpus and field convention for that migration.
+**Rule:** `include` follows the ADR-0003 durable-documentation corpus: `docs/**/*.md`, `docs/research/*.md`, `products/**/*.md`, and `hooks/**/*.md`. Preserve the ADR-0003 exclusions for scratchpads, handoff state, reviews, plans, fixtures, root operational files, agent harness files, templates, generated content, and vendored content.
 
-**Why:** `markdown-frontmatter` was adopted only as a prerequisite for the `adr` standard (2026-07-09). This repo has many pre-existing Markdown files with no frontmatter; widening scope before the ADR-0003 migration would fail validation across the corpus.
+**Why:** ADR-0003 was accepted and migrated on 2026-07-09. The widened scope validates durable docs without forcing project-standards frontmatter onto operational files with different lifetimes.
 
 ## C-005: `dev` dependencies sync via bare `uv sync`
 

@@ -2,7 +2,7 @@
 schema_version: '1.1'
 id: 'adr-0003-agent-pseudocode-markdown-frontmatter-scope-and-conventions'
 title: 'ADR 0003: Govern Durable Markdown Frontmatter Scope and Conventions'
-description: 'Decision for which Markdown files in agent-pseudocode are governed by project-standards frontmatter and how they are classified.'
+description: 'Decision for the durable Markdown frontmatter corpus and metadata conventions.'
 doc_type: 'adr'
 status: 'active'
 created: '2026-07-09'
@@ -16,6 +16,7 @@ tags:
   - 'frontmatter'
   - 'standards-adoption'
 aliases:
+  - 'ADR 0003'
   - 'Markdown frontmatter conventions'
   - 'Frontmatter scope'
 related:

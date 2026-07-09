@@ -1,3 +1,29 @@
+---
+schema_version: '1.1'
+id: 'concept-nwduvm-runner-workflows'
+title: 'Runner Workflows'
+description: 'Guide to workflows that use executable Pythonic Agent Pseudocode runner scripts.'
+doc_type: 'concept'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'user'
+tags:
+  - 'concept'
+  - 'usage'
+  - 'agent-workflow'
+  - 'runner'
+aliases:
+  - 'apseudo-run'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Runner Workflows
 
 Date: 2026-07-09  

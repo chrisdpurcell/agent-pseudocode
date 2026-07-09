@@ -1,3 +1,28 @@
+---
+schema_version: '1.1'
+id: 'index-0vtp0k-agent-pseudocode-vs-code-extension'
+title: 'Agent Pseudocode VS Code Extension'
+description: 'Index for the VS Code extension for Pythonic Agent Pseudocode.'
+doc_type: 'index'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'product-maintainers'
+consumer: 'user'
+tags:
+  - 'product'
+  - 'vscode'
+  - 'editor-integration'
+aliases:
+  - 'VS Code extension'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Agent Pseudocode VS Code Extension
 
 This extension provides syntax highlighting, Markdown fenced-block highlighting, snippets, and LSP-backed language features for Pythonic Agent Pseudocode.

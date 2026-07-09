@@ -1,3 +1,30 @@
+---
+schema_version: '1.1'
+id: 'runbook-bezkyl-pythonic-agent-pseudocode-enforcement-guide'
+title: 'Pythonic Agent Pseudocode Enforcement Guide'
+description: 'Guide to enforcing Pythonic Agent Pseudocode across local, CI, and agent workflows.'
+doc_type: 'runbook'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'mix'
+tags:
+  - 'runbook'
+  - 'enforcement'
+  - 'agent-workflow'
+aliases:
+  - 'pre-commit hooks'
+  - 'CI gate'
+  - 'agent hooks'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Pythonic Agent Pseudocode Enforcement Guide
 
 **Date:** 2026-07-08  
@@ -23,7 +50,7 @@ The design rule is simple: **all policy logic lives in `src/apseudo_lint`; integ
 ## What is sourced vs internal convention
 
 | Area | Status | Notes |
-|---|---|---|
+| --- | --- | --- |
 | VS Code syntax highlighting | Sourced | VS Code uses TextMate grammars and supports injection grammars for Markdown fenced code blocks. |
 | Kate highlighting | Sourced | Kate/KDE uses XML syntax definitions installed under KSyntaxHighlighting paths. |
 | pre-commit | Sourced | Uses standard `.pre-commit-config.yaml` local hook configuration. |
@@ -37,7 +64,7 @@ The design rule is simple: **all policy logic lives in `src/apseudo_lint`; integ
 ## Files added for enforcement
 
 | Path | Purpose |
-|---|---|
+| --- | --- |
 | `src/apseudo_lint/` | Shared Python validator package. |
 | `scripts/apseudo-lint` | Install-free CLI wrapper using `PYTHONPATH=src`. |
 | `.apseudo-lint.toml` | Project rule configuration. |
@@ -130,11 +157,11 @@ Project hook config:
 
 Configured events:
 
-| Event | Purpose |
-|---|---|
-| `SessionStart` | Adds a short pseudocode-enforcement reminder. |
-| `PostToolUse` | Runs after file-edit tools and validates changed pseudocode. |
-| `Stop` | Validates changed pseudocode before final response. |
+| Event          | Purpose                                                      |
+| -------------- | ------------------------------------------------------------ |
+| `SessionStart` | Adds a short pseudocode-enforcement reminder.                |
+| `PostToolUse`  | Runs after file-edit tools and validates changed pseudocode. |
+| `Stop`         | Validates changed pseudocode before final response.          |
 
 The command hook invokes:
 
@@ -161,7 +188,7 @@ Project hook config:
 Configured events:
 
 | Event | Purpose |
-|---|---|
+| --- | --- |
 | `SessionStart` | Adds a short pseudocode-enforcement reminder. |
 | `PostToolUse` | Runs after Bash/apply_patch/Edit/Write and validates changed pseudocode. |
 | `Stop` | Validates changed pseudocode before turn completion. |
@@ -182,7 +209,7 @@ Operational notes:
 ## Rule catalog
 
 | Rule ID | Severity | Status | Meaning |
-|---|---:|---|---|
+| --- | --: | --- | --- |
 | `APSEUDO-IO-001` | Error | Internal | File could not be read as UTF-8. |
 | `APSEUDO-IO-002` | Error | Internal | File does not exist. |
 | `APSEUDO-PARSE-001` | Error | Internal | Header syntax is malformed for the Pythonic pseudocode subset. |
@@ -209,7 +236,7 @@ Operational notes:
 Annotations are comments on the same line or immediately preceding line.
 
 | Annotation | Effect |
-|---|---|
+| --- | --- |
 | `# @bounded` | Marks a loop/iteration source as intentionally bounded. |
 | `# @external_stop_condition` | Allows loops controlled by external events, queues, or tools. |
 | `# @explicit_stop_condition` | Documents a stop condition the heuristic cannot infer. |
@@ -227,6 +254,7 @@ Markdown can skip the next pseudocode fence:
 
 ````markdown
 <!-- apseudo-lint: disable-next-fence -->
+
 ```apseudo
 this example is intentionally invalid
 ```
@@ -289,10 +317,10 @@ Use this operating model:
 
 ## Sources
 
-- VS Code syntax highlighting guide: https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide
-- VS Code contribution points: https://code.visualstudio.com/api/references/contribution-points
-- Kate syntax highlighting docs: https://docs.kde.org/stable_kf6/en/kate/katepart/highlight.html
-- pre-commit docs: https://pre-commit.com/
-- GitHub Actions workflow syntax: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
-- Claude Code hooks reference: https://code.claude.com/docs/en/hooks
-- Codex hooks docs: https://developers.openai.com/codex/hooks
+- VS Code syntax highlighting guide: <https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide>
+- VS Code contribution points: <https://code.visualstudio.com/api/references/contribution-points>
+- Kate syntax highlighting docs: <https://docs.kde.org/stable_kf6/en/kate/katepart/highlight.html>
+- pre-commit docs: <https://pre-commit.com/>
+- GitHub Actions workflow syntax: <https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax>
+- Claude Code hooks reference: <https://code.claude.com/docs/en/hooks>
+- Codex hooks docs: <https://developers.openai.com/codex/hooks>

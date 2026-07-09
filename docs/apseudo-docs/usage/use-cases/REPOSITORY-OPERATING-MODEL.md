@@ -1,3 +1,27 @@
+---
+schema_version: '1.1'
+id: 'concept-m6hyno-repository-operating-model'
+title: 'Repository Operating Model'
+description: 'Concept guide for operating the agent-pseudocode repository.'
+doc_type: 'concept'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'user'
+tags:
+  - 'concept'
+  - 'usage'
+  - 'agent-workflow'
+aliases: []
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Repository Operating Model
 
 Date: 2026-07-09  
@@ -114,8 +138,7 @@ uv run apseudo-lint standards/processes/<process-name>.apseudo
 ### 3. Reference it from docs
 
 ```markdown
-The normative process is `standards/processes/<process-name>.apseudo`.
-If prose and pseudocode conflict, the agent must stop and surface the conflict.
+The normative process is `standards/processes/<process-name>.apseudo`. If prose and pseudocode conflict, the agent must stop and surface the conflict.
 ```
 
 ### 4. Register it if it is executable

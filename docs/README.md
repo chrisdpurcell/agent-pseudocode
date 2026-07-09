@@ -1,7 +1,29 @@
+---
+schema_version: '1.1'
+id: 'index-aqjczt-documentation-index'
+title: 'Documentation Index'
+description: 'Index for the durable documentation tree in the agent-pseudocode repository.'
+doc_type: 'index'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'docs-maintainers'
+consumer: 'mix'
+tags:
+  - 'docs'
+  - 'index'
+aliases: []
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Documentation Index
 
-The documentation tree is grouped by purpose so the normative specs stay easy to
-find while the toolkit guides live under `docs/apseudo-docs/`.
+The documentation tree is grouped by purpose so the normative specs stay easy to find while the toolkit guides live under `docs/apseudo-docs/`.
 
 ## Layout
 

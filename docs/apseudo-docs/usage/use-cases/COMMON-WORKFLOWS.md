@@ -1,3 +1,28 @@
+---
+schema_version: '1.1'
+id: 'concept-s3dsf5-common-workflows-and-use-cases'
+title: 'Common Workflows and Use Cases'
+description: 'Guide to common Pythonic Agent Pseudocode workflows and use cases.'
+doc_type: 'concept'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'user'
+tags:
+  - 'concept'
+  - 'usage'
+  - 'agent-workflow'
+aliases:
+  - 'workflow examples'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Common Workflows and Use Cases
 
 Date: 2026-07-09  
@@ -289,13 +314,13 @@ Why pseudocode helps:
 
 Recommended defaults:
 
-| Task | Default |
-| --- | --- |
-| Spec critique, policy review, tradeoff analysis | Claude |
-| Repository edits, tests, lint/type repair | Codex |
-| Cross-checking another agent's output | Opposite model from the author |
-| CLI/script repair | Codex |
-| Standards language review | Claude first, Codex second |
+| Task                                            | Default                        |
+| ----------------------------------------------- | ------------------------------ |
+| Spec critique, policy review, tradeoff analysis | Claude                         |
+| Repository edits, tests, lint/type repair       | Codex                          |
+| Cross-checking another agent's output           | Opposite model from the author |
+| CLI/script repair                               | Codex                          |
+| Standards language review                       | Claude first, Codex second     |
 
 The runner supports both providers. Use flags to override script defaults:
 

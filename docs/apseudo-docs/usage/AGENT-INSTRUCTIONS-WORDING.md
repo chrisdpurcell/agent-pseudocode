@@ -1,3 +1,28 @@
+---
+schema_version: '1.1'
+id: 'runbook-2rwjds-repository-agent-instruction-wording'
+title: 'Repository Agent Instruction Wording'
+description: 'Reusable wording for repository agent instructions that adopt Pythonic Agent Pseudocode.'
+doc_type: 'runbook'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'user'
+tags:
+  - 'runbook'
+  - 'usage'
+aliases:
+  - 'AGENTS.md wording'
+  - 'CLAUDE.md wording'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Repository Agent Instruction Wording
 
 **Purpose:** Copy these blocks into repositories that should follow the Pythonic Agent Pseudocode convention.
@@ -16,7 +41,7 @@ When creating or editing `.apseudo`, `.agentpseudo`, `.pseudocode`, or Markdown 
 - Use explicit `if / elif / else`, bounded `while`, visibly finite `for`, and approved terminal outcomes.
 - Do not leave unbounded loops, implicit fallthrough branches, placeholder bodies, or ambiguous returns.
 - Run `scripts/apseudo-format --check --changed` and `scripts/apseudo-lint --changed` before declaring completion.
-- If validation fails, fix the pseudocode or report the exact APSEUDO-* rule ID and blocker.
+- If validation fails, fix the pseudocode or report the exact APSEUDO-\* rule ID and blocker.
 - Do not bypass hooks, pre-commit, CI, or validation with `--no-verify`, `SKIP=...`, disabled hooks, or ignored checks.
 ```
 
@@ -35,7 +60,7 @@ Required behavior:
 2. Use the `agent_pseudocode` MCP server when available for validation, rule explanations, templates, and project review.
 3. Run `scripts/apseudo-template --list` before drafting a new workflow unless the user supplied a complete structure.
 4. Run `scripts/apseudo-format --check --changed` before `scripts/apseudo-lint --changed`.
-5. Do not finish while APSEUDO-* errors remain.
+5. Do not finish while APSEUDO-\* errors remain.
 6. Do not bypass `pre-commit`, CI, hooks, or validation.
 7. If a rule appears inappropriate, surface the rule ID, rationale, and proposed standard change instead of suppressing it.
 
@@ -51,7 +76,7 @@ Completion statement requirement:
 
 ## Pythonic Agent Pseudocode
 
-Use the project `agent-pseudocode` skill and local validation tools whenever the task mentions pseudocode, APSEUDO-* rules, process specs, agent workflows, bounded retry loops, or Markdown `apseudo` fences.
+Use the project `agent-pseudocode` skill and local validation tools whenever the task mentions pseudocode, APSEUDO-\* rules, process specs, agent workflows, bounded retry loops, or Markdown `apseudo` fences.
 
 Hard requirements:
 
@@ -60,7 +85,7 @@ Hard requirements:
 - Treat `apseudo-format` as the source of truth for formatting.
 - Run `scripts/apseudo-format --check --changed` and `scripts/apseudo-lint --changed` before completion.
 - Use `scripts/apseudo-explain <RULE>` for any unclear diagnostic.
-- Do not claim completion if APSEUDO-* errors remain.
+- Do not claim completion if APSEUDO-\* errors remain.
 - Do not use `git commit --no-verify`, `SKIP=...`, disabled hooks, or other enforcement bypasses.
 ```
 
@@ -97,7 +122,7 @@ This directory may define domain-specific outcomes in `.apseudo-lint.toml`, but 
 
 Use this block in repositories that include executable `.apseudo` scripts.
 
-```md
+````md
 ## Executable Agent Pseudocode scripts
 
 Files with a shebang such as `#!/usr/bin/env apseudo-run` are executable Agent Pseudocode task launchers. They are not Python or Bash scripts. Treat their pseudocode body as the normative workflow and their frontmatter as runner metadata.
@@ -121,6 +146,7 @@ uv run apseudo-run --print-command <script.apseudo> -- <key=value>...
 uv run apseudo-run --claude --review <script.apseudo> -- <key=value>...
 uv run apseudo-run --codex --apply <script.apseudo> -- <key=value>...
 ```
+````
 
 Before completing work that creates or edits executable pseudocode, run:
 
@@ -130,7 +156,8 @@ uv run apseudo-lint .
 uv run apseudo-run --check <each changed executable .apseudo script>
 uv run apseudo-review .
 ```
-```
+
+````
 
 ## Executable runner instructions for repositories
 
@@ -147,7 +174,7 @@ Before editing executable pseudocode, run:
 
 ```bash
 uv run apseudo-run --check <script.apseudo>
-```
+````
 
 Before executing a new or changed executable script, inspect both:
 
@@ -163,4 +190,7 @@ uv run apseudo-run --run-dir .apseudo/runs <agent/mode flags> <script.apseudo> -
 ```
 
 Do not bypass `apseudo-lint`, `apseudo-format`, pre-commit, CI, hooks, post-checks, or diff policy. If a runner script conflicts with prose, existing implementation, or repo instructions, stop and surface the conflict instead of guessing.
+
+```
+
 ```

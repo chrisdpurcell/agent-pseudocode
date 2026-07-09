@@ -1,3 +1,28 @@
+---
+schema_version: '1.1'
+id: 'runbook-h9v7m9-apseudo-run'
+title: 'apseudo-run'
+description: 'User guide for running executable .apseudo task scripts with apseudo-run.'
+doc_type: 'runbook'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'tooling-maintainers'
+consumer: 'user'
+tags:
+  - 'runbook'
+  - 'usage'
+  - 'runner'
+aliases:
+  - 'Runner spec'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # apseudo-run
 
 Date: 2026-07-09  
@@ -448,16 +473,16 @@ uv run apseudo docs generate --output docs/apseudo-docs/usage/agent-tasks.md
 
 ## EXIT STATUS
 
-| Code | Meaning |
-| ---: | --- |
-| `0` | `Accepted` — script completed and verification passed. |
-| `10` | `NeedsUserDecision` — explicit user input or approval is required. |
-| `20` | `Blocked` — script could not complete or verification failed. |
-| `30` | Local pseudocode validation failed. |
+| Code | Meaning                                                                 |
+| ---: | ----------------------------------------------------------------------- |
+|  `0` | `Accepted` — script completed and verification passed.                  |
+| `10` | `NeedsUserDecision` — explicit user input or approval is required.      |
+| `20` | `Blocked` — script could not complete or verification failed.           |
+| `30` | Local pseudocode validation failed.                                     |
 | `31` | Runner configuration, argument, registry, or repeat-run metadata error. |
-| `40` | Provider command failed. |
-| `41` | Provider output did not match the required outcome schema. |
-| `50` | Safety policy blocked execution. |
+| `40` | Provider command failed.                                                |
+| `41` | Provider output did not match the required outcome schema.              |
+| `50` | Safety policy blocked execution.                                        |
 
 ## ENVIRONMENT
 
@@ -528,10 +553,7 @@ uv run apseudo-run --replay .apseudo/runs/20260709T010203Z-fix-ruff-codex-a1b2c3
 ### Use a script argument file
 
 ```json
-{
-  "target": "src",
-  "strict": true
-}
+{ "target": "src", "strict": true }
 ```
 
 ```bash

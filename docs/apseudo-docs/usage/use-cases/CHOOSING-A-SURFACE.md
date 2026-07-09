@@ -1,3 +1,28 @@
+---
+schema_version: '1.1'
+id: 'concept-zczt40-choosing-the-right-surface'
+title: 'Choosing the Right Surface'
+description: 'Concept guide for choosing between prose, fenced blocks, .apseudo files, and runner scripts.'
+doc_type: 'concept'
+status: 'active'
+created: '2026-07-08'
+updated: '2026-07-09'
+reviewed: null
+owner: 'language-maintainers'
+consumer: 'user'
+tags:
+  - 'concept'
+  - 'usage'
+  - 'agent-workflow'
+aliases:
+  - 'surface choice'
+related: []
+source: []
+confidence: 'medium'
+visibility: 'internal'
+license: null
+---
+
 # Choosing the Right Surface
 
 Date: 2026-07-09  
@@ -86,8 +111,7 @@ standards/processes/handoff-size-control.apseudo
 Then reference it from Markdown:
 
 ```markdown
-The normative process is `standards/processes/release-gate.apseudo`.
-Do not duplicate the release-gate logic in prose.
+The normative process is `standards/processes/release-gate.apseudo`. Do not duplicate the release-gate logic in prose.
 ```
 
 This keeps the workflow diff-friendly and makes it easier for hooks/CI to validate.
