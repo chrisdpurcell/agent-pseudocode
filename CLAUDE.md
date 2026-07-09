@@ -23,13 +23,13 @@ Hard requirements:
 ## Development commands
 
 ```bash
-uv sync --extra dev
+uv sync
 uv run pytest
 uv run apseudo-format --check .
 uv run apseudo-lint .
 uv run apseudo-review .
 uv run ruff check src tests integrations/agent-hooks
-uv run pyright
+uv run basedpyright
 ```
 
 ## Python code style

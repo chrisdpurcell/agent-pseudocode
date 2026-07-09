@@ -29,7 +29,6 @@ Instructions for AI agents:
   durable, normative reference documentation, not a project plan.
   `project-spec` was adopted for new, forward-looking specs authored under
   `docs/specs/` going forward.
-- [ ]
 
 ## Agent Tracked Tasks
 

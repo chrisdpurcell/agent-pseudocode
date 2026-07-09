@@ -50,7 +50,7 @@ The `python-tooling` standard (§19.2/§21 of `standards/python-tooling/README.m
 
 ## Decision Outcome
 
-Chosen option: "Update `apseudo-lint.yml` in place," because a second workflow would duplicate the checkout/Python-setup/`uv sync` preamble that `apseudo-lint.yml` already performs, and would create two independent "is this repo's Python code correct" signals instead of one. This repo's CI already checks out, sets up Python, and runs `uv sync --extra dev` once; folding the `python-tooling` steps into that same job keeps a single canonical gate and a single place to look when CI is red.
+Chosen option: "Update `apseudo-lint.yml` in place," because a second workflow would duplicate the checkout/Python-setup/`uv sync` preamble that `apseudo-lint.yml` already performs, and would create two independent "is this repo's Python code correct" signals instead of one. This repo's CI already checks out, sets up Python, and runs `uv sync` once; folding the `python-tooling` steps into that same job keeps a single canonical gate and a single place to look when CI is red.
 
 ### Consequences
 

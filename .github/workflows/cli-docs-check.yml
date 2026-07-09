@@ -15,8 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      # SHA-pinned per this repo's action-hardening policy (docs/handoff/bugs/001-setup-uv-
-      # v8-tag-withdrawn.md: moving tags broke CI once). Re-verify the pin when copying.
+      # SHA-pinned per this repo's action-hardening policy (a previously-used
+      # moving tag was withdrawn upstream and broke CI). See the upstream
+      # project-standards repo for full rationale. Re-verify the pin when copying.
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
       - name: Build and install the wheel into a clean venv
         run: |

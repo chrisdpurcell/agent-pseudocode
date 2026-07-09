@@ -6,7 +6,7 @@
 
 ## Current State
 
-- Local development toolkit, no deployment target. Repo migrated to `agent-handoff-v3` session-state layout and `project-standards` (adr, markdown-tooling, cli-documentation, project-spec, python-tooling) on 2026-07-08.
+- Local development toolkit, no deployment target. Repo migrated to `agent-handoff-v3` session-state layout and `project-standards` (adr, markdown-tooling, cli-documentation, project-spec, python-tooling, python-coding) on 2026-07-08.
 
 ## Recent Changes
 
