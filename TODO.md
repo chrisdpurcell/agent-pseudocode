@@ -27,4 +27,12 @@ Instructions for AI agents:
 
 ## Agent Tracked Tasks
 
+- [ ] Task 9: Full-repo Markdown cleanup — run `npx prettier@3.8.3 --write .`
+  and `npx markdownlint-cli2 --fix "**/*.md"` across all 83 tracked Markdown
+  files (489 pre-existing violations found across 33 files as of the
+  markdown-tooling adoption), review the diff, then re-add
+  `.github/workflows/lint-markdown.yml` (deleted after the adopt CLI wrote
+  it) and flip `.github/workflows/format.yml`'s `prettier` input from
+  `false` to `true`.
+
 ## Completed Tasks

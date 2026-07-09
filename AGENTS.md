@@ -48,3 +48,33 @@ uv run pyright
 ## Executable Agent Pseudocode runner
 
 Use `apseudo-run` or `apseudo run` for executable `.apseudo` task scripts. Before trusting a new or edited runner script, run `uv run apseudo-run --check`, `--render-prompt`, and `--print-command`. Prefer `--run-dir .apseudo/runs` for auditable runs. Do not bypass runner post-checks, diff policy, hooks, pre-commit, or CI.
+
+# Markdown & Structured-Text Tooling
+
+This repository follows the Markdown Tooling Standard. Prettier formats every file type it supports (`md`/`json`/`jsonc`/`yaml` here); markdownlint lints Markdown structure only. Do not introduce a competing formatter or linter.
+
+## Fix pass
+
+When changing Markdown, JSON, JSONC, or YAML, run the fix pass first:
+
+```bash
+npx prettier --write .
+npx markdownlint-cli2 --fix "**/*.md"
+```
+
+## Check contract
+
+Before considering work complete, run the non-mutating check:
+
+```bash
+npx prettier --check .
+npx markdownlint-cli2 "**/*.md"
+```
+
+Do not claim completion if either command fails.
+
+## Rules
+
+- Prettier owns physical formatting. Do not fight its output or hand-format.
+- markdownlint owns Markdown structure. Do not disable a rule to silence a warning — fix the Markdown.
+- Do not edit `.prettierrc.json` or `.markdownlint.json` to bypass a check without a documented ADR exception.

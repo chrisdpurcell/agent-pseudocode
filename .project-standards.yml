@@ -21,3 +21,6 @@ markdown:
   adr:
     version: "1.0"
     require_sections: true
+
+markdown_tooling:
+  version: "1.1"
