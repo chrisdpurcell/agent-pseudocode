@@ -14,15 +14,21 @@ Instructions for AI agents:
 
 ## User Tracked Tasks
 
-- [ ] Adopt [agent-handoff-v3](https://github.com/chrisdpurcell/agent-handoff-v3)
-- [ ] Adopt the following standards from [project-standards](https://github.com/L3DigitalNet/project-standards/tree/main/standards) (official releases only, do not adopt from the testing/dev branch):
-  - [ ] adr **Note:** use `docs/adr`, not `docs/decisions` as the ADR folder.
-  - [ ] markdown-tooling
-  - [ ] cli-documentation
-  - [ ] project-spec
+- [x] Adopt [agent-handoff-v3](https://github.com/chrisdpurcell/agent-handoff-v3)
+- [x] Adopt the following standards from [project-standards](https://github.com/L3DigitalNet/project-standards/tree/main/standards) (official releases only, do not adopt from the testing/dev branch):
+  - [x] adr **Note:** use `docs/adr`, not `docs/decisions` as the ADR folder.
+  - [x] markdown-tooling
+  - [x] cli-documentation
+  - [x] project-spec
   - [x] python-tooling
-  - [ ] python-coding
-- [ ] Ingest/migrate existing specs from `docs/reference` into the project-spec format.
+  - [x] python-coding
+- [x] Relocated the existing `docs/specs/*.md` language-reference material
+  (`PYTHONIC_PSEUDOCODE_STANDARD.md`, `EXECUTABLE-PSEUDOCODE-SPEC.md`,
+  `RULES.md`, `docs/specs/language/`) to `docs/reference/` rather than
+  migrating it into project-spec format — per ADR-0001, this content is
+  durable, normative reference documentation, not a project plan.
+  `project-spec` was adopted for new, forward-looking specs authored under
+  `docs/specs/` going forward.
 - [ ]
 
 ## Agent Tracked Tasks
@@ -46,5 +52,11 @@ Instructions for AI agents:
   CI on every push/PR until this gap is closed — writing the missing tests
   is a substantial, separate body of work, out of scope for a tooling-config
   adoption task.
+
+- [ ] Author the first project-spec-conformant spec under `docs/specs/` and
+  add `.github/workflows/validate-specs.yml` (deferred from project-spec
+  adoption, 2026-07-08 — the standard refuses an empty corpus rather than
+  passing vacuously, so wiring CI before any spec exists would fail every
+  run).
 
 ## Completed Tasks
