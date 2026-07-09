@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event session-start",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/integrations/agent-hooks/apseudo-hook.py\" --host claude --event session-start",
             "timeout": 10,
             "statusMessage": "Loading pseudocode enforcement context"
           }
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event user-prompt-submit",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/integrations/agent-hooks/apseudo-hook.py\" --host claude --event user-prompt-submit",
             "timeout": 10,
             "statusMessage": "Checking pseudocode prompt context"
           }
@@ -27,11 +27,11 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|apply_patch|Edit|Write",
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event pre-tool-use",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/integrations/agent-hooks/apseudo-hook.py\" --host claude --event pre-tool-use",
             "timeout": 20,
             "statusMessage": "Checking pseudocode enforcement bypass policy"
           }
@@ -40,11 +40,11 @@
     ],
     "PermissionRequest": [
       {
-        "matcher": "Bash|apply_patch|Edit|Write",
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event permission-request",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/integrations/agent-hooks/apseudo-hook.py\" --host claude --event permission-request",
             "timeout": 20,
             "statusMessage": "Checking pseudocode permission request"
           }
@@ -53,11 +53,11 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Bash|apply_patch|Edit|Write",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event post-tool-use",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/integrations/agent-hooks/apseudo-hook.py\" --host claude --event post-tool-use",
             "timeout": 60,
             "statusMessage": "Validating changed pseudocode"
           }
@@ -69,7 +69,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event subagent-stop",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/integrations/agent-hooks/apseudo-hook.py\" --host claude --event subagent-stop",
             "timeout": 60,
             "statusMessage": "Checking pseudocode after subagent work"
           }
@@ -81,7 +81,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/integrations/agent-hooks/apseudo-hook.py\" --host codex --event stop",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/integrations/agent-hooks/apseudo-hook.py\" --host claude --event stop",
             "timeout": 60,
             "statusMessage": "Checking pseudocode before final response"
           }

@@ -10,6 +10,12 @@ during adoption (not introduced by it).
 
 ## Recently landed
 
+- Agent-pseudocode lifecycle hook configs were moved out of active Claude/Codex
+  discovery into `hooks/.claude/` and `hooks/.codex/`. The active handoff-v3
+  SessionStart hooks remain at canonical `.claude/hooks/session_start.py` and
+  `.codex/hooks/session_start.py`.
+- MCP wrapper/config examples now live under `mcp/`, with root compatibility
+  shims kept for agent discovery and older callers.
 - Standards adoption plan (`docs/superpowers/plans/2026-07-08-adopt-standards.md`)
   fully executed and merged. See `docs/adr/adr-0001-*.md` and `adr-0002-*.md`
   for the two recorded deviations.

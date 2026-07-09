@@ -14,6 +14,10 @@
 - [2026-07-09] Merged the standards-adoption branch to `main`; recorded 4
   pre-existing bugs found (not introduced) during adoption in
   `docs/handoff/bugs/`.
+- [2026-07-09] Kept agent-handoff-v3 SessionStart hooks active at canonical
+  `.claude/hooks/` and `.codex/hooks/` paths; moved agent-pseudocode lifecycle
+  hook configs under `hooks/` so they stay dormant while MCP wrappers live under
+  `mcp/`.
 
 ## Notes For The Builder
 
