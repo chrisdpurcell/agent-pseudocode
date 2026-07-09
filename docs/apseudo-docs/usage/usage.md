@@ -327,6 +327,6 @@ uv run apseudo docs generate --output docs/apseudo-docs/usage/agent-tasks.md
 ## SEE ALSO
 
 - [`docs/apseudo-docs/usage/RUNNER-USAGE.md`](RUNNER-USAGE.md)
-- [`docs/specs/EXECUTABLE-PSEUDOCODE-SPEC.md`](../../specs/EXECUTABLE-PSEUDOCODE-SPEC.md)
+- [`docs/reference/EXECUTABLE-PSEUDOCODE-SPEC.md`](../../reference/EXECUTABLE-PSEUDOCODE-SPEC.md)
 - [`docs/apseudo-docs/usage/AGENT-INSTRUCTIONS-WORDING.md`](AGENT-INSTRUCTIONS-WORDING.md)
 - [`docs/apseudo-docs/roadmap/FUTURE-VERSIONS.md`](../roadmap/FUTURE-VERSIONS.md)

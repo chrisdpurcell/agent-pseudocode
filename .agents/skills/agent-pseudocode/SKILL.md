@@ -10,7 +10,7 @@ Use this skill for any task involving Pythonic Agent Pseudocode, `.apseudo` file
 
 ## Required workflow
 
-1. Read `docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md` when the task changes the convention itself.
+1. Read `docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md` when the task changes the convention itself.
 2. For new workflow blocks, start from `scripts/apseudo-template --list` and `scripts/apseudo-template <name>` unless a custom structure is clearly required.
 3. Use bounded `while` loops, explicit `else` fallbacks, and approved terminal outcomes.
 4. Run `scripts/apseudo-format --check --changed` and `scripts/apseudo-lint --changed` before completion.

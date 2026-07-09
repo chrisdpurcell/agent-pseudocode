@@ -11,7 +11,7 @@ Use this when you only have one place for instructions.
 
 When creating or editing `.apseudo`, `.agentpseudo`, `.pseudocode`, or Markdown fenced blocks tagged `apseudo`, `agent-pseudocode`, `agent_pseudocode`, `pythonic-pseudocode`, or `pseudocode-pythonic`:
 
-- Follow the Pythonic Agent Pseudocode standard in `docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md`.
+- Follow the Pythonic Agent Pseudocode standard in `docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md`.
 - Use `process name(...):` for complete workflows.
 - Use explicit `if / elif / else`, bounded `while`, visibly finite `for`, and approved terminal outcomes.
 - Do not leave unbounded loops, implicit fallthrough branches, placeholder bodies, or ambiguous returns.
@@ -55,7 +55,7 @@ Use the project `agent-pseudocode` skill and local validation tools whenever the
 
 Hard requirements:
 
-- Follow `docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md`.
+- Follow `docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md`.
 - Treat `apseudo-lint` as the source of truth for structural compliance.
 - Treat `apseudo-format` as the source of truth for formatting.
 - Run `scripts/apseudo-format --check --changed` and `scripts/apseudo-lint --changed` before completion.

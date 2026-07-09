@@ -88,7 +88,7 @@ apseudo-codex     Runner alias that selects Codex CLI.
 | Feature gap analysis | `docs/reviews/FEATURE-GAP-ANALYSIS.md` |
 | Traceability review | `docs/reviews/PROJECT-TRACEABILITY-REVIEW.md` |
 | Agent instruction wording | `docs/usage/AGENT-INSTRUCTIONS-WORDING.md` |
-| Rule catalog | `docs/specs/RULES.md` |
+| Rule catalog | `docs/reference/RULES.md` |
 | MCP server | `docs/features/MCP.md` |
 | Agent hooks | `docs/features/HOOKS.md` |
 | Agent skills | `docs/features/SKILLS.md` |
@@ -99,7 +99,7 @@ apseudo-codex     Runner alias that selects Codex CLI.
 | Enforcement | `docs/enforcement/ENFORCEMENT-GUIDE.md` |
 | VS Code | `docs/usage/VSCODE.md` and `products/vscode-extension/README.md` |
 | Kate | `docs/usage/KATE.md` and `products/kate-integration/README.md` |
-| Executable runner spec | `docs/specs/EXECUTABLE-PSEUDOCODE-SPEC.md` |
+| Executable runner spec | `docs/reference/EXECUTABLE-PSEUDOCODE-SPEC.md` |
 | Runner usage | `docs/usage/RUNNER-USAGE.md` |
 | Future runner versions | `docs/roadmap/FUTURE-VERSIONS.md` |
 | Sources | `docs/reference/SOURCES.md` |

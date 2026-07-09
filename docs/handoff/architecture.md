@@ -13,13 +13,8 @@
   entry point; calls into `src/apseudo_lint` rather than reimplementing rules.
 - `products/vscode-extension/`, `products/kate-integration/` — editor
   integrations; thin wrappers over the LSP/formatter, no duplicated policy.
-- `docs/specs/` (being relocated to `docs/reference/` — see Task 6 of the
-  2026-07-08 adoption plan) — normative language/format references, not
-  project plans.
+- `docs/reference/` — normative language/format references (relocated from
+  `docs/specs/` by Task 6 of the 2026-07-08 adoption plan); `docs/specs/` is
+  now empty, reserved for forward-looking project/feature specs under the
+  `project-spec` standard.
 - `docs/handoff/` — this handoff system (adopted 2026-07-08).
-
-## Standing structural backlog
-
-- `src/apseudo_lint/mcp.py:253` referenced `docs/RULES.md`, which never
-  existed (the real file was `docs/specs/RULES.md`) — fixed during the
-  docs/specs → docs/reference/ relocation (Task 6).

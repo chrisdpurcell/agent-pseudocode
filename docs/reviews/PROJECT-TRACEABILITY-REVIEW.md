@@ -30,8 +30,8 @@ The Pythonic Agent Pseudocode convention is now represented across all major enf
 
 | Tooling area | Files | Review |
 |---|---|---|
-| Standard | `docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md` | Complete enough for internal use; labels sourced/adapted/internal claims. |
-| Token spec | `docs/specs/language/TOKEN-SPEC.md`, `docs/specs/language/SCOPE-MAP.md` | Provides shared vocabulary for VS Code and Kate. |
+| Standard | `docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md` | Complete enough for internal use; labels sourced/adapted/internal claims. |
+| Token spec | `docs/reference/language/TOKEN-SPEC.md`, `docs/reference/language/SCOPE-MAP.md` | Provides shared vocabulary for VS Code and Kate. |
 | VS Code syntax | `products/vscode-extension/syntaxes/*.yaml`, generated JSON | Grammar files exist and are generated from YAML. |
 | Markdown injection | `products/vscode-extension/syntaxes/agent-pseudocode-markdown-injection.*` | Supports fenced Markdown blocks. |
 | VS Code LSP client | `products/vscode-extension/extension.js`, `products/vscode-extension/package.json` | Starts `apseudo-lsp` and exposes commands. |
@@ -39,7 +39,7 @@ The Pythonic Agent Pseudocode convention is now represented across all major enf
 | Kate LSP | `products/kate-integration/lsp-client-settings*.json` | Config examples for `.apseudo` and optional Markdown. |
 | Formatter | `src/apseudo_lint/formatting.py`, `scripts/apseudo-format` | Conservative and shared by LSP/MCP/CLI. |
 | Validator | `src/apseudo_lint/lint.py`, `scripts/apseudo-lint` | Enforces core instruction-following rules. |
-| Rule catalog | `src/apseudo_lint/rules.py`, `docs/specs/RULES.md` | Central explanation source for humans and tools. |
+| Rule catalog | `src/apseudo_lint/rules.py`, `docs/reference/RULES.md` | Central explanation source for humans and tools. |
 | Language server | `src/apseudo_lint/lsp.py`, `scripts/apseudo-lsp` | Diagnostics, completion, hover, formatting, code actions, symbols, folding, definition, references. |
 | MCP server | `src/apseudo_lint/mcp.py`, `scripts/apseudo-mcp` | Tools/resources/prompts for Claude Code and Codex. |
 | Hooks | `integrations/agent-hooks/apseudo-hook.py`, `.claude/settings.json`, `.codex/hooks.json` | Shared script with host-specific configs. |

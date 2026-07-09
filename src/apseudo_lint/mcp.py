@@ -250,7 +250,7 @@ class APseudoMCPServer:
         uri = _string_arg(params, "uri")
         resource_map = {
             "apseudo://standard": self.root / "docs" / "PYTHONIC_PSEUDOCODE_STANDARD.md",
-            "apseudo://rules": self.root / "docs" / "RULES.md",
+            "apseudo://rules": self.root / "docs" / "reference" / "RULES.md",
             "apseudo://agent-instructions": self.root / "docs" / "AGENT-INSTRUCTIONS-WORDING.md",
             "apseudo://feature-gap-analysis": self.root / "docs" / "FEATURE-GAP-ANALYSIS.md",
             "apseudo://traceability-review": self.root / "docs" / "PROJECT-TRACEABILITY-REVIEW.md",

@@ -8,8 +8,8 @@
 
 | Area | Status | Detail |
 |---|---|---|
-| Language convention | OK | `docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md` present |
-| Token specification | OK | `docs/specs/language/TOKEN-SPEC.md` present |
+| Language convention | OK | `docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md` present |
+| Token specification | OK | `docs/reference/language/TOKEN-SPEC.md` present |
 | VS Code extension | OK | `products/vscode-extension/package.json` present |
 | Kate syntax | OK | `products/kate-integration/agent-pseudocode.xml` present |
 | Formatter | OK | `src/apseudo_lint/formatting.py` present |

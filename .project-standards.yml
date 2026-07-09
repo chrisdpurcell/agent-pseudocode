@@ -27,3 +27,8 @@ markdown_tooling:
 
 cli_documentation:
   version: "1.0"
+
+spec:
+  include:
+    - 'docs/specs/**/*.md'
+  exclude: []

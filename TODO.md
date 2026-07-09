@@ -22,7 +22,7 @@ Instructions for AI agents:
   - [ ] project-spec
   - [ ] python-tooling
   - [ ] python-coding
-- [ ] Ingest/migrate existing specs from `docs/specs` into the project-spec format.
+- [ ] Ingest/migrate existing specs from `docs/reference` into the project-spec format.
 - [ ]
 
 ## Agent Tracked Tasks

@@ -136,7 +136,7 @@ uv run apseudo-run --codex --apply \
 ```bash
 uv run apseudo-run --claude --review \
   --require-no-diff \
-  docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
+  docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 ### Use the unified command and script registry
@@ -487,7 +487,7 @@ uv run apseudo docs generate --output docs/apseudo-docs/usage/agent-tasks.md
 uv run apseudo-run --claude --review \
   --require-no-diff \
   --run-dir .apseudo/runs \
-  docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
+  docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 ### Run an apply task and require it to make a change
@@ -515,7 +515,7 @@ uv run apseudo-run --codex --apply \
 ### Resume the last provider session
 
 ```bash
-uv run apseudo-run --claude --resume-last docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
+uv run apseudo-run --claude --resume-last docs/apseudo-docs/examples/runner/review-spec.apseudo -- spec_path=docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md
 uv run apseudo-run --codex --resume-last docs/apseudo-docs/examples/runner/fix-ruff.apseudo -- target=src
 ```
 
@@ -559,7 +559,7 @@ uv run apseudo-run --codex --apply \
 
 ## SEE ALSO
 
-- `docs/specs/EXECUTABLE-PSEUDOCODE-SPEC.md` — normative executable script specification.
+- `docs/reference/EXECUTABLE-PSEUDOCODE-SPEC.md` — normative executable script specification.
 - `docs/apseudo-docs/usage/AGENT-INSTRUCTIONS-WORDING.md` — copy/paste wording for repositories.
 - `docs/apseudo-docs/roadmap/FUTURE-VERSIONS.md` — future runner and system roadmap.
 - `docs/apseudo-docs/usage/usage.md` — overall CLI usage reference.

@@ -27,10 +27,10 @@ Version 0.4.0 adds those missing layers:
 
 | Layer | Earlier status | Gap | Added in 0.4.0 | Remaining optional work |
 |---|---|---|---|---|
-| Language convention | Comprehensive Markdown standard existed | Needed explicit traceability into tool rules | `docs/reviews/PROJECT-TRACEABILITY-REVIEW.md` and `docs/specs/RULES.md` | Add project-specific outcome profiles for different agent domains |
+| Language convention | Comprehensive Markdown standard existed | Needed explicit traceability into tool rules | `docs/reviews/PROJECT-TRACEABILITY-REVIEW.md` and `docs/reference/RULES.md` | Add project-specific outcome profiles for different agent domains |
 | Syntax highlighting | VS Code TextMate and Kate XML existed | No semantic repair | LSP code actions now complement highlighting | Add semantic tokens if the language grows beyond regex scopes |
 | Formatter | Conservative formatter existed | No MCP exposure | `format_text` and `format_file` MCP tools | Add configurable import-like section sorting if the dialect later gains sections |
-| Validator/linter | Core structural rules existed | Rule explanations were not central enough | `src/apseudo_lint/rules.py`, `apseudo-explain`, `docs/specs/RULES.md`, MCP `explain_rule` | Add deeper path analysis for exhaustive branch proof |
+| Validator/linter | Core structural rules existed | Rule explanations were not central enough | `src/apseudo_lint/rules.py`, `apseudo-explain`, `docs/reference/RULES.md`, MCP `explain_rule` | Add deeper path analysis for exhaustive branch proof |
 | CLI utilities | Lint/format/LSP existed | Missing templates, rule explanation, visualization, review | `apseudo-template`, `apseudo-explain`, `apseudo-mermaid`, `apseudo-review` | Add SARIF output for code scanning platforms |
 | Language server | Diagnostics/completion/hover/format existed | Missing quick fixes and navigation | Code actions, symbols, folding, definition, references, workspace symbols | Add semantic tokens and rename support if needed |
 | VS Code extension | LSP client existed | Needed to advertise richer LSP behavior | Server capabilities now expose richer features | Add VS Code command UI for template insertion |

@@ -98,7 +98,7 @@ process review_only(target):
 Command:
 
 ```bash
-uv run apseudo-run --claude --review --require-no-diff script.apseudo -- target=docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md
+uv run apseudo-run --claude --review --require-no-diff script.apseudo -- target=docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md
 ```
 
 ## Pattern: Release approval gate

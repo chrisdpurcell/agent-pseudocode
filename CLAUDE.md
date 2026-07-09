@@ -12,7 +12,7 @@ Use the project `agent-pseudocode` skill and local validation tools whenever the
 
 Hard requirements:
 
-- Follow `docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md`.
+- Follow `docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md`.
 - Treat `apseudo-lint` as the source of truth for structural compliance.
 - Treat `apseudo-format` as the source of truth for formatting.
 - Run `scripts/apseudo-format --check --changed` and `scripts/apseudo-lint --changed` before completion.

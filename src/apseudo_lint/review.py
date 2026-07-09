@@ -91,8 +91,8 @@ def review_project(root: Path, config: LintConfig | None = None) -> ProjectRevie
     paths = collect_paths([actual_root], effective)
     diagnostics = lint_paths(paths, effective)
     checks = [
-        _check_file(actual_root, "Language convention", "docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md"),
-        _check_file(actual_root, "Token specification", "docs/specs/language/TOKEN-SPEC.md"),
+        _check_file(actual_root, "Language convention", "docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md"),
+        _check_file(actual_root, "Token specification", "docs/reference/language/TOKEN-SPEC.md"),
         _check_file(actual_root, "VS Code extension", "products/vscode-extension/package.json"),
         _check_file(actual_root, "Kate syntax", "products/kate-integration/agent-pseudocode.xml"),
         _check_file(actual_root, "Formatter", "src/apseudo_lint/formatting.py"),
@@ -109,7 +109,7 @@ def review_project(root: Path, config: LintConfig | None = None) -> ProjectRevie
         _check_file(actual_root, "CI", ".github/workflows/apseudo-lint.yml"),
         _check_file(actual_root, "Agent wording", "docs/usage/AGENT-INSTRUCTIONS-WORDING.md"),
         _check_file(actual_root, "Traceability review", "docs/reviews/PROJECT-TRACEABILITY-REVIEW.md"),
-        _check_file(actual_root, "Executable runner spec", "docs/specs/EXECUTABLE-PSEUDOCODE-SPEC.md"),
+        _check_file(actual_root, "Executable runner spec", "docs/reference/EXECUTABLE-PSEUDOCODE-SPEC.md"),
         _check_file(actual_root, "Runner usage", "docs/usage/RUNNER-USAGE.md"),
         _check_file(actual_root, "Future versions", "docs/roadmap/FUTURE-VERSIONS.md"),
     ]
