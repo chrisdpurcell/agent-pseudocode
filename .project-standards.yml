@@ -1,0 +1,20 @@
+standards_version: "v3"
+
+markdown:
+  frontmatter:
+    version: "1.1"
+    schema: "markdown-frontmatter"
+    required: true
+    include:
+      - "docs/adr/**/*.md"
+    exclude:
+      - "**/*.template.md"
+      - "CHANGELOG.md"
+      - "LICENSE.md"
+      - "CLAUDE.md"
+      - "AGENTS.md"
+      - ".claude/**"
+      - ".agents/**"
+      - ".codex/**"
+      - ".github/**"
+      - "node_modules/**"
