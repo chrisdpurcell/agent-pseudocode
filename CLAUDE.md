@@ -36,6 +36,12 @@ uv run pyright
 
 The validator and formatter are the policy source of truth. The language server, MCP server, hooks, pre-commit, CI, VS Code, and Kate integrations must call or reuse those modules rather than reimplementing rules.
 
+## Key docs
+
+| Doc | When to read |
+| --- | --- |
+| `docs/adr/README.md` | Architecture decision records — index of accepted decisions and their rationale. |
+
 ## Executable Agent Pseudocode runner
 
 Use `apseudo-run` or `apseudo run` for executable `.apseudo` task scripts. Before trusting a new or edited runner script, run `uv run apseudo-run --check`, `--render-prompt`, and `--print-command`. Prefer `--run-dir .apseudo/runs` for auditable runs. Do not bypass runner post-checks, diff policy, hooks, pre-commit, or CI.
