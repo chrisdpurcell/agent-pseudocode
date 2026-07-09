@@ -48,10 +48,11 @@ Instructions for AI agents:
   `output.py` (0%), `template_cli.py` (0%), `discover.py` (16%),
   `cli.py` (16%), `format_cli.py` (13%), `mermaid.py` (20%),
   `mermaid_cli.py` (29%), `lsp.py` (42%), `mcp.py` (39%). `apseudo-lint.yml`'s
-  new `Run coverage` step (added by the python-tooling adoption) will fail
-  CI on every push/PR until this gap is closed — writing the missing tests
-  is a substantial, separate body of work, out of scope for a tooling-config
-  adoption task.
+  new `Run coverage` step (added by the python-tooling adoption) is currently
+  advisory (`continue-on-error: true`) rather than blocking CI, pending this
+  gap closing — writing the missing tests is a substantial, separate body of
+  work, out of scope for a tooling-config adoption task. Flip
+  `continue-on-error` off once coverage clears 85%.
 
 - [ ] Author the first project-spec-conformant spec under `docs/specs/` and
   add `.github/workflows/validate-specs.yml` (deferred from project-spec
