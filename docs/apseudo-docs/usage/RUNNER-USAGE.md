@@ -36,6 +36,8 @@ apseudo run [AGENT] [MODE] [OPTIONS] <script-or-registry-name> [-- <key=value>..
 
 Use the runner for repeatable AI-assisted workflows that require judgment and repository edits, such as lint repair, bounded spec review, docs repair, issue triage, and template synchronization. Use Bash or Python instead for deterministic operations such as file moves, secret rotation, backups, production deploys, or irreversible infrastructure actions.
 
+**Relationship to `apseudo run`:** `apseudo-run` is the standalone `[project.scripts]` entry point that owns the full option contract documented on this page. `apseudo run` (a leaf command of the unified `apseudo` dispatcher — see [`usage.md`](usage.md)) is a thin front end over it: it resolves a script argument that is either a filesystem path or a `.apseudo/scripts.toml` registry name, then delegates to `apseudo-run` with the resolved path. The two accept the same `[AGENT] [MODE] [OPTIONS]` surface; `apseudo run` adds only registry-name resolution on top. `apseudo-claude` and `apseudo-codex` are further standalone aliases that pin `apseudo-run`'s agent selection to `claude` or `codex` respectively. Unified equivalent: `apseudo run` runs this entry point after resolving the script argument.
+
 ## EXECUTABLE SCRIPT FORMAT
 
 A script may include a shebang and frontmatter before the normal Agent Pseudocode body:

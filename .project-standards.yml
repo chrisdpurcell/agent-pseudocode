@@ -24,3 +24,6 @@ markdown:
 
 markdown_tooling:
   version: "1.1"
+
+cli_documentation:
+  version: "1.0"
