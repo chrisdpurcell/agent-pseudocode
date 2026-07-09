@@ -22,8 +22,14 @@ Instructions for AI agents:
   - [ ] project-spec
   - [ ] python-tooling
   - [ ] python-coding
+- [ ] Setup GitHub repository settings; see `/home/chris/Downloads/public-repo-settings.md`
 - [ ] Ingest/migrate existing specs from `docs/specs` into the project-spec format.
-- [ ]
+- [ ] Create specification documents from the existing project state. See `docs/reference`.
+  - Some reverse-engineering may be required.
+  - It is important to capture the current state of the project in a specification document to ensure that future development aligns with the intended design and functionality. It also provides a baseline for future reference and helps maintain consistency in the project's evolution.
+  - Create multiple specification documents if necessary to cover different aspects of the project. Size/scope them appropriately to ensure clarity and comprehensiveness.
+  - Ensure the specs comply with the project-spec standard.
+- [ ] Correct naming of markdown files in `docs/` (except README.md) to use lower kebab-case. Ensure all links and references are updated accordingly.
 
 ## Agent Managed
 
