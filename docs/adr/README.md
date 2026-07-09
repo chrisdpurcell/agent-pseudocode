@@ -19,3 +19,4 @@ related: []
 | Number | Title | Status |
 | --- | --- | --- |
 | [0001](adr-0001-relocate-language-reference-docs.md) | Relocate normative language reference docs out of docs/specs | Accepted |
+| [0002](adr-0002-merge-python-tooling-ci-into-apseudo-lint.md) | Merge python-tooling CI expectations into apseudo-lint.yml instead of a separate check.yml | Accepted |
