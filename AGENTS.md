@@ -1,6 +1,6 @@
 # Agent instructions
 
-**Session state:** read `docs/handoff/state.md` first — live state and active work.
+**Session state:** Agent Handoff SessionStart injects `docs/handoff/state.md`; do not reread it when injected.
 **Full conventions reference:** `docs/handoff/conventions.md`.
 **Detailed review workflows:** not configured for this repo.
 
@@ -78,3 +78,10 @@ Do not claim completion if either command fails.
 - Prettier owns physical formatting. Do not fight its output or hand-format.
 - markdownlint owns Markdown structure. Do not disable a rule to silence a warning — fix the Markdown.
 - Do not edit `.prettierrc.json` or `.markdownlint.json` to bypass a check without a documented ADR exception.
+
+<!-- BEGIN agent-handoff managed instructions -->
+Use the repo-local `$agent-handoff` skill at startup and closeout.
+Do not reread `docs/handoff/state.md` when SessionStart already injected it.
+Keep current status and tasks in `docs/STATUS.md` and `docs/TODO.md`; route durable facts through `docs/handoff/`.
+At closeout, update only changed facts, preserve user-authored work, store credential references only, and run relevant validation.
+<!-- END agent-handoff managed instructions -->

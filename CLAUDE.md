@@ -1,6 +1,6 @@
 # Claude repository instructions
 
-**Session state:** read `docs/handoff/state.md` first — live state and active incidents.
+**Session state:** Agent Handoff SessionStart injects `docs/handoff/state.md`; do not reread it when injected.
 
 ## Repository purpose
 
@@ -46,3 +46,10 @@ Validator and formatter are the policy source of truth. LSP, MCP, hooks, pre-com
 ## Executable Agent Pseudocode runner
 
 Use `apseudo-run`/`apseudo run` for executable `.apseudo` scripts. Before trusting a new/edited runner script, run `uv run apseudo-run --check`, `--render-prompt`, `--print-command`. Prefer `--run-dir .apseudo/runs`. Do not bypass runner post-checks, diff policy, hooks, pre-commit, or CI.
+
+<!-- BEGIN agent-handoff managed instructions -->
+Use the repo-local `$agent-handoff` skill at startup and closeout.
+Do not reread `docs/handoff/state.md` when SessionStart already injected it.
+Keep current status and tasks in `docs/STATUS.md` and `docs/TODO.md`; route durable facts through `docs/handoff/`.
+At closeout, update only changed facts, preserve user-authored work, store credential references only, and run relevant validation.
+<!-- END agent-handoff managed instructions -->
