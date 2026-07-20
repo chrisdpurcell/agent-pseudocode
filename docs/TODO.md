@@ -53,3 +53,7 @@ Instructions for AI agents:
   - [bug 001](handoff/bugs/001-mcp-resource-map-stale-paths.md): stale MCP resource paths.
   - [bug 002](handoff/bugs/002-review-completeness-stale-paths.md): stale completeness-check paths.
   - [bug 004](handoff/bugs/004-lsp-serve-unhandled-read-message.md): unguarded LSP message reads.
+
+- [ ] Decide and execute the project-standards V4→V5 migration (tool-ready on release 5.2.0; prior blockers #8/#9/#10 fixed upstream).
+
+  Assessed 2026-07-20: read-only preview reconciles 31 targets but is `applicable: false` on three deliberately-customized files. Resolve before applying: (a) align `.editorconfig` `[*] indent_style` `space`→`tab` (matches the repo's own tab-emitting Prettier; bounded takeover keeps the apseudo 4-space glob); (b) preserve the hardened `format.yml` and `cli-docs-check.yml` — blocked on upstream relinquishment (#12, #13), or accept restoring package bytes and re-applying hardening after; (c) sequence the deferred lint/Prettier/spec CI gates the plan would create. Then `init --catalog 5 --migrate --apply`. Not urgent — V5 keeps a read-only V4 fallback until V6.
