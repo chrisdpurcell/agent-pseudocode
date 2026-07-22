@@ -38,15 +38,21 @@ Instructions for AI agents:
 
 ## Agent tasks
 
-- [ ] Complete full-repo Markdown cleanup, then restore lint CI and enable the reusable Prettier gate.
+- [ ] Complete full-repo Markdown cleanup so the enabled lint gate passes, then turn on the Prettier gate.
 
-  The adoption audit found 489 pre-existing violations across 33 files. Run the pinned formatter/linter fix pass, review the diff, restore `lint-markdown.yml`, and enable `.github/workflows/format.yml`.
+  `lint-markdown.yml` is live and currently red on 272 markdownlint errors. Run the pinned formatter/linter fix pass and review the diff. `format.yml` is installed `workflow_dispatch`-only; enable it by setting `format = true` and `ci.format_caller = true` under `[standards.markdown-tooling]` in `.standards/config.toml`, then `project-standards reconcile --apply`.
 
 - [ ] Raise coverage from 60% to the Python Tooling 85% floor, then make the CI coverage step blocking.
 
   Prioritize untested CLI, output, discovery, Mermaid, LSP, and MCP paths documented by the adoption audit.
 
-- [ ] Author the first project-spec-conformant spec under `docs/specs/`, then add `validate-specs.yml`.
+- [ ] Author the first project-spec-conformant spec under `docs/specs/`.
+
+  `validate-specs.yml` is already live and red: `project-standards spec validate` exits 2 on an empty corpus (upstream #17).
+
+- [ ] Author `docs/usage.md` for the `apseudo` CLI.
+
+  The cli-documentation package created it as a scaffold with literal `toolname` placeholders. It is consumer-owned and create-only, so edits survive reconciliation.
 
 - [ ] Fix the three remaining pre-existing bugs in `docs/handoff/bugs/`.
 
@@ -54,6 +60,6 @@ Instructions for AI agents:
   - [bug 002](handoff/bugs/002-review-completeness-stale-paths.md): stale completeness-check paths.
   - [bug 004](handoff/bugs/004-lsp-serve-unhandled-read-message.md): unguarded LSP message reads.
 
-- [ ] Decide and execute the project-standards V4→V5 migration (tool-ready on release 5.2.0; prior blockers #8/#9/#10 fixed upstream).
+- [ ] Consider adopting the `python-tooling` package, which V5 leaves disabled.
 
-  Assessed 2026-07-20: read-only preview reconciles 31 targets but is `applicable: false` on three deliberately-customized files. Resolve before applying: (a) align `.editorconfig` `[*] indent_style` `space`→`tab` (matches the repo's own tab-emitting Prettier; bounded takeover keeps the apseudo 4-space glob); (b) preserve the hardened `format.yml` and `cli-docs-check.yml` — blocked on upstream relinquishment (#12, #13), or accept restoring package bytes and re-applying hardening after; (c) sequence the deferred lint/Prettier/spec CI gates the plan would create. Then `init --catalog 5 --migrate --apply`. Not urgent — V5 keeps a read-only V4 fallback until V6.
+  It was never in the V4 config, so migration did not select it. Enabling it rewrites `pyproject.toml`'s `[build-system]` and adds a managed `check.yml` plus `scripts/check.py`; upstream #14 documents keys it can drop. Preview with `reconcile` before applying.
