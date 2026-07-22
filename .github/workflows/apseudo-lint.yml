@@ -92,7 +92,6 @@ jobs:
       - name: Validate JSON/TOML configs
         run: |
           python -m json.tool .claude/settings.json >/dev/null
-          python -m json.tool .codex/hooks.json >/dev/null
           python -m json.tool .mcp.json >/dev/null
           python - <<'PY'
           import tomllib

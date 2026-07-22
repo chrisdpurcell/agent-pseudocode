@@ -33,6 +33,20 @@ def parse_frontmatter(text: str) -> dict[str, str]:
     return fields
 
 
+def escape_cell(value: str) -> str:
+    r"""Escape a frontmatter value for use inside a Markdown table cell.
+
+    Bug titles routinely contain literal `*` and `_` from code identifiers and
+    globs (`docs/*.md`, `_read_message`). Left bare they read as emphasis and
+    trip markdownlint MD037/MD049, so the enabled lint-markdown gate would fail
+    on generated output. A bare `|` would additionally split the row into an
+    extra column.
+    """
+    for char in ("|", "*", "_"):
+        value = value.replace(char, "\\" + char)
+    return value
+
+
 def build_index(bugs_dir: Path) -> str:
     """Render the full INDEX.md text from the NNN-*.md bug records in bugs_dir.
 
@@ -64,11 +78,13 @@ def build_index(bugs_dir: Path) -> str:
         lines.extend(
             [
                 "| # | Date | Title | Services | Status |",
-                "|---|---|---|---|---|",
+                # Padded, not "|---|": markdownlint MD060 enforces the "compact"
+                # table style, which requires one space either side of a pipe.
+                "| --- | --- | --- | --- | --- |",
             ]
         )
         for row in rows:
-            lines.append("| " + " | ".join(row) + " |")
+            lines.append("| " + " | ".join(escape_cell(cell) for cell in row) + " |")
 
     return "\n".join(lines) + "\n"
 
