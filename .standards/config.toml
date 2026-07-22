@@ -20,14 +20,63 @@ config = { contract_version = "1.0", workflow_ownership = "consumer-owned" }
 [standards.markdown-frontmatter]
 enabled = true
 version = "latest"
-config = { contract_version = "1.1", exclude = ["**/*.template.md", "AGENTS.md", "CLAUDE.md", ".agents/**", ".claude/**", ".codex/**", ".github/**", "docs/STATUS.md", "docs/TODO.md", "docs/handoff/**", "node_modules/**", "docs/scratchpad.md", "docs/reviews/**", "docs/plans/**", "docs/superpowers/plans/**", "tests/fixtures/**", "README.md", "CHANGELOG.md", "LICENSE.md"], include = ["docs/**/*.md", "docs/research/*.md", "products/**/*.md", "hooks/**/*.md"], required = true, schema = "markdown-frontmatter" }
+config = { contract_version = "1.1", exclude = ["**/*.template.md", "AGENTS.md", "CLAUDE.md", ".agents/**", ".claude/**", ".codex/**", ".github/**", "docs/STATUS.md", "docs/TODO.md", "docs/handoff/**", "node_modules/**", "docs/scratchpad.md", "docs/reviews/**", "docs/plans/**", "docs/specs/**", "docs/superpowers/plans/**", "tests/fixtures/**", "README.md", "CHANGELOG.md", "LICENSE.md"], include = ["docs/**/*.md", "docs/research/*.md", "products/**/*.md", "hooks/**/*.md"], required = true, schema = "markdown-frontmatter" }
 
 [standards.markdown-tooling]
 enabled = true
 version = "latest"
-config = { contract_version = "1.1", format = false, ci = { lint_caller = true, format_caller = false } }
+config.contract_version = "1.1"
+config.format = true
+config.ci = { lint_caller = true, format_caller = true }
+config.exclusions = [
+  { glob = "docs/reference/pre-migration/**", applies_to = "both", reason = "Verbatim archived ChatGPT transcript; reformatting or annotating it would destroy the historical record. Already exempt from APSEUDO fence linting per bug 003." },
+  { glob = "package-lock.json", applies_to = "format", reason = "npm regenerates this file and reverts Prettier's formatting on every install." },
+]
 
 [standards.project-spec]
 enabled = true
 version = "latest"
 config = { include_patterns = ["docs/specs/**/*.md"] }
+
+[standards.python-tooling]
+enabled = true
+version = "latest"
+
+[standards.python-tooling.config]
+contract_version = "1.1"
+python_version = "3.14"
+build_backend = "uv_build"
+source_layout = "src"
+additional_dev_dependencies = []
+workflow_ownership = "managed"
+script_ownership = "managed"
+
+[standards.python-tooling.config.ruff]
+line_length = 100
+extend_exclude = [".claude", ".agents", ".codex", ".continue"]
+
+[standards.python-tooling.config.type_checker]
+name = "basedpyright"
+mode = "strict"
+
+[standards.python-tooling.config.pytest]
+fail_under = 85
+markers = []
+coverage_exclude_also = []
+
+[standards.python-tooling.config.coverage]
+parallel = false
+patch = []
+
+[standards.python-tooling.config.pip_audit]
+ignore_vulnerabilities = []
+
+[standards.python-tooling.config.ci]
+enabled = true
+performance = true
+
+[standards.python-tooling.config.vscode]
+format_on_save = true
+
+[standards.python-tooling.config.agent_instructions]
+include_fix_commands = true

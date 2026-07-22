@@ -26,7 +26,7 @@ Version 0.4.0 adds those missing layers:
 ## Feature analysis by layer
 
 | Layer | Earlier status | Gap | Added in 0.4.0 | Remaining optional work |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | Language convention | Comprehensive Markdown standard existed | Needed explicit traceability into tool rules | `docs/reviews/PROJECT-TRACEABILITY-REVIEW.md` and `docs/reference/RULES.md` | Add project-specific outcome profiles for different agent domains |
 | Syntax highlighting | VS Code TextMate and Kate XML existed | No semantic repair | LSP code actions now complement highlighting | Add semantic tokens if the language grows beyond regex scopes |
 | Formatter | Conservative formatter existed | No MCP exposure | `format_text` and `format_file` MCP tools | Add configurable import-like section sorting if the dialect later gains sections |
@@ -62,7 +62,7 @@ Code actions add explicit fallbacks, terminal outcomes, bounded-loop placeholder
 ## Remaining non-blocking opportunities
 
 | Opportunity | Value | Cost | Recommendation |
-|---|---:|---:|---|
+| --- | --: | --: | --- |
 | SARIF output | Useful for GitHub code scanning | Low-medium | Add later if this becomes a shared org standard |
 | Semantic tokens | Better editor theming | Medium | Defer until syntax scopes become insufficient |
 | Rename provider | Rename process symbols | Medium | Useful only if processes become large and cross-file |

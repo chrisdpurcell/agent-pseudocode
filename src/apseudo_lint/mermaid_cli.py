@@ -16,9 +16,13 @@ def build_parser() -> argparse.ArgumentParser:
         prog="apseudo-mermaid",
         description="Render Pythonic Agent Pseudocode as a Mermaid flowchart view.",
     )
-    parser.add_argument("path", nargs="?", type=Path, help="File to render. Reads stdin when omitted.")
+    parser.add_argument(
+        "path", nargs="?", type=Path, help="File to render. Reads stdin when omitted."
+    )
     parser.add_argument("--config", type=Path, default=None, help="Explicit linter config file.")
-    parser.add_argument("--no-fence", action="store_true", help="Emit raw Mermaid without Markdown code fences.")
+    parser.add_argument(
+        "--no-fence", action="store_true", help="Emit raw Mermaid without Markdown code fences."
+    )
     parser.add_argument("--version", action="version", version=f"apseudo-mermaid {__version__}")
     return parser
 

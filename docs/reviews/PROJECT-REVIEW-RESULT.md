@@ -7,7 +7,7 @@
 ## Completeness checks
 
 | Area | Status | Detail |
-|---|---|---|
+| --- | --- | --- |
 | Language convention | OK | `docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md` present |
 | Token specification | OK | `docs/reference/language/TOKEN-SPEC.md` present |
 | VS Code extension | OK | `products/vscode-extension/package.json` present |

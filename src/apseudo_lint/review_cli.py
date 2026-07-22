@@ -17,7 +17,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog="apseudo-review",
         description="Review a repository for Agent Pseudocode convention/tooling completeness.",
     )
-    parser.add_argument("root", nargs="?", type=Path, default=Path.cwd(), help="Repository root to review.")
+    parser.add_argument(
+        "root", nargs="?", type=Path, default=Path.cwd(), help="Repository root to review."
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of Markdown.")
     parser.add_argument("--version", action="version", version=f"apseudo-review {__version__}")
     return parser

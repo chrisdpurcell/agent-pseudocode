@@ -24,7 +24,7 @@ dev = [
     { name = "coverage", extras = ["toml"] },
     { name = "pip-audit" },
     { name = "pytest", specifier = ">=9.0" },
-    { name = "ruff", specifier = ">=0.14" },
+    { name = "ruff", specifier = ">=0.14.11" },
 ]
 
 [[package]]

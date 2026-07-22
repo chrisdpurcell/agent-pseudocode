@@ -439,10 +439,19 @@ def build_agent_command(invocation: RunnerInvocation, prompt: str, temp_dir: Pat
 def execute_invocation(invocation: RunnerInvocation) -> tuple[RunnerOutcome | None, int, str]:
     """Validate, execute, parse, and map a runner invocation."""
 
-    LOGGER.info("execute_start", script=str(invocation.script.path), agent=invocation.agent, mode=invocation.mode)
+    LOGGER.info(
+        "execute_start",
+        script=str(invocation.script.path),
+        agent=invocation.agent,
+        mode=invocation.mode,
+    )
     validation = validate_script(invocation.script)
     if validation.failed_with_options(invocation.options):
-        return None, EXIT_VALIDATION_FAILED, json.dumps(validation.as_dict(), indent=2, sort_keys=True)
+        return (
+            None,
+            EXIT_VALIDATION_FAILED,
+            json.dumps(validation.as_dict(), indent=2, sort_keys=True),
+        )
 
     safety_error = check_safety(invocation)
     if safety_error is not None:
@@ -902,7 +911,11 @@ def _build_claude_command(invocation: RunnerInvocation, prompt: str) -> AgentCom
         argv.append("--continue")
     if options.resume:
         argv.extend(["--resume", options.resume])
-    output_format = "stream-json" if options.stream else _string_option(provider, "output_format", default="json")
+    output_format = (
+        "stream-json"
+        if options.stream
+        else _string_option(provider, "output_format", default="json")
+    )
     argv.extend(["--output-format", output_format])
     if options.stream:
         argv.extend(["--verbose", "--include-partial-messages"])
@@ -913,7 +926,9 @@ def _build_claude_command(invocation: RunnerInvocation, prompt: str) -> AgentCom
     allowed_tools = _allowed_tools(invocation, provider)
     if allowed_tools:
         argv.extend(["--allowedTools", ",".join(allowed_tools)])
-    permission_mode = _string_option(provider, "permission_mode", default="") or _claude_permission_mode(
+    permission_mode = _string_option(
+        provider, "permission_mode", default=""
+    ) or _claude_permission_mode(
         invocation.mode,
         options.approval_policy,
     )
@@ -1012,7 +1027,9 @@ def _run_agent_command_streaming(
     for line in process.stdout:
         output_parts.append(line)
         if events_path is not None:
-            _append_jsonl(events_path, {"timestamp": _now(), "event": "stream", "text": line.rstrip("\n")})
+            _append_jsonl(
+                events_path, {"timestamp": _now(), "event": "stream", "text": line.rstrip("\n")}
+            )
         print(line, end="")
         if deadline is not None and time.monotonic() > deadline:
             process.kill()
@@ -1020,7 +1037,9 @@ def _run_agent_command_streaming(
     returncode = process.wait(timeout=5)
     stdout = _limit_text("".join(output_parts), max_output_bytes)
     if events_path is not None:
-        _append_jsonl(events_path, {"timestamp": _now(), "event": "process_exit", "returncode": returncode})
+        _append_jsonl(
+            events_path, {"timestamp": _now(), "event": "process_exit", "returncode": returncode}
+        )
     final_message = ""
     if command.output_last_message_path and command.output_last_message_path.exists():
         final_message = command.output_last_message_path.read_text(encoding="utf-8")
@@ -1050,7 +1069,10 @@ def _write_post_run_files(
     if invocation.options.output:
         _write_text(invocation.options.output, output_text)
     if record is not None:
-        record.write_text("outcome.json" if invocation.options.outcome_format == "json" else "outcome.txt", output_text)
+        record.write_text(
+            "outcome.json" if invocation.options.outcome_format == "json" else "outcome.txt",
+            output_text,
+        )
     changed_files = "\n".join(_git_changed_files(invocation.workspace)) + "\n"
     diff = _git_diff(invocation.workspace)
     if invocation.options.changed_files_out:
@@ -1226,7 +1248,9 @@ def _resolve_agent(script: ExecutableScript, options: RunnerOptions) -> AgentNam
         return cast(AgentName, env_agent)
     if script.metadata.default_agent is not None:
         return script.metadata.default_agent
-    raise ValueError("no agent selected; pass --claude, --codex, --agent, set APSEUDO_AGENT, or set default_agent")
+    raise ValueError(
+        "no agent selected; pass --claude, --codex, --agent, set APSEUDO_AGENT, or set default_agent"
+    )
 
 
 def _resolve_workspace(script: ExecutableScript, explicit: Path | None) -> Path:
@@ -1354,7 +1378,9 @@ def _limit_text(text: str, max_bytes: int | None) -> str:
     data = text.encode("utf-8")
     if len(data) <= max_bytes:
         return text
-    return data[:max_bytes].decode("utf-8", errors="replace") + "\n[apseudo-run: output truncated]\n"
+    return (
+        data[:max_bytes].decode("utf-8", errors="replace") + "\n[apseudo-run: output truncated]\n"
+    )
 
 
 def _hooks_configured(invocation: RunnerInvocation) -> bool:

@@ -29,7 +29,7 @@ license: null
 
 This file is generated from `src/apseudo_lint/rules.py`. It is the shared explanatory layer for the CLI, language server, MCP server, hooks, and documentation.
 
-### APSEUDO-ACTION-001: Mutating action should be followed by verification
+## APSEUDO-ACTION-001: Mutating action should be followed by verification
 
 - **Default severity:** warning
 - **Source:** Internal convention
@@ -55,7 +55,7 @@ return Accepted()
 
 **Fix:** Add a verification action or @no_verification_required with rationale.
 
-### APSEUDO-ACTION-002: Action names should use lower_snake_case
+## APSEUDO-ACTION-002: Action names should use lower_snake_case
 
 - **Default severity:** warning
 - **Source:** Internal convention
@@ -78,7 +78,7 @@ review_document(document)
 
 **Fix:** Rename the action to lower_snake_case.
 
-### APSEUDO-BRANCH-001: if/elif chain should have fallback
+## APSEUDO-BRANCH-001: if/elif chain should have fallback
 
 - **Default severity:** warning
 - **Source:** Internal convention
@@ -105,7 +105,7 @@ else:
 
 **Fix:** Add else with an explicit action/outcome, or annotate @exhaustive when the condition set is complete.
 
-### APSEUDO-BRANCH-002: Placeholder body should be resolved
+## APSEUDO-BRANCH-002: Placeholder body should be resolved
 
 - **Default severity:** warning
 - **Source:** Internal convention
@@ -130,7 +130,7 @@ else:
 
 **Fix:** Replace the placeholder or mark the branch with @allow_empty_branch.
 
-### APSEUDO-FOR-001: For loop iterable should be visibly bounded
+## APSEUDO-FOR-001: For loop iterable should be visibly bounded
 
 - **Default severity:** warning
 - **Source:** Internal convention
@@ -156,7 +156,7 @@ for item in items:
 
 **Fix:** Name the collection, use range/literal data, or add @bounded/@finite_collection.
 
-### APSEUDO-IO-001: File must be valid UTF-8
+## APSEUDO-IO-001: File must be valid UTF-8
 
 - **Default severity:** error
 - **Source:** Internal convention
@@ -181,7 +181,7 @@ process demo():
 
 **Fix:** Re-save the file as UTF-8.
 
-### APSEUDO-IO-002: Input path must exist
+## APSEUDO-IO-002: Input path must exist
 
 - **Default severity:** error
 - **Source:** Internal convention
@@ -204,7 +204,7 @@ apseudo-lint docs/process.apseudo
 
 **Fix:** Correct the path or remove the stale reference.
 
-### APSEUDO-NEST-001: Nesting should stay shallow
+## APSEUDO-NEST-001: Nesting should stay shallow
 
 - **Default severity:** warning
 - **Source:** Internal convention
@@ -236,7 +236,7 @@ return Accepted()
 
 **Fix:** Use guard clauses, helper processes, or decision tables.
 
-### APSEUDO-NORM-001: Normative keywords must be uppercase
+## APSEUDO-NORM-001: Normative keywords must be uppercase
 
 - **Default severity:** warning
 - **Source:** RFC 2119-inspired internal convention
@@ -259,7 +259,7 @@ Use uppercase RFC-style normative terms: MUST, MUST NOT, SHOULD, SHOULD NOT, MAY
 
 **Fix:** Run apseudo-format or uppercase the normative term manually.
 
-### APSEUDO-NORM-002: Use MUST/SHOULD/MAY instead of SHALL
+## APSEUDO-NORM-002: Use MUST/SHOULD/MAY instead of SHALL
 
 - **Default severity:** warning
 - **Source:** Internal convention
@@ -282,7 +282,7 @@ The standard avoids SHALL and SHALL NOT to keep the vocabulary small.
 
 **Fix:** Replace SHALL with MUST, and SHALL NOT with MUST NOT.
 
-### APSEUDO-OUTCOME-001: Returned outcome must be approved
+## APSEUDO-OUTCOME-001: Returned outcome must be approved
 
 - **Default severity:** warning
 - **Source:** Internal convention
@@ -305,7 +305,7 @@ return Accepted(reason="done")
 
 **Fix:** Use an approved outcome or add the intentional project-specific outcome to .apseudo-lint.toml.
 
-### APSEUDO-PARSE-001: Block header must use the standard shape
+## APSEUDO-PARSE-001: Block header must use the standard shape
 
 - **Default severity:** error
 - **Source:** Python compound-statement-inspired internal convention
@@ -330,7 +330,7 @@ if approved:
 
 **Fix:** Add the missing colon or rewrite the header using the documented block form.
 
-### APSEUDO-PARSE-002: Block header must have an indented body
+## APSEUDO-PARSE-002: Block header must have an indented body
 
 - **Default severity:** error
 - **Source:** Internal convention
@@ -355,7 +355,7 @@ if approved:
 
 **Fix:** Indent the body, add a real action, or annotate an intentionally empty branch with @allow_empty_branch.
 
-### APSEUDO-PROC-001: Full workflow block should declare a process
+## APSEUDO-PROC-001: Full workflow block should declare a process
 
 - **Default severity:** warning
 - **Source:** Internal convention
@@ -381,7 +381,7 @@ process review_document_flow(document):
 
 **Fix:** Wrap the snippet in a process declaration or add @allow_missing_process for a fragment.
 
-### APSEUDO-RETURN-001: Process must have a terminal return outcome
+## APSEUDO-RETURN-001: Process must have a terminal return outcome
 
 - **Default severity:** error
 - **Source:** Internal convention
@@ -407,7 +407,7 @@ process demo():
 
 **Fix:** Add a terminal return such as Accepted(...), Blocked(...), or NeedsUserDecision(...).
 
-### APSEUDO-RETURN-002: Return must use an outcome value
+## APSEUDO-RETURN-002: Return must use an outcome value
 
 - **Default severity:** warning
 - **Source:** Internal convention
@@ -430,7 +430,7 @@ return Blocked(reason="missing required input")
 
 **Fix:** Return an approved outcome constructor or add a project outcome to the config.
 
-### APSEUDO-RETURN-003: Process should end with an explicit terminal statement
+## APSEUDO-RETURN-003: Process should end with an explicit terminal statement
 
 - **Default severity:** warning
 - **Source:** Internal convention
@@ -458,7 +458,7 @@ process demo():
 
 **Fix:** Append an explicit return outcome or justify the non-return terminal action.
 
-### APSEUDO-WHILE-001: While loop must have a bounded stop condition
+## APSEUDO-WHILE-001: While loop must have a bounded stop condition
 
 - **Default severity:** error
 - **Source:** Internal convention
@@ -484,7 +484,7 @@ while not approved and round <= max_rounds:
 
 **Fix:** Add a bounded condition, update loop state, or annotate a genuine external stop condition.
 
-### APSEUDO-WHILE-002: While body should update loop-control state
+## APSEUDO-WHILE-002: While body should update loop-control state
 
 - **Default severity:** warning
 - **Source:** Internal convention
@@ -510,7 +510,7 @@ while round <= max_rounds:
 
 **Fix:** Update the condition variable, return/break from the loop, or annotate an external stop condition.
 
-### APSEUDO-WHILE-003: while True must visibly terminate
+## APSEUDO-WHILE-003: while True must visibly terminate
 
 - **Default severity:** error
 - **Source:** Internal convention

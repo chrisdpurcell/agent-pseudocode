@@ -40,7 +40,9 @@ HEADER_COLON_RE = re.compile(r"\s+:")
 PROCESS_SPACE_RE = re.compile(r"\b(process|def)\s+([A-Za-z_]\w*)\s+\(")
 KEYWORD_SPACE_RE = re.compile(r"\b(if|elif|while|for|return)\s+")
 ELSE_SPACE_RE = re.compile(r"\b(else|try|finally)\s+:")
-PROCESS_HEADER_RE = re.compile(r"^(process|def)\s+([A-Za-z_]\w*)\s*\((?P<args>.*?)\)\s*(?P<ret>->\s*[^:]+)?\s*:$")
+PROCESS_HEADER_RE = re.compile(
+    r"^(process|def)\s+([A-Za-z_]\w*)\s*\((?P<args>.*?)\)\s*(?P<ret>->\s*[^:]+)?\s*:$"
+)
 IF_HEADER_RE = re.compile(r"^(if|elif|while)\s+(.+):$")
 FOR_HEADER_RE = re.compile(r"^for\s+(.+?)\s+in\s+(.+):$")
 
@@ -82,7 +84,9 @@ class FormatResult:
         )
 
 
-def format_file(path: Path, config: LintConfig, options: FormatOptions | None = None) -> FormatResult:
+def format_file(
+    path: Path, config: LintConfig, options: FormatOptions | None = None
+) -> FormatResult:
     """Format a supported file's content without writing it."""
 
     original = path.read_text(encoding="utf-8")
@@ -218,7 +222,9 @@ def _format_line(line: str, options: FormatOptions) -> str:
 def _normalize_indent(leading_spaces: int, options: FormatOptions) -> str:
     if not options.round_indentation or leading_spaces == 0:
         return " " * leading_spaces
-    level_width = ((leading_spaces + options.indent_size - 1) // options.indent_size) * options.indent_size
+    level_width = (
+        (leading_spaces + options.indent_size - 1) // options.indent_size
+    ) * options.indent_size
     return " " * level_width
 
 

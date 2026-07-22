@@ -143,16 +143,25 @@ def _doctor(args: list[str]) -> int:
         for provider in providers:
             available = "yes" if provider["available"] else "no"
             print(f"{provider['name']}: available={available} path={provider.get('path') or '-'}")
-        print(f"hooks: claude={payload['hooks']['claude_settings']} codex={payload['hooks']['codex_hooks']} mcp={payload['hooks']['mcp_config']}")
+        print(
+            f"hooks: claude={payload['hooks']['claude_settings']} codex={payload['hooks']['codex_hooks']} mcp={payload['hooks']['mcp_config']}"
+        )
         print(f"registry: {payload['registry'] or '-'}")
     return 0 if all(provider["available"] for provider in providers) else 1
 
 
 def _provider_status(name: str, command: str) -> dict[str, object]:
     path = shutil.which(command)
-    status: dict[str, object] = {"name": name, "command": command, "available": path is not None, "path": path}
+    status: dict[str, object] = {
+        "name": name,
+        "command": command,
+        "available": path is not None,
+        "path": path,
+    }
     if path is not None:
-        result = subprocess.run([path, "--version"], text=True, capture_output=True, check=False, timeout=10)
+        result = subprocess.run(
+            [path, "--version"], text=True, capture_output=True, check=False, timeout=10
+        )
         status["version_output"] = (result.stdout or result.stderr).strip()
         status["version_returncode"] = result.returncode
     return status
@@ -176,7 +185,7 @@ def _provider_test(args: list[str]) -> int:
         script = root / "test.apseudo"
         script.write_text(
             "---\nname: provider_test\ndefault_agent: codex\nmode: review\n---\n\n"
-            "process provider_test():\n    return Accepted(reason=\"ok\")\n",
+            'process provider_test():\n    return Accepted(reason="ok")\n',
             encoding="utf-8",
         )
         result = runner_cli.main(["--codex", "--agent-command", str(provider), str(script)])
@@ -206,13 +215,22 @@ def _docs(args: list[str]) -> int:
             continue
         path = raw.get("path")
         description = raw.get("description", "")
-        lines.extend([f"## `{name}`", "", str(description) if description else "No description provided.", ""])
+        lines.extend(
+            [
+                f"## `{name}`",
+                "",
+                str(description) if description else "No description provided.",
+                "",
+            ]
+        )
         if isinstance(path, str):
             lines.extend(["```bash", f"apseudo run --codex {name} --", "```", ""])
             try:
                 script = Path(path)
                 if script.exists():
-                    parsed = __import__("apseudo_lint.executable", fromlist=["parse_executable_file"]).parse_executable_file(script)
+                    parsed = __import__(
+                        "apseudo_lint.executable", fromlist=["parse_executable_file"]
+                    ).parse_executable_file(script)
                     if parsed.metadata.args:
                         lines.append("Arguments:")
                         for arg_name in parsed.metadata.args:

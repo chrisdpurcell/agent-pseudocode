@@ -56,7 +56,9 @@ NORMATIVE_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\brequired\b", re.IGNORECASE), "REQUIRED"),
     (re.compile(r"\boptional\b", re.IGNORECASE), "OPTIONAL"),
 )
-BLOCK_HEADER_RE = re.compile(r"^\s*(?:process|def|if|elif|else|while|for|try|except|finally|with)\b.*:\s*(?:#.*)?$")
+BLOCK_HEADER_RE = re.compile(
+    r"^\s*(?:process|def|if|elif|else|while|for|try|except|finally|with)\b.*:\s*(?:#.*)?$"
+)
 PROCESS_RE = re.compile(r"^\s*(?:process|def)\s+[A-Za-z_]\w*\s*\(")
 
 
@@ -194,7 +196,11 @@ class APseudoLanguageServer:
                 "hoverProvider": True,
                 "documentFormattingProvider": True,
                 "codeActionProvider": {
-                    "codeActionKinds": ["quickfix", "source.fixAll.apseudo", "source.formatDocument"]
+                    "codeActionKinds": [
+                        "quickfix",
+                        "source.fixAll.apseudo",
+                        "source.formatDocument",
+                    ]
                 },
                 "documentSymbolProvider": True,
                 "foldingRangeProvider": True,
@@ -250,7 +256,10 @@ class APseudoLanguageServer:
         if doc is None or not self._position_is_supported_context(doc, params):
             return {"isIncomplete": False, "items": []}
         config = self._config_for(doc)
-        return {"isIncomplete": False, "items": [item.as_lsp() for item in completion_specs(config)]}
+        return {
+            "isIncomplete": False,
+            "items": [item.as_lsp() for item in completion_specs(config)],
+        }
 
     def _hover(self, params: Json) -> Json | None:
         doc = self._document_from_params(params)
@@ -265,7 +274,9 @@ class APseudoLanguageServer:
         if token is None:
             return None
         rule = get_rule(token.upper()) if token.upper().startswith("APSEUDO-") else None
-        contents = rule.as_markdown() if rule is not None else hover_markdown(token, self._config_for(doc))
+        contents = (
+            rule.as_markdown() if rule is not None else hover_markdown(token, self._config_for(doc))
+        )
         if contents is None:
             return None
         return {"contents": {"kind": "markdown", "value": contents}}
@@ -301,7 +312,13 @@ class APseudoLanguageServer:
                     {
                         "title": "Format Agent Pseudocode document",
                         "kind": "source.fixAll.apseudo",
-                        "edit": {"changes": {doc.uri: [{"range": _full_document_range(doc.text), "newText": formatted}]}},
+                        "edit": {
+                            "changes": {
+                                doc.uri: [
+                                    {"range": _full_document_range(doc.text), "newText": formatted}
+                                ]
+                            }
+                        },
                     }
                 )
         for diagnostic in diagnostics:
@@ -357,7 +374,10 @@ class APseudoLanguageServer:
         )
         if occurrence is None:
             return []
-        return [{"uri": doc.uri, "range": item.range.as_lsp()} for item in occurrences(doc.text, occurrence.name)]
+        return [
+            {"uri": doc.uri, "range": item.range.as_lsp()}
+            for item in occurrences(doc.text, occurrence.name)
+        ]
 
     def _workspace_symbol(self, params: Json) -> list[Json]:
         query = cast(str, params.get("query", "")).lower()
@@ -464,7 +484,7 @@ def _quickfix_for_diagnostic(doc: Document, diagnostic: Json) -> Json | None:
     if code == "APSEUDO-BRANCH-001":
         indent = _leading_space(line_text)
         insert_line = _block_end_line(doc.text, line_index) + 1
-        new_text = f"{indent}else:\n{indent}    return Blocked(reason=\"unhandled condition\")\n"
+        new_text = f'{indent}else:\n{indent}    return Blocked(reason="unhandled condition")\n'
         return _edit_action(
             doc,
             diagnostic,
@@ -475,7 +495,7 @@ def _quickfix_for_diagnostic(doc: Document, diagnostic: Json) -> Json | None:
     if code in {"APSEUDO-RETURN-001", "APSEUDO-RETURN-003"}:
         insert_line = _block_end_line(doc.text, line_index) + 1
         indent = "    " if PROCESS_RE.match(line_text) else _leading_space(line_text)
-        new_text = f"{indent}return Blocked(reason=\"terminal outcome required\")\n"
+        new_text = f'{indent}return Blocked(reason="terminal outcome required")\n'
         return _edit_action(
             doc,
             diagnostic,
@@ -495,7 +515,9 @@ def _quickfix_for_diagnostic(doc: Document, diagnostic: Json) -> Json | None:
 
     if code == "APSEUDO-FOR-001":
         indent = _leading_space(line_text)
-        new_text = f"{indent}# @finite_collection TODO: name or bound the collection before iterating\n"
+        new_text = (
+            f"{indent}# @finite_collection TODO: name or bound the collection before iterating\n"
+        )
         return _edit_action(
             doc,
             diagnostic,
@@ -505,7 +527,9 @@ def _quickfix_for_diagnostic(doc: Document, diagnostic: Json) -> Json | None:
 
     if code == "APSEUDO-WHILE-002":
         indent = _leading_space(line_text) + "    "
-        new_text = f"{indent}# TODO: update loop-control state visibly or return/break from the loop\n"
+        new_text = (
+            f"{indent}# TODO: update loop-control state visibly or return/break from the loop\n"
+        )
         return _edit_action(
             doc,
             diagnostic,
@@ -653,7 +677,10 @@ def _line_range(text: str, line_index: int) -> Json:
 
 
 def _empty_range(line: int, character: int) -> Json:
-    return {"start": {"line": line, "character": character}, "end": {"line": line, "character": character}}
+    return {
+        "start": {"line": line, "character": character},
+        "end": {"line": line, "character": character},
+    }
 
 
 def _leading_space(line: str) -> str:
@@ -727,8 +754,14 @@ def _int_or_default(value: Any, default: int) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="apseudo-lsp", description="Agent Pseudocode language server.")
-    parser.add_argument("--stdio", action="store_true", help="Run over stdio. This is the default and exists for editor-client compatibility.")
+    parser = argparse.ArgumentParser(
+        prog="apseudo-lsp", description="Agent Pseudocode language server."
+    )
+    parser.add_argument(
+        "--stdio",
+        action="store_true",
+        help="Run over stdio. This is the default and exists for editor-client compatibility.",
+    )
     parser.add_argument("--trace", action="store_true", help="Log LSP message flow to stderr.")
     parser.add_argument("--version", action="version", version=f"apseudo-lsp {__version__}")
     return parser

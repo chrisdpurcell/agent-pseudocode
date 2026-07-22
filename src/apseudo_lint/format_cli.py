@@ -30,8 +30,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Explicit .apseudo-lint.toml, apseudo.toml, or pyproject.toml file.",
     )
-    parser.add_argument("--check", action="store_true", help="Exit non-zero if files need formatting.")
-    parser.add_argument("--diff", action="store_true", help="Print unified diffs for changed files.")
+    parser.add_argument(
+        "--check", action="store_true", help="Exit non-zero if files need formatting."
+    )
+    parser.add_argument(
+        "--diff", action="store_true", help="Print unified diffs for changed files."
+    )
     parser.add_argument(
         "--write",
         action="store_true",
@@ -58,7 +62,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not uppercase MUST/SHOULD/MAY-style normative keywords in comments.",
     )
     parser.add_argument("--quiet", action="store_true", help="Suppress success output.")
-    parser.add_argument("--changed", action="store_true", help="Format only Git-changed supported files.")
+    parser.add_argument(
+        "--changed", action="store_true", help="Format only Git-changed supported files."
+    )
     parser.add_argument("--version", action="version", version=f"apseudo-format {__version__}")
     return parser
 
@@ -80,7 +86,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.stdin_filename is not None:
-        result = format_text(sys.stdin.read(), path=args.stdin_filename, config=config, options=options)
+        result = format_text(
+            sys.stdin.read(), path=args.stdin_filename, config=config, options=options
+        )
         sys.stdout.write(result.formatted)
         return 0
 

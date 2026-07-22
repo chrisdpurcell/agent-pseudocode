@@ -28,7 +28,9 @@ class Rule:
     def as_markdown(self) -> str:
         """Render the rule as Markdown."""
 
-        return f"""### {self.code}: {self.title}
+        # h2, not h3: docs/reference/RULES.md nests these under its single H1, and
+        # an h1 -> h3 jump trips markdownlint MD001 in the enabled lint gate.
+        return f"""## {self.code}: {self.title}
 
 - **Default severity:** {self.severity}
 - **Source:** {self.source}
@@ -134,7 +136,7 @@ RULES: dict[str, Rule] = {
         summary="Every process must return at least one approved outcome.",
         rationale="Agents need explicit success/failure outcomes to know when the workflow is complete.",
         noncompliant_example="process demo():\n    do_work()",
-        compliant_example="process demo():\n    do_work()\n    return Accepted(reason=\"done\")",
+        compliant_example='process demo():\n    do_work()\n    return Accepted(reason="done")',
         fix="Add a terminal return such as Accepted(...), Blocked(...), or NeedsUserDecision(...).",
     ),
     "APSEUDO-RETURN-002": Rule(
@@ -144,7 +146,7 @@ RULES: dict[str, Rule] = {
         summary="Bare return statements and arbitrary return values are discouraged.",
         rationale="Outcome constructors make termination states explicit and searchable.",
         noncompliant_example="return",
-        compliant_example="return Blocked(reason=\"missing required input\")",
+        compliant_example='return Blocked(reason="missing required input")',
         fix="Return an approved outcome constructor or add a project outcome to the config.",
     ),
     "APSEUDO-RETURN-003": Rule(
@@ -154,7 +156,7 @@ RULES: dict[str, Rule] = {
         summary="The final executable line in a process should be return, raise, break, or continue.",
         rationale="A non-terminal trailing action can make completion ambiguous.",
         noncompliant_example="process demo():\n    do_work()\n    verify_work()",
-        compliant_example="process demo():\n    do_work()\n    verify_work()\n    return Accepted(reason=\"verified\")",
+        compliant_example='process demo():\n    do_work()\n    verify_work()\n    return Accepted(reason="verified")',
         fix="Append an explicit return outcome or justify the non-return terminal action.",
     ),
     "APSEUDO-OUTCOME-001": Rule(
@@ -164,7 +166,7 @@ RULES: dict[str, Rule] = {
         summary="Returned outcome names must appear in the configured allowed outcome set.",
         rationale="A finite outcome vocabulary lets agents, hooks, and reports classify process endings consistently.",
         noncompliant_example="return Done()",
-        compliant_example="return Accepted(reason=\"done\")",
+        compliant_example='return Accepted(reason="done")',
         fix="Use an approved outcome or add the intentional project-specific outcome to .apseudo-lint.toml.",
     ),
     "APSEUDO-WHILE-001": Rule(
@@ -194,7 +196,7 @@ RULES: dict[str, Rule] = {
         summary="while True requires an explicit annotation and a visible break, return, or raise in the loop body.",
         rationale="Intentional infinite loops are exceptional and must document their exit path.",
         noncompliant_example="while True:\n    poll_queue()",
-        compliant_example="# @intentional_infinite_loop until shutdown_requested\nwhile True:\n    if shutdown_requested:\n        return Accepted(reason=\"shutdown\")",
+        compliant_example='# @intentional_infinite_loop until shutdown_requested\nwhile True:\n    if shutdown_requested:\n        return Accepted(reason="shutdown")',
         fix="Prefer a bounded while condition; otherwise annotate and add a reachable terminal statement.",
     ),
     "APSEUDO-FOR-001": Rule(
@@ -214,7 +216,7 @@ RULES: dict[str, Rule] = {
         summary="Non-terminal if/elif chains should include else or be annotated @exhaustive.",
         rationale="Fallback branches prevent silent no-op behavior when a condition is unexpected.",
         noncompliant_example="if approved:\n    return Accepted()",
-        compliant_example="if approved:\n    return Accepted()\nelse:\n    return Blocked(reason=\"not approved\")",
+        compliant_example='if approved:\n    return Accepted()\nelse:\n    return Blocked(reason="not approved")',
         fix="Add else with an explicit action/outcome, or annotate @exhaustive when the condition set is complete.",
     ),
     "APSEUDO-BRANCH-002": Rule(
@@ -224,7 +226,7 @@ RULES: dict[str, Rule] = {
         summary="A branch body containing only pass or ... is considered incomplete.",
         rationale="Placeholders are easy for agents to skip accidentally.",
         noncompliant_example="else:\n    pass",
-        compliant_example="else:\n    return Blocked(reason=\"unsupported state\")",
+        compliant_example='else:\n    return Blocked(reason="unsupported state")',
         fix="Replace the placeholder or mark the branch with @allow_empty_branch.",
     ),
     "APSEUDO-NEST-001": Rule(
@@ -234,7 +236,7 @@ RULES: dict[str, Rule] = {
         summary="Nesting deeper than the configured maximum should be refactored.",
         rationale="Deeply nested agent instructions are harder for humans and models to follow reliably.",
         noncompliant_example="if a:\n    if b:\n        if c:\n            if d:\n                if e:\n                    return Accepted()",
-        compliant_example="if not a:\n    return Blocked(reason=\"a missing\")\nif not b:\n    return Blocked(reason=\"b missing\")\nreturn Accepted()",
+        compliant_example='if not a:\n    return Blocked(reason="a missing")\nif not b:\n    return Blocked(reason="b missing")\nreturn Accepted()',
         fix="Use guard clauses, helper processes, or decision tables.",
     ),
     "APSEUDO-ACTION-001": Rule(

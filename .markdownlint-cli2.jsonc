@@ -1,5 +1,12 @@
 {
-  "config": ".markdownlint.json",
-  "globs": ["**/*.md"],
-  "ignores": ["node_modules/**", ".venv/**"],
+	"config": ".markdownlint.json",
+	"globs": ["**/*.md"],
+	// Mirrors the markdown-tooling `exclusions` in .standards/config.toml so a
+	// local run matches the lint-markdown CI caller. Keep the two in sync.
+	"ignores": [
+		"node_modules/**",
+		".venv/**",
+		".pytest_cache/**",
+		"docs/reference/pre-migration/**"
+	]
 }

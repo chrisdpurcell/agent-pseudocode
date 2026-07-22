@@ -2,9 +2,12 @@
 """Regenerate docs/handoff/bugs/INDEX.md from bug-file frontmatter.
 
 Run directly (`python3 docs/handoff/bugs/_regen_index.py`) after adding,
-removing, or renaming a bug file. build_index() is kept pure (no file writes)
-so it can be unit-tested and diffed against the committed INDEX.md; only the
-__main__ path writes.
+removing, or renaming a bug file, then `npx prettier --write` the result:
+Prettier owns physical formatting and pads table columns, so the committed
+INDEX.md is this generator's output after that pass, not its raw bytes.
+
+build_index() is kept pure (no file writes) so it can be unit-tested and
+compared row-wise against the committed INDEX.md; only the __main__ path writes.
 """
 
 import re

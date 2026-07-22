@@ -82,7 +82,9 @@ def document_symbols(text: str, *, base_line: int = 0) -> list[Symbol]:
         end = match.end("name")
         full_range = _block_range(lines, index, base_line=base_line)
         selection = Range(base_line + index, start, base_line + index, end)
-        symbols.append(Symbol(name=name, kind="process", range=full_range, selection_range=selection))
+        symbols.append(
+            Symbol(name=name, kind="process", range=full_range, selection_range=selection)
+        )
     return symbols
 
 

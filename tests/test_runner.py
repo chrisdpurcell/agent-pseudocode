@@ -128,7 +128,16 @@ def test_runner_cli_check_and_render_prompt() -> None:
         check=False,
     )
     prompt = subprocess.run(
-        [sys.executable, "-m", "apseudo_lint.runner_cli", "--codex", "--render-prompt", str(SCRIPT), "--", "target=src"],
+        [
+            sys.executable,
+            "-m",
+            "apseudo_lint.runner_cli",
+            "--codex",
+            "--render-prompt",
+            str(SCRIPT),
+            "--",
+            "target=src",
+        ],
         cwd=ROOT,
         env=env,
         text=True,

@@ -87,7 +87,10 @@ def main(argv: list[str] | None = None) -> int:
         if format_result.returncode != 0:
             status = "blocked"
             detail = _combined_output(format_result)
-            print(_failure_message(args.host, args.event, format_result, "apseudo-format"), file=sys.stderr)
+            print(
+                _failure_message(args.host, args.event, format_result, "apseudo-format"),
+                file=sys.stderr,
+            )
             return 2
 
         result = _run_linter(repo_root, strict=args.strict)
@@ -99,7 +102,14 @@ def main(argv: list[str] | None = None) -> int:
         print(_failure_message(args.host, args.event, result, "apseudo-lint"), file=sys.stderr)
         return 2
     finally:
-        _audit(repo_root, host=args.host, event=args.event, status=status, detail=detail, payload=payload)
+        _audit(
+            repo_root,
+            host=args.host,
+            event=args.event,
+            status=status,
+            detail=detail,
+            payload=payload,
+        )
 
 
 def _read_json_stdin() -> dict[str, Any]:
@@ -216,7 +226,9 @@ def _run(command: list[str], repo_root: Path) -> subprocess.CompletedProcess[str
         return subprocess.CompletedProcess(command, returncode=1, stdout="", stderr=str(exc))
 
 
-def _failure_message(host: str, event: str, result: subprocess.CompletedProcess[str], tool: str) -> str:
+def _failure_message(
+    host: str, event: str, result: subprocess.CompletedProcess[str], tool: str
+) -> str:
     body = _combined_output(result) or f"{tool} failed without output."
     return (
         f"{tool} blocked {host} {event}: pseudocode validation failed.\n\n"
@@ -233,7 +245,9 @@ def _block_message(host: str, event: str, reason: str) -> str:
 
 
 def _combined_output(result: subprocess.CompletedProcess[str]) -> str:
-    return "\n".join(part for part in (result.stdout.strip(), result.stderr.strip()) if part).strip()
+    return "\n".join(
+        part for part in (result.stdout.strip(), result.stderr.strip()) if part
+    ).strip()
 
 
 def _audit(

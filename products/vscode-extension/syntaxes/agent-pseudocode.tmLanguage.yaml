@@ -1,105 +1,105 @@
 name: Agent Pseudocode
 scopeName: source.agent-pseudocode
 fileTypes:
-- apseudo
-- agentpseudo
-- pseudocode
+  - apseudo
+  - agentpseudo
+  - pseudocode
 patterns:
-- include: '#docstrings'
-- include: '#strings'
-- include: '#comments'
-- include: '#annotations'
-- include: '#process-declarations'
-- include: '#normative'
-- include: '#control'
-- include: '#logical-operators'
-- include: '#outcomes'
-- include: '#types'
-- include: '#constants'
-- include: '#numbers'
-- include: '#operators'
-- include: '#function-calls'
+  - include: "#docstrings"
+  - include: "#strings"
+  - include: "#comments"
+  - include: "#annotations"
+  - include: "#process-declarations"
+  - include: "#normative"
+  - include: "#control"
+  - include: "#logical-operators"
+  - include: "#outcomes"
+  - include: "#types"
+  - include: "#constants"
+  - include: "#numbers"
+  - include: "#operators"
+  - include: "#function-calls"
 repository:
   comments:
     patterns:
-    - name: comment.line.number-sign.agent-pseudocode
-      match: '#.*$'
+      - name: comment.line.number-sign.agent-pseudocode
+        match: "#.*$"
   docstrings:
     patterns:
-    - name: string.quoted.docstring.multi.double.agent-pseudocode
-      begin: (?i:\b[frbu]*)"""
-      end: '"""'
-      patterns:
-      - include: '#string-escapes'
-    - name: string.quoted.docstring.multi.single.agent-pseudocode
-      begin: (?i:\b[frbu]*)'''
-      end: ''''''''
-      patterns:
-      - include: '#string-escapes'
+      - name: string.quoted.docstring.multi.double.agent-pseudocode
+        begin: (?i:\b[frbu]*)"""
+        end: '"""'
+        patterns:
+          - include: "#string-escapes"
+      - name: string.quoted.docstring.multi.single.agent-pseudocode
+        begin: (?i:\b[frbu]*)'''
+        end: "'''"
+        patterns:
+          - include: "#string-escapes"
   strings:
     patterns:
-    - name: string.quoted.double.agent-pseudocode
-      begin: (?i:\b[frbu]*)"
-      end: '"'
-      patterns:
-      - include: '#string-escapes'
-    - name: string.quoted.single.agent-pseudocode
-      begin: (?i:\b[frbu]*)'
-      end: ''''
-      patterns:
-      - include: '#string-escapes'
+      - name: string.quoted.double.agent-pseudocode
+        begin: (?i:\b[frbu]*)"
+        end: '"'
+        patterns:
+          - include: "#string-escapes"
+      - name: string.quoted.single.agent-pseudocode
+        begin: (?i:\b[frbu]*)'
+        end: "'"
+        patterns:
+          - include: "#string-escapes"
   string-escapes:
     patterns:
-    - name: constant.character.escape.agent-pseudocode
-      match: \\.
+      - name: constant.character.escape.agent-pseudocode
+        match: \\.
   annotations:
     patterns:
-    - name: meta.annotation.agent-pseudocode
-      match: ^\s*@[A-Za-z_][A-Za-z0-9_\.]*
+      - name: meta.annotation.agent-pseudocode
+        match: ^\s*@[A-Za-z_][A-Za-z0-9_\.]*
   process-declarations:
     patterns:
-    - name: meta.function.agent-pseudocode
-      match: \b(process|def)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?=\()
-      captures:
-        '1':
-          name: keyword.declaration.function.agent-pseudocode
-        '2':
-          name: entity.name.function.agent-pseudocode
+      - name: meta.function.agent-pseudocode
+        match: \b(process|def)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?=\()
+        captures:
+          "1":
+            name: keyword.declaration.function.agent-pseudocode
+          "2":
+            name: entity.name.function.agent-pseudocode
   normative:
     patterns:
-    - name: keyword.other.normative.agent-pseudocode
-      match: \b(MUST NOT|SHOULD NOT|SHALL NOT|NOT RECOMMENDED|MUST|SHOULD|SHALL|MAY|REQUIRED|OPTIONAL|RECOMMENDED)\b
+      - name: keyword.other.normative.agent-pseudocode
+        match: \b(MUST NOT|SHOULD NOT|SHALL NOT|NOT RECOMMENDED|MUST|SHOULD|SHALL|MAY|REQUIRED|OPTIONAL|RECOMMENDED)\b
   control:
     patterns:
-    - name: keyword.control.agent-pseudocode
-      match: \b(if|elif|else|while|for|return|continue|break|try|except|finally|raise|assert|with|as|match|case|yield|pass|from|import)\b
+      - name: keyword.control.agent-pseudocode
+        match: \b(if|elif|else|while|for|return|continue|break|try|except|finally|raise|assert|with|as|match|case|yield|pass|from|import)\b
   logical-operators:
     patterns:
-    - name: keyword.operator.logical.agent-pseudocode
-      match: \b(and|or|not|is|in)\b
+      - name: keyword.operator.logical.agent-pseudocode
+        match: \b(and|or|not|is|in)\b
   outcomes:
     patterns:
-    - name: support.class.outcome.agent-pseudocode
-      match: \b(Accepted|Approved|Blocked|Rejected|NeedsUserDecision|NeedsRevision|Skipped|Failed|Succeeded|Retry|Escalated|Done|Complete|Incomplete|Cancelled|Deferred)\b
+      - name: support.class.outcome.agent-pseudocode
+        match: \b(Accepted|Approved|Blocked|Rejected|NeedsUserDecision|NeedsRevision|Skipped|Failed|Succeeded|Retry|Escalated|Done|Complete|Incomplete|Cancelled|Deferred)\b
   types:
     patterns:
-    - name: support.type.agent-pseudocode
-      match: \b(Outcome|Review|Decision|State|Action|Rule|Invariant|Guard|Input|Output|Blocker|Finding|Result|Process|Actor|Event|Condition)\b
+      - name: support.type.agent-pseudocode
+        match: \b(Outcome|Review|Decision|State|Action|Rule|Invariant|Guard|Input|Output|Blocker|Finding|Result|Process|Actor|Event|Condition)\b
   constants:
     patterns:
-    - name: constant.language.agent-pseudocode
-      match: \b(True|False|None|Unknown)\b
+      - name: constant.language.agent-pseudocode
+        match: \b(True|False|None|Unknown)\b
   numbers:
     patterns:
-    - name: constant.numeric.float.agent-pseudocode
-      match: \b\d+\.\d+\b
-    - name: constant.numeric.integer.agent-pseudocode
-      match: \b\d+\b
+      - name: constant.numeric.float.agent-pseudocode
+        match: \b\d+\.\d+\b
+      - name: constant.numeric.integer.agent-pseudocode
+        match: \b\d+\b
   operators:
     patterns:
-    - name: keyword.operator.agent-pseudocode
-      match: (\+=|-=|\*=|/=|//=|%=|==|!=|<=|>=|:=|->|=>|=|\+|-|\*|/|//|%|<|>)
+      - name: keyword.operator.agent-pseudocode
+        match: (\+=|-=|\*=|/=|//=|%=|==|!=|<=|>=|:=|->|=>|=|\+|-|\*|/|//|%|<|>)
   function-calls:
     patterns:
-    - name: entity.name.function.call.agent-pseudocode
-      match: \b[a-z_][A-Za-z0-9_]*(?=\()
+      - name: entity.name.function.call.agent-pseudocode
+        match: \b[a-z_][A-Za-z0-9_]*(?=\()

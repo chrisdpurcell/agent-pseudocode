@@ -310,7 +310,9 @@ def _parse_scalar(value: str) -> JsonValue:
         if not inner:
             return []
         return [_parse_scalar(part.strip()) for part in inner.split(",")]
-    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+    if (text.startswith('"') and text.endswith('"')) or (
+        text.startswith("'") and text.endswith("'")
+    ):
         return text[1:-1]
     try:
         return int(text)

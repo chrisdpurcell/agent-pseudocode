@@ -14,7 +14,7 @@
 - Pin every `project-standards` CLI invocation to `@v4` (the first release carrying `project-spec`; older tags lack it — keep all standards on the same major for consistency).
 - Never run `~/projects/agent-handoff-v3/agent-handoff-v3/scripts/handoff/install-globals.sh` — it defaults to a fleet-wide rollout across all of `~/projects/`. Hand-install this repo's handoff files only.
 - Use `uv` for all dependency changes (`uv add`, `uv sync`) — never hand-edit `uv.lock`.
-- This repo's pseudocode-enforcement hooks (`integrations/agent-hooks/apseudo-hook.py`) block Bash commands whose arguments merely *mention* `.pre-commit-config.yaml` or `.codex/hooks.json`, even for reads — use the `Read` tool for those files, not `cat`/`grep` via Bash, to avoid false-positive blocks.
+- This repo's pseudocode-enforcement hooks (`integrations/agent-hooks/apseudo-hook.py`) block Bash commands whose arguments merely _mention_ `.pre-commit-config.yaml` or `.codex/hooks.json`, even for reads — use the `Read` tool for those files, not `cat`/`grep` via Bash, to avoid false-positive blocks.
 - Any deliberate deviation from a standard's baseline (e.g. merging python-tooling's CI gate into the existing `apseudo-lint.yml` instead of a separate `check.yml`) gets recorded as an ADR once Task 3 (adr adoption) is complete — do not silently deviate.
 - After Task 3, every subsequent task that touches Markdown under `docs/adr/**` follows the frontmatter rules from Task 1; nothing outside `docs/adr/**` gets frontmatter in this plan (repo-wide frontmatter adoption is out of scope — TODO.md does not list `markdown-frontmatter`).
 - Run `scripts/apseudo-format --check --changed` and `scripts/apseudo-lint --changed` before completing any task that edits `.apseudo`/`.agentpseudo`/`.pseudocode` files or Markdown `apseudo` fences (none of these tasks touch such files directly, but re-check if a task ends up editing `docs/apseudo-docs/**`).
@@ -26,10 +26,12 @@
 ### Task 1: Adopt markdown-frontmatter (prerequisite for adr, scoped narrowly)
 
 **Files:**
+
 - Create: `.project-standards.yml`
 - Create: `.github/workflows/validate-standards.yml`
 
 **Interfaces:**
+
 - Produces: `.project-standards.yml` with a `markdown.frontmatter` block that Task 3 (adr) extends with a `markdown.adr` block, and Task 4/6/8 extend with their own top-level blocks (`markdown_tooling`, `spec`, `cli_documentation`).
 
 - [ ] **Step 1: Run the adopt CLI**
@@ -41,31 +43,31 @@ uvx --from 'git+https://github.com/L3DigitalNet/project-standards@v4' \
 
 Expected: writes `.project-standards.yml` (only if absent — it is) and `.github/workflows/validate-standards.yml`.
 
-- [ ] **Step 2: Narrow the `include` scope to just `docs/adr/**`**
+- [ ] **Step 2: Narrow the `include` scope to just `docs/adr/**`\*\*
 
 This repo has ~150+ untouched Markdown files with no frontmatter; enabling `required: true` repo-wide would fail validation on all of them — a full docs-frontmatter migration nobody asked for. TODO.md does not list `markdown-frontmatter` as an item; only `adr` needs it. Edit `.project-standards.yml` to:
 
 ```yaml
-standards_version: "v3"
+standards_version: 'v3'
 
 markdown:
   frontmatter:
-    version: "1.1"
-    schema: "markdown-frontmatter"
+    version: '1.1'
+    schema: 'markdown-frontmatter'
     required: true
     include:
-      - "docs/adr/**/*.md"
+      - 'docs/adr/**/*.md'
     exclude:
-      - "**/*.template.md"
-      - "CHANGELOG.md"
-      - "LICENSE.md"
-      - "CLAUDE.md"
-      - "AGENTS.md"
-      - ".claude/**"
-      - ".agents/**"
-      - ".codex/**"
-      - ".github/**"
-      - "node_modules/**"
+      - '**/*.template.md'
+      - 'CHANGELOG.md'
+      - 'LICENSE.md'
+      - 'CLAUDE.md'
+      - 'AGENTS.md'
+      - '.claude/**'
+      - '.agents/**'
+      - '.codex/**'
+      - '.github/**'
+      - 'node_modules/**'
 ```
 
 - [ ] **Step 3: Verify the CI workflow content**
@@ -85,8 +87,8 @@ jobs:
   validate:
     uses: L3DigitalNet/project-standards/.github/workflows/validate-markdown-frontmatter.yml@v4
     with:
-      config-path: ".project-standards.yml"
-      standards-ref: "v4"
+      config-path: '.project-standards.yml'
+      standards-ref: 'v4'
 ```
 
 - [ ] **Step 4: Validate locally (expect a clean pass — no files exist under `docs/adr/` yet)**
@@ -110,6 +112,7 @@ git commit -m "chore: adopt markdown-frontmatter standard (scoped to docs/adr/, 
 ### Task 2: Adopt agent-handoff-v3
 
 **Files:**
+
 - Create: `docs/handoff/state.md`, `docs/handoff/deployed.md`, `docs/handoff/architecture.md`, `docs/handoff/credentials.md`, `docs/handoff/conventions.md`, `docs/handoff/specs-plans.md`, `docs/handoff/sessions/2026-07.md`, `docs/handoff/bugs/INDEX.md`, `docs/handoff/bugs/_regen_index.py`
 - Create: `STATUS.md`
 - Modify: `TODO.md` (rename section headings, preserve all content)
@@ -122,6 +125,7 @@ git commit -m "chore: adopt markdown-frontmatter standard (scoped to docs/adr/, 
 - Modify: `CLAUDE.md` (repo root — add the required top-of-file pointer block)
 
 **Interfaces:**
+
 - Produces: `docs/handoff/state.md` etc. — consumed by the `session_start.py` hook (reads `docs/handoff/state.md` first, falling back to `docs/state.md`) and by future sessions per the `handoff-system-v3` skill.
 
 - [ ] **Step 1: Copy the canonical hook script to both harness locations**
@@ -140,14 +144,14 @@ Add a second object to the existing `hooks.SessionStart[0].hooks` array (same `m
 
 ```json
 {
-  "type": "command",
-  "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.py\"",
-  "timeout": 30,
-  "statusMessage": "Loading handoff state"
+	"type": "command",
+	"command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.py\"",
+	"timeout": 30,
+	"statusMessage": "Loading handoff state"
 }
 ```
 
-**Both the timeout and the ordering are load-bearing, not stylistic.** `validate-layout.sh`'s `handoff_check_settings` (in `_handoff-lib.sh`) reads the *first* command-type handler in the array and requires the `${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.py` anchor string there specifically — the apseudo-hook entry doesn't contain that string, so the handoff hook must be listed first, not appended second. It also requires `timeout == 30` on *some* handler in the group; the apseudo entry uses `timeout: 10`, so the new handoff entry must be the one carrying 30. Resulting `hooks.SessionStart` array has one matcher object (`"startup|resume|clear|compact"`) containing two hook entries, handoff-hook first.
+**Both the timeout and the ordering are load-bearing, not stylistic.** `validate-layout.sh`'s `handoff_check_settings` (in `_handoff-lib.sh`) reads the _first_ command-type handler in the array and requires the `${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.py` anchor string there specifically — the apseudo-hook entry doesn't contain that string, so the handoff hook must be listed first, not appended second. It also requires `timeout == 30` on _some_ handler in the group; the apseudo entry uses `timeout: 10`, so the new handoff entry must be the one carrying 30. Resulting `hooks.SessionStart` array has one matcher object (`"startup|resume|clear|compact"`) containing two hook entries, handoff-hook first.
 
 - [ ] **Step 3: Add the `[hooks]` table to `.codex/config.toml` (satisfies the formal validator)**
 
@@ -170,10 +174,10 @@ This repo's existing apseudo hooks demonstrably run through `.codex/hooks.json`,
 
 ```json
 {
-  "type": "command",
-  "command": "bash -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/session_start.py\"'",
-  "timeout": 30,
-  "statusMessage": "Loading handoff state"
+	"type": "command",
+	"command": "bash -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/session_start.py\"'",
+	"timeout": 30,
+	"statusMessage": "Loading handoff state"
 }
 ```
 
@@ -184,9 +188,7 @@ This repo's existing apseudo hooks demonstrably run through `.codex/hooks.json`,
 
 ## In flight
 
-Adopting agent-handoff-v3 and six project-standards standards per `TODO.md`
-(User Managed section), via a single implementation plan at
-`docs/superpowers/plans/2026-07-08-adopt-standards.md`. Executing task-by-task.
+Adopting agent-handoff-v3 and six project-standards standards per `TODO.md` (User Managed section), via a single implementation plan at `docs/superpowers/plans/2026-07-08-adopt-standards.md`. Executing task-by-task.
 
 ## Recently landed
 
@@ -194,12 +196,8 @@ Adopting agent-handoff-v3 and six project-standards standards per `TODO.md`
 
 ## Watch out for
 
-- `.project-standards.yml`'s `markdown.frontmatter.include` is deliberately
-  scoped to `docs/adr/**` only — do not widen it to the whole repo without a
-  separate decision; this repo has ~150 pre-existing Markdown files with no
-  frontmatter.
-- `python-tooling` adoption bumps `requires-python` to `>=3.14` and swaps
-  `pyright` → `basedpyright`, `hatchling` → `uv_build`.
+- `.project-standards.yml`'s `markdown.frontmatter.include` is deliberately scoped to `docs/adr/**` only — do not widen it to the whole repo without a separate decision; this repo has ~150 pre-existing Markdown files with no frontmatter.
+- `python-tooling` adoption bumps `requires-python` to `>=3.14` and swaps `pyright` → `basedpyright`, `hatchling` → `uv_build`.
 ```
 
 - [ ] **Step 6: Create `docs/handoff/deployed.md`**
@@ -209,11 +207,7 @@ Adopting agent-handoff-v3 and six project-standards standards per `TODO.md`
 
 # Deployed
 
-This repo has no deployment target. It is a local development toolkit
-(syntax highlighting, formatter/validator, LSP, MCP server, hooks, skills)
-consumed by editors (VS Code, Kate) and agent harnesses (Claude Code, Codex)
-directly from a checkout — there is no packaged release, hosted service, or
-server component to track here.
+This repo has no deployment target. It is a local development toolkit (syntax highlighting, formatter/validator, LSP, MCP server, hooks, skills) consumed by editors (VS Code, Kate) and agent harnesses (Claude Code, Codex) directly from a checkout — there is no packaged release, hosted service, or server component to track here.
 ```
 
 - [ ] **Step 7: Create `docs/handoff/architecture.md`**
@@ -225,25 +219,15 @@ server component to track here.
 
 ## Components
 
-- `src/apseudo_lint/` — the policy source of truth: rules (`rules.py`),
-  formatter (`format_cli.py`), linter (`cli.py`), LSP (`lsp.py`), MCP server
-  (`mcp.py`), pseudocode runner (`runner_cli.py`), project reviewer
-  (`review.py`), template generator (`template_cli.py`), Mermaid renderer
-  (`mermaid_cli.py`).
-- `integrations/agent-hooks/apseudo-hook.py` — Claude Code + Codex hook
-  entry point; calls into `src/apseudo_lint` rather than reimplementing rules.
-- `products/vscode-extension/`, `products/kate-integration/` — editor
-  integrations; thin wrappers over the LSP/formatter, no duplicated policy.
-- `docs/specs/` (being relocated to `docs/reference/` — see Task 6 of the
-  2026-07-08 adoption plan) — normative language/format references, not
-  project plans.
+- `src/apseudo_lint/` — the policy source of truth: rules (`rules.py`), formatter (`format_cli.py`), linter (`cli.py`), LSP (`lsp.py`), MCP server (`mcp.py`), pseudocode runner (`runner_cli.py`), project reviewer (`review.py`), template generator (`template_cli.py`), Mermaid renderer (`mermaid_cli.py`).
+- `integrations/agent-hooks/apseudo-hook.py` — Claude Code + Codex hook entry point; calls into `src/apseudo_lint` rather than reimplementing rules.
+- `products/vscode-extension/`, `products/kate-integration/` — editor integrations; thin wrappers over the LSP/formatter, no duplicated policy.
+- `docs/specs/` (being relocated to `docs/reference/` — see Task 6 of the 2026-07-08 adoption plan) — normative language/format references, not project plans.
 - `docs/handoff/` — this handoff system (adopted 2026-07-08).
 
 ## Standing structural backlog
 
-- `src/apseudo_lint/mcp.py:253` referenced `docs/RULES.md`, which never
-  existed (the real file was `docs/specs/RULES.md`) — fixed during the
-  docs/specs → docs/reference/ relocation (Task 6).
+- `src/apseudo_lint/mcp.py:253` referenced `docs/RULES.md`, which never existed (the real file was `docs/specs/RULES.md`) — fixed during the docs/specs → docs/reference/ relocation (Task 6).
 ```
 
 - [ ] **Step 8: Create `docs/handoff/credentials.md`**
@@ -253,8 +237,7 @@ server component to track here.
 
 # Credentials
 
-None. This repo has no external service dependencies, API keys, or deployment
-credentials — it is a local toolkit with no network-facing components.
+None. This repo has no external service dependencies, API keys, or deployment credentials — it is a local toolkit with no network-facing components.
 ```
 
 - [ ] **Step 9: Create `docs/handoff/conventions.md`**
@@ -306,12 +289,7 @@ credentials — it is a local toolkit with no network-facing components.
 
 # Specs & Plans
 
-This repo does not use `docs/superpowers/specs/` — plans live under
-`docs/superpowers/plans/`; reference specs live under `docs/reference/`
-(relocated from `docs/specs/` — see Task 6 of the 2026-07-08 plan below).
-Forward-looking project/feature specs adopted under the `project-spec`
-standard (Task 6) will live under `docs/specs/` going forward — a fresh,
-narrower use of that directory name than the pre-migration reference docs.
+This repo does not use `docs/superpowers/specs/` — plans live under `docs/superpowers/plans/`; reference specs live under `docs/reference/` (relocated from `docs/specs/` — see Task 6 of the 2026-07-08 plan below). Forward-looking project/feature specs adopted under the `project-spec` standard (Task 6) will live under `docs/specs/` going forward — a fresh, narrower use of that directory name than the pre-migration reference docs.
 
 | Doc | Kind | Status |
 | --- | --- | --- |
@@ -331,8 +309,7 @@ narrower use of that directory name than the pre-migration reference docs.
 
 ## 2026-07-08
 
-Adopted agent-handoff-v3 and six project-standards standards per TODO.md,
-via `docs/superpowers/plans/2026-07-08-adopt-standards.md`.
+Adopted agent-handoff-v3 and six project-standards standards per TODO.md, via `docs/superpowers/plans/2026-07-08-adopt-standards.md`.
 ```
 
 - [ ] **Step 12: Copy the bugs index helper and create an empty index**
@@ -376,9 +353,7 @@ Change `## User Managed` → `## User Tracked Tasks` and `## Agent Managed` → 
 Insert at the top of `AGENTS.md`, before `## Repository purpose`:
 
 ```markdown
-**Session state:** read `docs/handoff/state.md` first — live state and active work.
-**Full conventions reference:** `docs/handoff/conventions.md`.
-**Detailed review workflows:** not configured for this repo.
+**Session state:** read `docs/handoff/state.md` first — live state and active work. **Full conventions reference:** `docs/handoff/conventions.md`. **Detailed review workflows:** not configured for this repo.
 ```
 
 - [ ] **Step 16: Add the pointer block to `CLAUDE.md`**
@@ -409,6 +384,7 @@ git commit -m "feat: adopt agent-handoff-v3 session-state system"
 ### Task 3: Adopt the `adr` standard
 
 **Files:**
+
 - Create: `docs/adr/README.md` (index)
 - Create: `docs/adr/adr.template.md`
 - Create: `docs/adr/adr-0001-*.md` (first ADR — see Step 4)
@@ -416,6 +392,7 @@ git commit -m "feat: adopt agent-handoff-v3 session-state system"
 - Modify: `/home/chris/projects/agent-pseudocode/CLAUDE.md` (add docs-table pointer row)
 
 **Interfaces:**
+
 - Consumes: `.project-standards.yml`'s `markdown.frontmatter` block from Task 1 (scoped to `docs/adr/**`).
 
 - [ ] **Step 1: Run the adopt CLI**
@@ -506,6 +483,7 @@ git commit -m "feat: adopt adr standard, record docs/specs relocation as ADR-000
 ### Task 4: Adopt the `markdown-tooling` standard
 
 **Files:**
+
 - Create: `.markdownlint.json`, `.prettierrc.json`, `.markdownlint-cli2.jsonc`, `package.json`
 - Modify: `.editorconfig` (add `[*.md]` deviation)
 - Modify: `.vscode/settings.json`, `.vscode/extensions.json` (created fresh — no `.vscode/` exists yet)
@@ -532,11 +510,9 @@ No root `package.json` exists (this is a pure-Python + VS Code-extension-in-subd
 
 ```json
 {
-  "name": "agent-pseudocode-syntax-toolkit",
-  "private": true,
-  "devDependencies": {
-    "prettier": "3.8.3"
-  }
+	"name": "agent-pseudocode-syntax-toolkit",
+	"private": true,
+	"devDependencies": { "prettier": "3.8.3" }
 }
 ```
 
@@ -562,9 +538,9 @@ Wiring it is deferred to the full-repo markdownlint cleanup task recorded in Tas
 
 ```jsonc
 {
-  "config": ".markdownlint.json",
-  "globs": ["**/*.md"],
-  "ignores": ["node_modules/**", ".venv/**"],
+	"config": ".markdownlint.json",
+	"globs": ["**/*.md"],
+	"ignores": ["node_modules/**", ".venv/**"],
 }
 ```
 
@@ -592,11 +568,13 @@ git commit -m "feat: adopt markdown-tooling standard (rules seeded, lint+format 
 ### Task 5: Adopt the `cli-documentation` standard
 
 **Files:**
+
 - Modify: `docs/apseudo-docs/usage/usage.md` (already standard-shaped — close the gap, not a rewrite)
 - Create: `.github/workflows/cli-docs-check.yml`
 - Modify: `.project-standards.yml` (add `cli_documentation` block)
 
 **Interfaces:**
+
 - Consumes: the existing `NAME → SYNOPSIS → DESCRIPTION → OPTIONS → EXIT STATUS → ENVIRONMENT → FILES → EXAMPLES → NOTES → SEE ALSO` section registry already used in `usage.md` and `RUNNER-USAGE.md` — this task extends it, not replaces it.
 
 - [ ] **Step 1: Record the profile decision at the top of `usage.md`**
@@ -604,11 +582,7 @@ git commit -m "feat: adopt markdown-tooling standard (rules seeded, lint+format 
 This repo is **Packaged** (installed via `[project.scripts]`), tailored to stay Packaged (not Packaged-deep) despite the unified `apseudo` dispatcher's 9 subcommands, since nesting alone never forces the deep tier — record this explicitly:
 
 ```markdown
-> **CLI documentation profile:** Packaged (per the `cli-documentation` standard).
-> The unified `apseudo` dispatcher exposes 9 subcommands, which exceeds the
-> "~5-7 top-level subcommands" Packaged-deep signal on count alone, but the
-> standard is explicit that nesting/count alone never forces the deep tier —
-> this repo stays Packaged as a deliberate tailoring.
+> **CLI documentation profile:** Packaged (per the `cli-documentation` standard). The unified `apseudo` dispatcher exposes 9 subcommands, which exceeds the "~5-7 top-level subcommands" Packaged-deep signal on count alone, but the standard is explicit that nesting/count alone never forces the deep tier — this repo stays Packaged as a deliberate tailoring.
 ```
 
 - [ ] **Step 2: Add standalone entries for the four bare `[project.scripts]` keys that lack them**
@@ -618,9 +592,7 @@ This repo is **Packaged** (installed via `[project.scripts]`), tailored to stay 
 ```markdown
 ## apseudo-lint (standalone entry point)
 
-`apseudo-lint` is a standalone console-script alias for `apseudo lint` — see
-the `apseudo lint` entry above for the full `NAME`/`SYNOPSIS`/`OPTIONS`/`EXIT
-STATUS` contract, which applies identically to the standalone invocation.
+`apseudo-lint` is a standalone console-script alias for `apseudo lint` — see the `apseudo lint` entry above for the full `NAME`/`SYNOPSIS`/`OPTIONS`/`EXIT STATUS` contract, which applies identically to the standalone invocation.
 ```
 
 Repeat for `apseudo-format` → `apseudo format`, `apseudo-lsp`, `apseudo-explain` (the latter two have no `apseudo <subcommand>` equivalent per the 9-subcommand list — verify and give them full standalone `NAME`/`SYNOPSIS`/`OPTIONS`/`EXIT STATUS` entries if so, not just cross-references).
@@ -637,7 +609,7 @@ Create `.github/workflows/cli-docs-check.yml` from `standards/cli-documentation/
 
 ```yaml
 cli_documentation:
-  version: "1.0"
+  version: '1.0'
 ```
 
 - [ ] **Step 6: Commit**
@@ -652,6 +624,7 @@ git commit -m "feat: adopt cli-documentation standard, close standalone-entry-po
 ### Task 6: Adopt the `project-spec` standard + relocate `docs/specs/` → `docs/reference/`
 
 **Files:**
+
 - Move: `docs/specs/PYTHONIC_PSEUDOCODE_STANDARD.md` → `docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md`
 - Move: `docs/specs/EXECUTABLE-PSEUDOCODE-SPEC.md` → `docs/reference/EXECUTABLE-PSEUDOCODE-SPEC.md`
 - Move: `docs/specs/RULES.md` → `docs/reference/RULES.md`
@@ -662,6 +635,7 @@ git commit -m "feat: adopt cli-documentation standard, close standalone-entry-po
 - Modify: `.project-standards.yml` (add `spec:` block, pointed at the now-empty `docs/specs/`)
 
 **Interfaces:**
+
 - Consumes: ADR-0001 from Task 3, which documents the rationale for this move.
 
 - [ ] **Step 1: Move the files**
@@ -703,7 +677,7 @@ Update every `docs/specs/...` reference to `docs/reference/...` in: `CLAUDE.md`,
 grep -rln "docs/specs" --include="*.py" --include="*.md" --include="*.toml" --include="*.json" --include="*.yml" --include="*.yaml" . | grep -v node_modules
 ```
 
-Expected: empty output, except any files that legitimately describe the *new* `docs/specs/` usage under project-spec (Step 6 onward).
+Expected: empty output, except any files that legitimately describe the _new_ `docs/specs/` usage under project-spec (Step 6 onward).
 
 - [ ] **Step 5: Run the project reviewer to confirm the moved-file checks still pass**
 
@@ -749,6 +723,7 @@ git commit -m "feat: adopt project-spec standard (config only, CI deferred until
 ### Task 7: Adopt the `python-tooling` standard
 
 **Files:**
+
 - Modify: `pyproject.toml`
 - Create: `.python-version`
 - Modify: `.github/workflows/apseudo-lint.yml` (update in place — see rationale below, not a new `check.yml`)
@@ -756,6 +731,7 @@ git commit -m "feat: adopt project-spec standard (config only, CI deferred until
 - Create: `docs/adr/adr-0002-merge-python-tooling-ci-into-apseudo-lint.md`
 
 **Interfaces:**
+
 - Consumes: `docs/adr/adr.template.md` from Task 3.
 
 - [ ] **Step 1: Update `pyproject.toml`'s `[project]` table**
@@ -885,9 +861,11 @@ git commit -m "feat: adopt python-tooling standard (py3.14, uv_build, basedpyrig
 ### Task 8: Document the `python-coding` standard (reference-only, no adopt CLI)
 
 **Files:**
+
 - Modify: `/home/chris/projects/agent-pseudocode/CLAUDE.md`
 
 **Interfaces:**
+
 - Consumes: nothing generated by prior tasks — this is a documentation-only pointer, since `python-coding` has no `adopt.md`, is not registered for adoption or validation, and is explicitly "reference-only" per its own §31.
 
 - [ ] **Step 1: Add a one-line pointer to `CLAUDE.md`**
@@ -897,11 +875,7 @@ Under the existing "## Development commands" or a new short section, add:
 ```markdown
 ## Python code style
 
-Python code in this repository follows the `python-coding` standard
-(project-standards) — code shape, type policy, error handling, and testing
-conventions. Use the `python-expert` skill as the front door to both
-`python-coding` and `python-tooling`; canon (the standards themselves) wins on
-any conflict.
+Python code in this repository follows the `python-coding` standard (project-standards) — code shape, type policy, error handling, and testing conventions. Use the `python-expert` skill as the front door to both `python-coding` and `python-tooling`; canon (the standards themselves) wins on any conflict.
 ```
 
 - [ ] **Step 2: Commit**
@@ -916,6 +890,7 @@ git commit -m "docs: point CLAUDE.md at the python-coding standard via the pytho
 ### Task 9: Close out `TODO.md`
 
 **Files:**
+
 - Modify: `TODO.md`
 
 - [ ] **Step 1: Check off every completed User Tracked Task**
@@ -927,7 +902,7 @@ Mark `[x]` for: adopt agent-handoff-v3, adr, markdown-tooling, cli-documentation
 Add three new `## Agent Tracked Tasks` entries:
 
 - `- [ ] Run \`npx prettier@3.8.3 --write .\` across the repo and flip \`format.yml\`'s \`prettier: false\` to enabled (deferred from markdown-tooling adoption, 2026-07-08 — touches ~150 files, out of scope for the adoption plan).`
-- `- [ ] Fix markdownlint violations across the repo (\`npx markdownlint-cli2 "**/*.md" "#node_modules"\`) and add \`.github/workflows/lint-markdown.yml\` (deferred from markdown-tooling adoption, 2026-07-08 — CI would go red immediately otherwise; ~150 files never linted before).`
+- `- [ ] Fix markdownlint violations across the repo (\`npx markdownlint-cli2 "\*_/_.md" "#node_modules"\`) and add \`.github/workflows/lint-markdown.yml\` (deferred from markdown-tooling adoption, 2026-07-08 — CI would go red immediately otherwise; ~150 files never linted before).`
 - `- [ ] Author the first project-spec-conformant spec under \`docs/specs/\` and add \`.github/workflows/validate-specs.yml\` (deferred from project-spec adoption, 2026-07-08 — the standard refuses an empty corpus rather than passing vacuously, so wiring CI before any spec exists would fail every run).`
 
 - [ ] **Step 3: Update `docs/handoff/state.md` to close out the "In flight" section**

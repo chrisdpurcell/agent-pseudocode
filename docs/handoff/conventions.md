@@ -1,6 +1,6 @@
-**Last updated:** 2026-07-09
-
 # Conventions
+
+**Last updated:** 2026-07-09
 
 ## Quick Reference
 

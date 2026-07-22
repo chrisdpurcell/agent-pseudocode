@@ -167,7 +167,9 @@ class APseudoMCPServer:
             text,
             path=path,
             config=self._config_for_path(path),
-            options=FormatOptions(round_indentation=bool(arguments.get("round_indentation", False))),
+            options=FormatOptions(
+                round_indentation=bool(arguments.get("round_indentation", False))
+            ),
         ).formatted
         return _tool_text(formatted)
 
@@ -221,7 +223,6 @@ class APseudoMCPServer:
             return _tool_json(review.as_dict(), is_error=review.errors > 0)
         return _tool_text(review.as_markdown(), is_error=review.errors > 0)
 
-
     def _tool_runner_check(self, arguments: Json) -> Json:
         path = self._resolve_path(_string_arg(arguments, "path"))
         script = parse_executable_file(path)
@@ -258,7 +259,11 @@ class APseudoMCPServer:
         path = resource_map.get(uri)
         if path is None:
             raise ValueError(f"unknown resource URI: {uri}")
-        text = path.read_text(encoding="utf-8") if path.exists() else f"Resource file not found: {path}\n"
+        text = (
+            path.read_text(encoding="utf-8")
+            if path.exists()
+            else f"Resource file not found: {path}\n"
+        )
         return {"contents": [{"uri": uri, "mimeType": "text/markdown", "text": text}]}
 
     def _get_prompt(self, params: Json) -> Json:
@@ -398,11 +403,27 @@ def _tool_schema(name: str, description: str, properties: Json, required: list[s
 
 def _resource_definitions() -> list[Json]:
     return [
-        {"uri": "apseudo://standard", "name": "Pythonic Agent Pseudocode Standard", "mimeType": "text/markdown"},
+        {
+            "uri": "apseudo://standard",
+            "name": "Pythonic Agent Pseudocode Standard",
+            "mimeType": "text/markdown",
+        },
         {"uri": "apseudo://rules", "name": "APSEUDO rule catalog", "mimeType": "text/markdown"},
-        {"uri": "apseudo://agent-instructions", "name": "Repository agent instruction wording", "mimeType": "text/markdown"},
-        {"uri": "apseudo://feature-gap-analysis", "name": "Feature gap analysis", "mimeType": "text/markdown"},
-        {"uri": "apseudo://traceability-review", "name": "Traceability review", "mimeType": "text/markdown"},
+        {
+            "uri": "apseudo://agent-instructions",
+            "name": "Repository agent instruction wording",
+            "mimeType": "text/markdown",
+        },
+        {
+            "uri": "apseudo://feature-gap-analysis",
+            "name": "Feature gap analysis",
+            "mimeType": "text/markdown",
+        },
+        {
+            "uri": "apseudo://traceability-review",
+            "name": "Traceability review",
+            "mimeType": "text/markdown",
+        },
     ]
 
 
@@ -470,8 +491,12 @@ def _as_dict(value: Any) -> Json:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="apseudo-mcp", description="Agent Pseudocode MCP stdio server.")
-    parser.add_argument("--root", type=Path, default=Path.cwd(), help="Repository root for relative paths.")
+    parser = argparse.ArgumentParser(
+        prog="apseudo-mcp", description="Agent Pseudocode MCP stdio server."
+    )
+    parser.add_argument(
+        "--root", type=Path, default=Path.cwd(), help="Repository root for relative paths."
+    )
     parser.add_argument("--trace", action="store_true", help="Log MCP message flow to stderr.")
     parser.add_argument("--version", action="version", version=f"apseudo-mcp {__version__}")
     return parser

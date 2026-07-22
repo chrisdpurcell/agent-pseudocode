@@ -157,13 +157,11 @@ uv run apseudo-run --check <each changed executable .apseudo script>
 uv run apseudo-review .
 ```
 
-````
-
 ## Executable runner instructions for repositories
 
 Add this block to `AGENTS.md` and `CLAUDE.md` in repositories that adopt executable `.apseudo` tasks:
 
-```md
+````md
 ## Executable Agent Pseudocode
 
 This repository may contain executable Agent Pseudocode scripts ending in `.apseudo` or `.agentpseudo`, and a task registry at `.apseudo/scripts.toml`.
@@ -174,7 +172,7 @@ Before editing executable pseudocode, run:
 
 ```bash
 uv run apseudo-run --check <script.apseudo>
-````
+```
 
 Before executing a new or changed executable script, inspect both:
 
@@ -190,7 +188,4 @@ uv run apseudo-run --run-dir .apseudo/runs <agent/mode flags> <script.apseudo> -
 ```
 
 Do not bypass `apseudo-lint`, `apseudo-format`, pre-commit, CI, hooks, post-checks, or diff policy. If a runner script conflicts with prose, existing implementation, or repo instructions, stop and surface the conflict instead of guessing.
-
-```
-
-```
+````

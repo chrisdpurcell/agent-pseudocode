@@ -12,4 +12,4 @@ jobs:
     uses: L3DigitalNet/project-standards/.github/workflows/lint-markdown.yml@v5
     with:
       markdownlint: true
-      globs: "**/*.md"
+      globs: "**/*.md\n!docs/reference/pre-migration/**"

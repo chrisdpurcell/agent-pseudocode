@@ -38,21 +38,11 @@ Instructions for AI agents:
 
 ## Agent tasks
 
-- [ ] Complete full-repo Markdown cleanup so the enabled lint gate passes, then turn on the Prettier gate.
+- [ ] Raise coverage from 62% to the Python Tooling 85% floor.
 
-  `lint-markdown.yml` is live and currently red on 272 markdownlint errors. Run the pinned formatter/linter fix pass and review the diff. `format.yml` is installed `workflow_dispatch`-only; enable it by setting `format = true` and `ci.format_caller = true` under `[standards.markdown-tooling]` in `.standards/config.toml`, then `project-standards reconcile --apply`.
+  The `check.yml` gate installed by python-tooling enforces `fail_under = 85`, so `scripts/check.py` and CI are red until this lands. Lowest-coverage modules: `output.py` 0%, `format_cli.py` 13%, `mermaid.py` 20%, `mermaid_cli.py` 29%, `mcp.py` 39%, `review_cli.py` 40%, `lsp.py` 42%.
 
-- [ ] Raise coverage from 60% to the Python Tooling 85% floor, then make the CI coverage step blocking.
-
-  Prioritize untested CLI, output, discovery, Mermaid, LSP, and MCP paths documented by the adoption audit.
-
-- [ ] Author the first project-spec-conformant spec under `docs/specs/`.
-
-  `validate-specs.yml` is already live and red: `project-standards spec validate` exits 2 on an empty corpus (upstream #17).
-
-- [ ] Author `docs/usage.md` for the `apseudo` CLI.
-
-  The cli-documentation package created it as a scaffold with literal `toolname` placeholders. It is consumer-owned and create-only, so edits survive reconciliation.
+  Prioritize the untested CLI, output, discovery, Mermaid, LSP, and MCP paths, and fill the `Not Started` rows in §17.3 of `docs/specs/apseudo-validation-toolchain.md` as the tests land.
 
 - [ ] Fix the three remaining pre-existing bugs in `docs/handoff/bugs/`.
 
@@ -60,6 +50,12 @@ Instructions for AI agents:
   - [bug 002](handoff/bugs/002-review-completeness-stale-paths.md): stale completeness-check paths.
   - [bug 004](handoff/bugs/004-lsp-serve-unhandled-read-message.md): unguarded LSP message reads.
 
-- [ ] Consider adopting the `python-tooling` package, which V5 leaves disabled.
+  Add one pinning regression test per fix, per §17.2 of the toolchain spec.
 
-  It was never in the V4 config, so migration did not select it. Enabling it rewrites `pyproject.toml`'s `[build-system]` and adds a managed `check.yml` plus `scripts/check.py`; upstream #14 documents keys it can drop. Preview with `reconcile` before applying.
+- [ ] Add the single-policy-source test (NFR-004 / MS-1 in the toolchain spec).
+
+  Assert no rule code or severity is defined outside `src/apseudo_lint/rules.py`. This is the architecture rule the whole design rests on and the only one with no mechanical enforcement.
+
+- [ ] Resolve OQ-001: make `docs/reference/RULES.md` generated rather than hand-maintained.
+
+  The file states it is generated from `rules.py`, but no generator exists. Either write one and wire it into CI, or correct the claim.

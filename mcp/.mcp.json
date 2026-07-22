@@ -1,12 +1,9 @@
 {
-  "mcpServers": {
-    "agent-pseudocode": {
-      "type": "stdio",
-      "command": "bash",
-      "args": [
-        "-lc",
-        "cd \"${CLAUDE_PROJECT_DIR:-$(pwd)}\" && exec ./mcp/apseudo-mcp"
-      ]
-    }
-  }
+	"mcpServers": {
+		"agent-pseudocode": {
+			"type": "stdio",
+			"command": "bash",
+			"args": ["-lc", "cd \"${CLAUDE_PROJECT_DIR:-$(pwd)}\" && exec ./mcp/apseudo-mcp"]
+		}
+	}
 }

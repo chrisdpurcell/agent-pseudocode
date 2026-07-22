@@ -49,35 +49,21 @@ uv run pyright
 
 Use `apseudo-run` or `apseudo run` for executable `.apseudo` task scripts. Before trusting a new or edited runner script, run `uv run apseudo-run --check`, `--render-prompt`, and `--print-command`. Prefer `--run-dir .apseudo/runs` for auditable runs. Do not bypass runner post-checks, diff policy, hooks, pre-commit, or CI.
 
-# Markdown & Structured-Text Tooling
+## Markdown and structured-text fix pass
 
-This repository follows the Markdown Tooling Standard. Prettier formats every file type it supports (`md`/`json`/`jsonc`/`yaml` here); markdownlint lints Markdown structure only. Do not introduce a competing formatter or linter.
+The managed `markdown-tooling` block below states the policy. These are the commands.
 
-## Fix pass
-
-When changing Markdown, JSON, JSONC, or YAML, run the fix pass first:
+When changing Markdown, JSON, JSONC, or YAML, run the fix pass first, then the non-mutating check:
 
 ```bash
 npx prettier --write .
 npx markdownlint-cli2 --fix "**/*.md"
-```
 
-## Check contract
-
-Before considering work complete, run the non-mutating check:
-
-```bash
 npx prettier --check .
 npx markdownlint-cli2 "**/*.md"
 ```
 
-Do not claim completion if either command fails.
-
-## Rules
-
-- Prettier owns physical formatting. Do not fight its output or hand-format.
-- markdownlint owns Markdown structure. Do not disable a rule to silence a warning — fix the Markdown.
-- Do not edit `.prettierrc.json` or `.markdownlint.json` to bypass a check without a documented ADR exception.
+Do not claim completion if either check fails. Do not edit `.prettierrc.json` or `.markdownlint.json` to bypass a check without a documented ADR exception — both are package-managed, so reconciliation reverts hand edits anyway.
 
 <!-- prettier-ignore-start -->
 
@@ -99,12 +85,47 @@ Use the repo-local `agent-handoff` skill at session startup and closeout. Do not
 
 Prettier owns physical formatting and markdownlint owns Markdown structure. Do not add overlapping tools.
 
-Enabled checks: lint.
+Enabled checks: format, lint.
 Markdown scope: `**/*.md`.
 Structured-config scope: `**/*.json`, `**/*.jsonc`, `**/*.yml`, `**/*.yaml`.
+
+Declared exclusions:
+- `docs/reference/pre-migration/**` (both): Verbatim archived ChatGPT transcript; reformatting or annotating it would destroy the historical record. Already exempt from APSEUDO fence linting per bug 003.
+- `package-lock.json` (format): npm regenerates this file and reverts Prettier's formatting on every install.
 
 Run the enabled checks before claiming completion.
 <!-- markdownlint-enable MD025 -->
 <!-- END project-standards:markdown-tooling -->
+
+<!-- prettier-ignore-end -->
+
+<!-- prettier-ignore-start -->
+
+<!-- BEGIN project-standards:python-tooling -->
+<!-- markdownlint-disable MD025 -->
+# Python tooling
+
+Use uv for environments and dependency changes. Ruff owns formatting, linting, and imports.
+Use basedpyright in strict mode for type checking. Do not add a competing Python gate.
+
+Run before claiming completion:
+
+```bash
+uv run ruff format --check .
+uv run ruff check .
+uv run basedpyright
+uv run coverage run -m pytest
+uv run coverage report
+uv run pip-audit
+```
+
+When the gate reports formatting or lint findings, run:
+
+```bash
+uv run ruff format .
+uv run ruff check . --fix
+```
+<!-- markdownlint-enable MD025 -->
+<!-- END project-standards:python-tooling -->
 
 <!-- prettier-ignore-end -->

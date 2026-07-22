@@ -67,12 +67,47 @@ Use the repo-local `agent-handoff` skill at session startup and closeout. Do not
 
 Prettier owns physical formatting and markdownlint owns Markdown structure. Do not add overlapping tools.
 
-Enabled checks: lint.
+Enabled checks: format, lint.
 Markdown scope: `**/*.md`.
 Structured-config scope: `**/*.json`, `**/*.jsonc`, `**/*.yml`, `**/*.yaml`.
+
+Declared exclusions:
+- `docs/reference/pre-migration/**` (both): Verbatim archived ChatGPT transcript; reformatting or annotating it would destroy the historical record. Already exempt from APSEUDO fence linting per bug 003.
+- `package-lock.json` (format): npm regenerates this file and reverts Prettier's formatting on every install.
 
 Run the enabled checks before claiming completion.
 <!-- markdownlint-enable MD025 -->
 <!-- END project-standards:markdown-tooling -->
+
+<!-- prettier-ignore-end -->
+
+<!-- prettier-ignore-start -->
+
+<!-- BEGIN project-standards:python-tooling -->
+<!-- markdownlint-disable MD025 -->
+# Python tooling
+
+Use uv for environments and dependency changes. Ruff owns formatting, linting, and imports.
+Use basedpyright in strict mode for type checking. Do not add a competing Python gate.
+
+Run before claiming completion:
+
+```bash
+uv run ruff format --check .
+uv run ruff check .
+uv run basedpyright
+uv run coverage run -m pytest
+uv run coverage report
+uv run pip-audit
+```
+
+When the gate reports formatting or lint findings, run:
+
+```bash
+uv run ruff format .
+uv run ruff check . --fix
+```
+<!-- markdownlint-enable MD025 -->
+<!-- END project-standards:python-tooling -->
 
 <!-- prettier-ignore-end -->

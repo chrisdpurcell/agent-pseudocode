@@ -11,7 +11,7 @@ The Pythonic Agent Pseudocode convention is now represented across all major enf
 ## Traceability matrix
 
 | Convention element | Standard section | Validator/rule | Formatter | LSP | Hooks/CI | MCP | Docs/status |
-|---|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- | --- |
 | Python-shaped block structure | Process, branching, loops | `APSEUDO-PARSE-001`, `APSEUDO-PARSE-002` | Normalizes headers and spacing | Diagnostics, symbols, folding | Enforced by `apseudo-lint` | `validate_text`, `validate_file` | OK |
 | Named workflows | Process definitions | `APSEUDO-PROC-001` | Preserves declaration shape | Document/workspace symbols | Enforced when configured | Templates generate `process` blocks | OK |
 | Explicit outcomes | Outcomes and returns | `APSEUDO-RETURN-*`, `APSEUDO-OUTCOME-001` | Preserves outcome constructors | Completion, hover, diagnostics | Enforced by hooks/CI | Rule explanations and validation | OK |
@@ -29,7 +29,7 @@ The Pythonic Agent Pseudocode convention is now represented across all major enf
 ## Tooling representation
 
 | Tooling area | Files | Review |
-|---|---|---|
+| --- | --- | --- |
 | Standard | `docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md` | Complete enough for internal use; labels sourced/adapted/internal claims. |
 | Token spec | `docs/reference/language/TOKEN-SPEC.md`, `docs/reference/language/SCOPE-MAP.md` | Provides shared vocabulary for VS Code and Kate. |
 | VS Code syntax | `products/vscode-extension/syntaxes/*.yaml`, generated JSON | Grammar files exist and are generated from YAML. |

@@ -68,9 +68,20 @@ def test_review_project_reports_expected_tooling() -> None:
 
 
 def test_hook_blocks_no_verify_command() -> None:
-    payload = {"cwd": str(ROOT), "tool_name": "Bash", "tool_input": {"command": "git commit --no-verify"}}
+    payload = {
+        "cwd": str(ROOT),
+        "tool_name": "Bash",
+        "tool_input": {"command": "git commit --no-verify"},
+    }
     result = subprocess.run(
-        [sys.executable, str(ROOT / "integrations/agent-hooks" / "apseudo-hook.py"), "--host", "codex", "--event", "pre-tool-use"],
+        [
+            sys.executable,
+            str(ROOT / "integrations/agent-hooks" / "apseudo-hook.py"),
+            "--host",
+            "codex",
+            "--event",
+            "pre-tool-use",
+        ],
         input=json.dumps(payload),
         text=True,
         capture_output=True,

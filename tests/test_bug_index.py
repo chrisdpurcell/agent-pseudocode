@@ -65,11 +65,34 @@ def test_build_index_handles_empty_directory(tmp_path: Path) -> None:
     assert "_No bugs recorded._" in load_generator().build_index(tmp_path)
 
 
-def test_committed_index_matches_generator() -> None:
-    """The committed INDEX.md must be the generator's current output.
+def table_rows(markdown: str) -> list[list[str]]:
+    """Parse a Markdown table into cell values, ignoring the separator row.
 
-    Catches a hand-edited index and a generator change applied without
-    regenerating, either of which would surface as CI-only lint drift.
+    Backslash escapes are stripped before comparison. The generator escapes every
+    `*`/`_`, while Prettier keeps only the escapes that are actually load-bearing
+    (`\\_read\\_message` becomes `\\_read_message`). Escaping depth is Prettier's
+    call; this comparison is about the underlying data.
     """
-    expected = load_generator().build_index(BUGS)
-    assert (BUGS / "INDEX.md").read_text(encoding="utf-8") == expected
+    rows: list[list[str]] = []
+    for line in markdown.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip().replace("\\", "") for cell in line.strip("|").split("|")]
+        if all(set(cell) <= {"-", ":"} for cell in cells):
+            continue
+        rows.append(cells)
+    return rows
+
+
+def test_committed_index_matches_generator() -> None:
+    """The committed INDEX.md must carry the generator's current rows.
+
+    Compares parsed cells rather than bytes: Prettier owns physical formatting
+    and pads table columns to align, so the committed file is the generator's
+    output *after* `npx prettier --write`. Byte equality would fail on every
+    run. This still catches a hand-edited row and a new bug file added without
+    regenerating, either of which would otherwise surface only in CI.
+    """
+    generated = table_rows(load_generator().build_index(BUGS))
+    committed = table_rows((BUGS / "INDEX.md").read_text(encoding="utf-8"))
+    assert committed == generated

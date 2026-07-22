@@ -12,7 +12,7 @@ def test_lsp_lints_open_text() -> None:
         path=Path("/tmp/demo.apseudo"),
         language_id="agent-pseudocode",
         version=1,
-        text="process demo():\n    while True:\n        do_work()\n    return Accepted(reason=\"done\")\n",
+        text='process demo():\n    while True:\n        do_work()\n    return Accepted(reason="done")\n',
     )
 
     diagnostics = server._lint_document(document)  # pyright: ignore[reportPrivateUsage]
@@ -61,7 +61,7 @@ def test_lsp_formatting_returns_whole_document_edit() -> None:
         path=Path("/tmp/demo.apseudo"),
         language_id="agent-pseudocode",
         version=1,
-        text="PROCESS demo( a,b ) :\n    return Accepted(reason=\"ok\")\n",
+        text='PROCESS demo( a,b ) :\n    return Accepted(reason="ok")\n',
     )
 
     edits = server._formatting(  # pyright: ignore[reportPrivateUsage]
@@ -82,7 +82,7 @@ def test_full_document_range_handles_trailing_newline() -> None:
 def test_lsp_code_action_adds_else_fallback() -> None:
     server = APseudoLanguageServer()
     uri = "file:///tmp/demo.apseudo"
-    text = "process demo():\n    if approved:\n        return Accepted(reason=\"ok\")\n    return Blocked(reason=\"done\")\n"
+    text = 'process demo():\n    if approved:\n        return Accepted(reason="ok")\n    return Blocked(reason="done")\n'
     server.documents[uri] = Document(
         uri=uri,
         path=Path("/tmp/demo.apseudo"),
@@ -97,7 +97,10 @@ def test_lsp_code_action_adds_else_fallback() -> None:
                 "diagnostics": [
                     {
                         "code": "APSEUDO-BRANCH-001",
-                        "range": {"start": {"line": 1, "character": 4}, "end": {"line": 1, "character": 16}},
+                        "range": {
+                            "start": {"line": 1, "character": 4},
+                            "end": {"line": 1, "character": 16},
+                        },
                     }
                 ]
             },
@@ -109,7 +112,7 @@ def test_lsp_code_action_adds_else_fallback() -> None:
 def test_lsp_symbols_folding_definition_and_references() -> None:
     server = APseudoLanguageServer()
     uri = "file:///tmp/demo.apseudo"
-    text = "process demo():\n    result = helper()\n    return Accepted(reason=\"ok\")\n\nprocess helper():\n    return Accepted(reason=\"ok\")\n"
+    text = 'process demo():\n    result = helper()\n    return Accepted(reason="ok")\n\nprocess helper():\n    return Accepted(reason="ok")\n'
     server.documents[uri] = Document(
         uri=uri,
         path=Path("/tmp/demo.apseudo"),

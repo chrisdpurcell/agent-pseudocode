@@ -1,139 +1,284 @@
 ---
 schema_version: '1.1'
 id: 'reference-000001-cli-usage'
-title: 'toolname CLI Usage'
-description: 'Consumer-owned usage reference scaffold for the toolname command.'
+title: 'apseudo CLI Usage'
+description: 'Command-line reference for the apseudo toolkit: linting, formatting, review, Mermaid rendering, and the executable pseudocode runner.'
 doc_type: 'reference'
-status: 'draft'
-created: '2026-07-20'
-updated: '2026-07-20'
+status: 'active'
+created: '2026-07-22'
+updated: '2026-07-22'
 tags:
   - 'cli'
 aliases: []
-related: []
+related:
+  - 'docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md'
+  - 'docs/reference/RULES.md'
 ---
 
-# toolname
+# apseudo
 
 ## NAME
 
-`toolname` — one-line description of the command.
+`apseudo` — validate, format, review, visualize, and execute Pythonic Agent Pseudocode.
 
 ## SYNOPSIS
 
 ```bash
-toolname [OPTIONS] <input>
-toolname <command> [COMMAND OPTIONS] [ARGS]...
-toolname {--help | --version}
+apseudo <command> [<args>...]
+apseudo {--help | --version}
+
+apseudo-lint [OPTIONS] [<paths>...]
+apseudo-format [OPTIONS] [<paths>...]
+apseudo-run [OPTIONS] <script.apseudo> [-- <key=value>...]
 ```
 
 ## DESCRIPTION
 
-Explain what the command does, what problem it solves, what it does not do, and the default operating model. Mention stdin/stdout/stderr behavior if relevant.
+`apseudo` is the umbrella command for the Agent Pseudocode toolkit. It validates `.apseudo`, `.agentpseudo`, and `.pseudocode` files, plus `apseudo`-fenced blocks inside Markdown, against the APSEUDO-\* rule catalog.
+
+The validator and formatter are the policy source of truth. The language server, MCP server, agent hooks, pre-commit hooks, CI, and editor integrations all reuse those modules rather than reimplementing rules, so a diagnostic means the same thing everywhere it appears.
+
+Every subcommand is also installed as a standalone entry point (`apseudo lint` and `apseudo-lint` are equivalent). The standalone forms carry the full option surface and are what hooks and CI invoke; `apseudo <command>` is the convenience front door.
+
+Most commands read from standard input when no path is given, and write diagnostics to standard error and primary output to standard output.
+
+### Commands
+
+| Command | Standalone | Purpose |
+| --- | --- | --- |
+| `lint` | `apseudo-lint` | Validate files and Markdown fenced blocks against the rule catalog. |
+| `format` | `apseudo-format` | Normalize indentation, blank lines, and normative keywords. |
+| `review` | `apseudo-review` | Repository-level convention and tooling completeness checks. |
+| `mermaid` | `apseudo-mermaid` | Render a process as a Mermaid flowchart view. |
+| `run` | `apseudo-run` | Execute an executable `.apseudo` script through Claude Code or Codex. |
+| `replay` | — | Summarize a saved runner run directory. |
+| `doctor` | — | Report local provider and tool availability. |
+| `provider-test` | — | Fake-provider runner smoke test. |
+| `docs generate` | — | Generate Markdown docs for registered executable scripts. |
+| — | `apseudo-explain` | Explain APSEUDO-\* rules and convention guidance. |
+| — | `apseudo-template` | List or emit starter pseudocode templates. |
+| — | `apseudo-lsp` | Language server (stdio). |
+| — | `apseudo-mcp` | MCP server (stdio). |
+
+`apseudo-claude` and `apseudo-codex` are thin wrappers that pin `apseudo-run` to one agent backend.
 
 ## OPTIONS
 
-### Global options
+### Common to `apseudo-lint` and `apseudo-format`
 
-#### `--help`, `-h`
+#### `--config <file>`
 
-Show help and exit.
+Use an explicit configuration file instead of discovery.
 
-#### `--version`, `-V`
+Default: the nearest `.apseudo-lint.toml`, `apseudo.toml`, or `pyproject.toml`, searched upward from each target.
 
-Show version information and exit.
+#### `--changed`
 
-#### `--verbose`, `-v`
+Restrict the run to Git-changed supported files.
 
-Increase diagnostic output.
+Default: off. This is what the repository's pre-commit hooks use.
 
-Default: off.
+#### `--stdin-filename <path>`
 
-#### `--output <file>`, `-o <file>`
+Process standard input as though it came from `<path>`, so extension-based and config-based behavior still applies.
 
-Write primary output to `<file>` instead of standard output.
+#### `--quiet`
 
-Default: standard output.
+Suppress success output. Diagnostics are still reported.
 
-Environment: overrides `TOOLNAME_OUTPUT`.
+### `apseudo-lint`
 
-### Command options
+#### `--format <fmt>`
 
-#### `--format <fmt>`, `-f <fmt>`
+Select the diagnostic output format.
 
-Select the output format.
-
-Allowed values: `text`, `json`, `markdown`.
+Allowed values: `text`, `json`, `github`. Use `github` to emit GitHub Actions annotations.
 
 Default: `text`.
 
-Mutually exclusive with `--raw`.
+#### `--strict`
 
-Since: `1.2.0`.
+Treat warnings as failures.
 
-#### `--jobs <n>`, `-j <n>`
+#### `--fail-on-warnings`
 
-Run up to `<n>` tasks concurrently.
+Treat warnings as failures without enabling other strict behavior.
 
-Allowed values: positive integers.
+#### `--errors-only`
 
-Default: number of available CPUs.
+Suppress warnings and infos in both output and the failure calculation.
 
-Mutually exclusive with `--sequential`.
+### `apseudo-format`
 
-Safety: higher values may increase system load and remote API rate usage.
+#### `--check`
 
-Environment: overrides `TOOLNAME_JOBS`.
+Exit non-zero if any file needs formatting. Writes nothing.
+
+#### `--diff`
+
+Print unified diffs for files that would change. Writes nothing.
+
+#### `--write`
+
+Write formatted output. This is the default unless `--check` or `--diff` is given.
+
+#### `--indent-size <n>`
+
+Indent width in spaces.
+
+Default: 4, matching the `.editorconfig` rule for pseudocode and Python files.
+
+#### `--max-blank-lines <n>`
+
+Maximum consecutive blank lines to preserve.
+
+#### `--round-indentation`
+
+Round leading indentation to multiples of `--indent-size`.
+
+Default: off, because rounding can silently reindent a block whose nesting was already meaningful.
+
+#### `--no-uppercase-normative`
+
+Leave normative keywords (`MUST`, `SHOULD`, `MAY`) in comments as written instead of uppercasing them.
+
+### `apseudo-run`
+
+The runner has a large option surface; `apseudo-run --help` is authoritative. The options that matter before trusting a new or edited script:
+
+#### `--check`
+
+Validate the script and print diagnostics only. No agent is invoked.
+
+#### `--render-prompt`
+
+Print the exact prompt that would be sent to the agent.
+
+#### `--print-command`
+
+Print the external agent command without running it.
+
+#### `--claude`, `--codex`, `--agent <name>`
+
+Select the agent backend.
+
+Default: `APSEUDO_AGENT`, then the config file's `default_agent`. With none of these set, the runner refuses to guess and exits with a configuration error.
+
+#### `--mode <mode>` (`--plan`, `--review`, `--apply`, `--danger`)
+
+Execution mode. `--danger` additionally requires `--i-understand-danger`.
+
+Default: the script's declared mode.
+
+Safety: prefer `--plan` or `--review` before `--apply` for any new or safety-sensitive script.
+
+#### `--run-dir <dir>`
+
+Write an auditable run record. Prefer `--run-dir .apseudo/runs`.
+
+#### `--require-clean-git`, `--allow-dirty`
+
+Require or waive a clean Git workspace before executing.
+
+#### `--require-no-diff`, `--expect-diff`, `--post-check <cmd>`
+
+Post-run assertions on the resulting working tree.
 
 ## EXIT STATUS
 
+`apseudo`, `apseudo-lint`, `apseudo-format`, `apseudo-review`, and the other non-runner commands:
+
 | Code | Meaning                          |
 | ---- | -------------------------------- |
-| `0`  | Success                          |
-| `1`  | Runtime or operational failure   |
+| `0`  | Success; no failing diagnostics  |
+| `1`  | Failing diagnostics found        |
 | `2`  | Usage error or invalid arguments |
+
+`apseudo-run` reports the script's terminal outcome as a distinct code, so a blocked run is not confused with a crash:
+
+| Code | Meaning                                        |
+| ---- | ---------------------------------------------- |
+| `0`  | `Accepted`                                     |
+| `10` | `NeedsUserDecision`                            |
+| `20` | `Blocked`                                      |
+| `30` | Script validation failed                       |
+| `31` | Configuration invalid                          |
+| `40` | Agent invocation failed                        |
+| `41` | Agent output did not match the expected schema |
+| `50` | Safety gate blocked the run                    |
 
 ## ENVIRONMENT
 
-- `TOOLNAME_FORMAT` — default format when `--format` is not provided.
-- `NO_COLOR` — disable ANSI color output when supported.
+- `APSEUDO_AGENT` — default runner backend (`claude` or `codex`) when no `--claude`, `--codex`, or `--agent` is given.
+- `NO_COLOR` — disable ANSI color output.
 
 ## FILES
 
-- `$XDG_CONFIG_HOME/toolname/config.toml` — optional per-user configuration.
-- `$XDG_STATE_HOME/toolname/` — optional state directory.
+- `.apseudo-lint.toml`, `apseudo.toml`, or `[tool.apseudo_lint]` in `pyproject.toml` — configuration, discovered upward from each target in that order.
+- `.apseudo/scripts.toml` — registry of named executable scripts.
+- `.apseudo/runs/` — run records written by `--run-dir`.
 
 ## EXAMPLES
 
-### Validate one file
+### Validate the repository
 
 ```bash
-toolname check ./input.txt
+apseudo lint .
 ```
 
-### Write JSON output to a file
+### Check formatting without writing
 
 ```bash
-toolname inspect --format json --output report.json ./input.txt
+apseudo format --check .
 ```
 
-### Preview a destructive operation
+### Lint only what changed, as CI annotations
 
 ```bash
-toolname apply --dry-run ./workspace
+apseudo-lint --changed --format github
 ```
 
-### Export Markdown without ANSI color
+### Understand a diagnostic
 
 ```bash
-NO_COLOR=1 toolname report --format markdown ./input > report.md
+apseudo-explain APSEUDO-WHILE-001
+```
+
+### Start from a template
+
+```bash
+apseudo-template --list
+apseudo-template bounded-review-loop > review-loop.apseudo
+```
+
+### Inspect an executable script before trusting it
+
+```bash
+apseudo-run --check review-loop.apseudo
+apseudo-run --render-prompt review-loop.apseudo -- target=src
+apseudo-run --print-command review-loop.apseudo -- target=src
+```
+
+### Execute with an audit trail
+
+```bash
+apseudo-run --codex --review --run-dir .apseudo/runs review-loop.apseudo -- target=src
+```
+
+### Render a diagram without ANSI color
+
+```bash
+NO_COLOR=1 apseudo mermaid docs/reference/language/examples/review-loop.apseudo --no-fence > flow.mmd
 ```
 
 ## NOTES
 
-- Output format is stable within a major version.
-- Paths are interpreted relative to the current working directory unless absolute.
+- The validator and formatter define policy. If an editor, hook, or CI check disagrees with `apseudo-lint`, the tooling is wrong, not the file.
+- `--check` and `--diff` never write; `apseudo-format` writes only in its default mode or with an explicit `--write`.
+- Do not bypass hooks, pre-commit, CI, runner post-checks, or diff policy to make a run pass.
 
 ## SEE ALSO
 
-`toolname-config(5)`, related-command(1)
+- `docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md` — the convention itself.
+- `docs/reference/RULES.md` — the full APSEUDO-\* rule catalog.
+- `docs/adr/README.md` — architecture decision records.

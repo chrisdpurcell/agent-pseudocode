@@ -5,3 +5,8 @@ CLAUDE.md
 .agents/skills/agent-handoff/
 docs/STATUS.md
 docs/TODO.md
+
+# Mirrors the markdown-tooling `exclusions` in .standards/config.toml so a local
+# run matches the format CI caller. Keep the two in sync.
+docs/reference/pre-migration/
+package-lock.json

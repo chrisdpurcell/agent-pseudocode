@@ -104,7 +104,9 @@ def render_snippet(snippet: Snippet) -> MermaidRenderResult:
         end = add_node("No executable pseudocode found", shape="terminal")
         edges.append(f"    {start} --> {end}")
 
-    warning = "Mermaid output is a visualization aid; linted pseudocode remains the source of truth."
+    warning = (
+        "Mermaid output is a visualization aid; linted pseudocode remains the source of truth."
+    )
     return MermaidRenderResult("\n".join([*nodes, *edges]) + "\n", warning)
 
 

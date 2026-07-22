@@ -20,7 +20,7 @@ TEMPLATES: dict[str, Template] = {
         name="bounded-review-loop",
         title="Bounded review/revision loop",
         description="Review a document until approval, blockers, or a round cap.",
-        body='''process review_until_accepted(document, reviewer, max_rounds=5) -> Outcome:
+        body="""process review_until_accepted(document, reviewer, max_rounds=5) -> Outcome:
     round = 1
     blockers = []
 
@@ -41,13 +41,13 @@ TEMPLATES: dict[str, Template] = {
             return Blocked(reason="ambiguous review result")
 
     return Blocked(reason="round cap reached", unresolved_blockers=blockers)
-''',
+""",
     ),
     "guarded-process": Template(
         name="guarded-process",
         title="Guard-clause process",
         description="Validate inputs up front, then execute and verify the main action.",
-        body='''process perform_guarded_action(required_input, max_attempts=3) -> Outcome:
+        body="""process perform_guarded_action(required_input, max_attempts=3) -> Outcome:
     if required_input is None:
         return NeedsInput(reason="required_input is missing")
 
@@ -63,13 +63,13 @@ TEMPLATES: dict[str, Template] = {
         attempt += 1
 
     return Blocked(reason="max attempts reached")
-''',
+""",
     ),
     "decision-fallback": Template(
         name="decision-fallback",
         title="Explicit decision fallback",
         description="Branch on known states and block on unexpected state.",
-        body='''process route_by_status(item) -> Outcome:
+        body="""process route_by_status(item) -> Outcome:
     status = classify_status(item)
 
     if status == "ready":
@@ -85,13 +85,13 @@ TEMPLATES: dict[str, Template] = {
 
     else:
         return Blocked(reason="unsupported status", status=status)
-''',
+""",
     ),
     "for-each-bounded": Template(
         name="for-each-bounded",
         title="Bounded for-each processing",
         description="Iterate over a named finite collection and carry failures forward.",
-        body='''process process_items(items) -> Outcome:
+        body="""process process_items(items) -> Outcome:
     failures = []
 
     for item in items:
@@ -108,7 +108,7 @@ TEMPLATES: dict[str, Template] = {
 
     else:
         return Accepted(reason="all items processed")
-''',
+""",
     ),
 }
 
