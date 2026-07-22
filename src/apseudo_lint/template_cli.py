@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from dataclasses import asdict
 
 from . import __version__
 from .templates import get_template, list_templates
@@ -28,7 +29,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.list or args.template is None:
         templates = list_templates()
         if args.json:
-            print(json.dumps([template.__dict__ for template in templates], indent=2, sort_keys=True))
+            # asdict(), not __dict__: Template is a slots dataclass with no instance dict.
+            print(
+                json.dumps([asdict(template) for template in templates], indent=2, sort_keys=True)
+            )
         else:
             for template in templates:
                 print(f"{template.name}\t{template.title}\t{template.description}")
@@ -40,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.json:
-        print(json.dumps(template.__dict__, indent=2, sort_keys=True))
+        print(json.dumps(asdict(template), indent=2, sort_keys=True))
     else:
         print(template.body, end="")
     return 0

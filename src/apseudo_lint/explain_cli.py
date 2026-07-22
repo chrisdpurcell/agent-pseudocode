@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from dataclasses import asdict
 
 from . import __version__
 from .rules import get_rule, list_rules
@@ -38,7 +39,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.json:
-        print(json.dumps([rule.__dict__ for rule in rules], indent=2, sort_keys=True))
+        # asdict(), not __dict__: Rule is a slots dataclass and has no instance dict.
+        print(json.dumps([asdict(rule) for rule in rules], indent=2, sort_keys=True))
         return 0
 
     if args.codes:
