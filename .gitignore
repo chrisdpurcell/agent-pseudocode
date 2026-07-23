@@ -219,3 +219,6 @@ __marimo__/
 
 # Node (markdown-tooling standard: root package.json pins Prettier)
 node_modules/
+
+.project-pipeline/
+.superpowers/
