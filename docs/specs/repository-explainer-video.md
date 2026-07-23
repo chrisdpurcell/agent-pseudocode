@@ -1,7 +1,7 @@
 ---
 spec_id: SPEC-NSBJ
 title: 'Repository Explainer Video'
-status: draft # draft | review | approved | superseded
+status: approved # draft | review | approved | superseded
 profile: standard # this is the Standard template; see Appendix D
 owner: 'Chris Purcell'
 implementer: 'Codex, supervised by the owner'
@@ -26,6 +26,7 @@ related:
 
 | Version | Date | Author | Change |
 | --- | --- | --- | --- |
+| 0.2 | `2026-07-23` | Chris Purcell | Approved for implementation; confirmed OpenAI `marin` narration. |
 | 0.1 | `2026-07-23` | Chris Purcell | Initial draft from the approved video design. |
 
 **Spec lifecycle:** This document is **living until `approved`**, then **change-controlled**: post-approval edits require a new revision row and, for scope-affecting changes, re-approval by the owner. Implementation deviations belong in the [Deviations Log](#deviations-log), not in silent requirement changes.

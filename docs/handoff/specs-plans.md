@@ -6,7 +6,8 @@ This repo does not use `docs/superpowers/specs/` — plans live under `docs/supe
 
 | Doc | Kind | Status |
 | --- | --- | --- |
-| `docs/specs/repository-explainer-video.md` | Spec (`SPEC-NSBJ`) | Draft — owner review requested |
+| `docs/specs/repository-explainer-video.md` | Spec (`SPEC-NSBJ`) | Approved |
+| `docs/superpowers/plans/2026-07-23-repository-explainer-video-plan.md` | Plan | Active — T1 ready |
 | `docs/superpowers/plans/2026-07-08-adopt-standards.md` | Plan | In progress |
 | `docs/reference/PYTHONIC_PSEUDOCODE_STANDARD.md` | Reference (relocated) | Active |
 | `docs/reference/EXECUTABLE-PSEUDOCODE-SPEC.md` | Reference (relocated) | Active |
