@@ -14,6 +14,21 @@
 		"speech_permitting_bundle": "provider-bundled model capabilities: Request"
 	},
 	"project_key_denial_probes": { "requests": [], "status": "not-run" },
+	"quick_demo_delivery": {
+		"checked_date": "2026-07-24",
+		"frame_review": "accepted opening, editor, diagnostic, runner, and end-card frames",
+		"narrated_loudness": { "integrated_lufs": -16.9, "true_peak_dbtp": -1.1 },
+		"narration": {
+			"model": "gpt-4o-mini-tts",
+			"provider_requests": 2,
+			"selected_take": 2,
+			"selected_wav_sha256": "4120cdc2019a926b01cd600c896e8b38c40c49c1dd73e328f873c157c118b677",
+			"voice": "marin"
+		},
+		"speaker_loudness": { "integrated_lufs": -28.6, "true_peak_dbtp": -14.9 },
+		"status": "verified",
+		"verification_report_sha256": "d4ac61da30e04180c7cf4cd8393f9169da3c4ebd814b61e99fef626607c205f3"
+	},
 	"provider_contract": {
 		"checked_date": "2026-07-23",
 		"documentation": "https://developers.openai.com/api/reference/resources/audio/subresources/speech/methods/create",

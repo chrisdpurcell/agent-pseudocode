@@ -37,18 +37,12 @@ To inspect the planned stages and repository-owned paths without writes or netwo
 uv run --project ../.. --directory media/repository-explainer python -m video_pipeline all --dry-run
 ```
 
-## Produce the demo
+## Rerender the demo
 
-Run capture validation, narration, rendering, and quick-demo verification:
-
-```bash
-uv run --project ../.. --directory media/repository-explainer python -m video_pipeline all
-```
-
-To rerender without another Speech request, provide the selected narration WAV:
+The verified selected narration WAV is retained in the final delivery. Run capture validation, rendering, and quick-demo verification without another Speech request:
 
 ```bash
-uv run --project ../.. --directory media/repository-explainer python -m video_pipeline all --selected-wav ../../dist/video/work/narration/selected-narration.wav
+uv run --project ../.. --directory media/repository-explainer python -m video_pipeline all --selected-wav ../../dist/video/final/agent-pseudocode-explainer-narration-selected.wav
 ```
 
 The selected WAV must be an existing nonempty file. `all --selected-wav` skips the narration stage completely.
@@ -57,11 +51,14 @@ Individual stages use the same command form:
 
 ```bash
 uv run --project ../.. --directory media/repository-explainer python -m video_pipeline capture
-uv run --project ../.. --directory media/repository-explainer python -m video_pipeline narrate
-uv run --project ../.. --directory media/repository-explainer python -m video_pipeline render --selected-wav ../../dist/video/work/narration/selected-narration.wav
+uv run --project ../.. --directory media/repository-explainer python -m video_pipeline render --selected-wav ../../dist/video/final/agent-pseudocode-explainer-narration-selected.wav
 uv run --project ../.. --directory media/repository-explainer python -m video_pipeline verify
 ```
 
+The separate `narrate` stage retains the dormant permission-smoke and three-take hardening controls for a future owner-approved narration series. It is not part of the quick rerender path.
+
 `verify` runs the quick-demo checks and writes `dist/video/final/verification-report.json`. It directly checks both MP4s with FFprobe, measures EBU R128 loudness, validates the narrated-only caption inventory and AI-narration disclosure, scans targeted text for credential patterns, and records SHA-256 hashes.
+
+The complete local delivery is `dist/video/final/`. It contains the narrated and speaker MP4s, selected narration WAV, captions, delivery and render manifests, verification report, and `checksums.sha256`. Verify the package from that directory with `sha256sum -c checksums.sha256`.
 
 Exit status `0` means the requested stage passed, `1` means verification completed with a failed check, and `2` means invocation or stage execution failed.

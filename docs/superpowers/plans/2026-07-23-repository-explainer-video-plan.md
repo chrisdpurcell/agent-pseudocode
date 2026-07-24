@@ -2,7 +2,7 @@
 title: 'Repository Explainer Video Implementation Plan'
 slug: 'repository-explainer-video'
 size: full
-status: active
+status: complete
 source: 'docs/specs/repository-explainer-video.md (SPEC-NSBJ)'
 spec_ref: 'docs/specs/repository-explainer-video.md'
 created: 2026-07-23
@@ -669,12 +669,12 @@ The known whole-repository Prettier drift in five VS Code extension files and th
 
 ## 14. Close-Out
 
-- **Completed:** _pending_ · final commit _pending_
-- **Deviations / decisions harvested from notes:** _pending close-out_
-- **Risks closed / accepted:** _pending close-out_
-- **Deferred work filed:** _pending close-out_
+- **Completed:** `2026-07-24` · T14 production checkpoint `d3ac117`; T15 close-out recorded by the plan-completion commit.
+- **Deviations / decisions harvested from notes:** OpenAI returned streaming WAV headers with an unknown-length sentinel, so the saved selected take was losslessly normalized through FFmpeg before local segmentation. Six narration segments were placed at their locked scene starts. A measured 1.3 dB post-normalization gain met the narrated loudness and peak limits, and libass production captions use 12 points to render at approximately the intended 44-pixel height.
+- **Risks closed / accepted:** Quick verification passed both 4050-frame MP4s, captions/disclosure, targeted credential scanning, loudness, and required-file hashes. Representative opening, editor, diagnostic, runner, and end-card frames passed visual review. The truthful runner scene remains preflight-only. The unrelated 62% repository coverage result remains an existing project backlog, not a media-delivery blocker.
+- **Deferred work filed:** T8–T12 release-grade assurance remains skipped under the owner-approved quick-demo boundary. The strict verifier and tests remain dormant and preserved for optional future hardening. Hosted publication and venue-specific transcoding remain open decisions.
 
-At close-out, harvest notes here and to the spec, ADRs, or issues as appropriate; set `status: complete`; update `updated`; commit the master; then remove `.project-pipeline/2026-07-23-repository-explainer-video/`.
+The ephemeral `.project-pipeline/2026-07-23-repository-explainer-video/` checklists were removed after final validation.
 
 ## Appendices
 
