@@ -1,0 +1,16 @@
+{
+	"caught-defect/mute_safe_copy": "b635fb43f42a7e7b537d46b06818da933e2fdce2726b4cc5ac26f6325c753099",
+	"caught-defect/teaching-diagnostics": "81ecd9139383fa0d3c01bfcf9e3c3267cf9ef8e64c7e4d290bba70c18480a3d3",
+	"caught-defect/teaching-source": "8ac9696162501f8b0596b8508364159ced31457fadd62b66778b630b8facb404",
+	"guarded-execution/mute_safe_copy": "cf706ba55078c29eb8b78b77a06c059c2a8dc87de8666c99bf9519e3724ae494",
+	"guarded-execution/runner": "2fa0623e3f960fcab31062d3e793b5d122bc8e1833fde06f86fa5b3b7c635712",
+	"problem/mute_safe_copy": "637646be3d9a4df16a3447fc17f1ea9c23a9a6dd9c1257d6c79ca7a045791690",
+	"problem/question": "d0152336a37e29a0fe3cf26370a881008879b955af78a8bee8273b9bb4afc7e1",
+	"promise/end-card": "439a62573c9e196006f737fd3ef5d138c9b37411c41710130b859d297db581d2",
+	"promise/mute_safe_copy": "78e5a3b9da32c4abe3f429760ca9020cec0fad61a5fb5c95eb84100dfea91876",
+	"shared-policy/mute_safe_copy": "dea4f5e10e68dee2c0b75f01eeca3dd885c80146aec3f281827adf7ee3020448",
+	"shared-policy/system-map": "df7940797a61429a539efb201c551702c21be7fa0de6cd7e0165d8def212cfc1",
+	"visible-workflow/editor-lines-1-14": "853f727290f428cea36af839115cddda7ca92e4a86f3b57c0956f9613b4ac50f",
+	"visible-workflow/editor-lines-15-27": "bf745023524643fea98606c611b5fa90c8340d91a5ca2c00d7bd6ed573895bab",
+	"visible-workflow/mute_safe_copy": "fb4808eab3dfcd54d6dbe3129476ef8144bdedbbf2b4c693d4972cfed70a3f04"
+}

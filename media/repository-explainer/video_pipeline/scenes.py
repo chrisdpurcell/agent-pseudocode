@@ -37,7 +37,7 @@ from .capture import (
     verify_evidence_manifest,
 )
 from .manifest import load_project
-from .models import ProjectManifest, Rectangle, Scene
+from .models import ProjectManifest, Rectangle, Scene, VisualState
 from .runner_capture import RunnerCaptureError, expand_display_command
 
 type AssetKind = Literal["audio", "font", "graphic"]
@@ -174,6 +174,7 @@ class RenderedSceneState:
     copy_rectangle: Rectangle | None
     caption_rectangle: Rectangle
     display_text: str
+    content_ledger: tuple[str, ...]
     references: tuple[ContentReference, ...]
     asset_ids: tuple[str, ...]
 
@@ -363,7 +364,7 @@ def render_scene_states(
     theme: SceneTheme,
     assets: AssetCatalog,
 ) -> tuple[RenderedSceneState, ...]:
-    """Render the six evidence-bound primary states and six mute-safe states."""
+    """Render the exact visual-state timeline declared by ``project.json``."""
     root = repository_root.resolve()
     editor = evidence.editor
     if editor is None:
@@ -372,7 +373,7 @@ def render_scene_states(
     _validate_cross_inputs(project, narration, evidence, theme, assets)
     commands = {command.id: command for command in evidence.commands}
     teaching = _teaching_inputs(root, evidence.revision, commands)
-    runner = _runner_inputs(evidence)
+    runner = _runner_inputs(root, evidence)
     segments = {segment.scene_id: segment for segment in narration.segments}
     source_cache = {
         scene.id: tuple(
@@ -381,7 +382,12 @@ def render_scene_states(
         )
         for scene in project.scenes
     }
-    theme_reference = _path_reference(root, theme.source_path, "theme")
+    theme_reference = _path_reference(
+        root,
+        theme.source_path,
+        "theme",
+        expected_sha256=theme.sha256,
+    )
     narration_reference = _path_reference(
         root,
         root / NARRATION_RELATIVE_PATH,
@@ -391,10 +397,6 @@ def render_scene_states(
     rendered: list[RenderedSceneState] = []
     for scene in project.scenes:
         segment = segments[scene.id]
-        primary_end = scene.end_frame - theme.mute_safe_frames
-        if primary_end <= scene.start_frame:
-            raise SceneError(f"scene {scene.id!r}: cannot reserve the mute-safe state")
-        manifest_state = scene.visual_states[0]
         context = _SceneContext(
             root=root,
             revision=evidence.revision,
@@ -409,22 +411,7 @@ def render_scene_states(
             theme_reference=theme_reference,
             narration_reference=narration_reference,
         )
-        rendered.append(
-            _render_primary(
-                context,
-                state_id=manifest_state.id,
-                start_frame=scene.start_frame,
-                end_frame=primary_end,
-                evidence_rectangles=manifest_state.evidence_rectangles,
-            )
-        )
-        rendered.append(
-            _render_mute_safe(
-                context,
-                start_frame=primary_end,
-                end_frame=scene.end_frame,
-            )
-        )
+        rendered.extend(_render_state(context, state) for state in scene.visual_states)
     return tuple(rendered)
 
 
@@ -467,72 +454,84 @@ class _SceneContext:
     narration_reference: ContentReference
 
 
-def _render_primary(
+@dataclass(frozen=True, slots=True)
+class _RenderedVisual:
+    svg: bytes
+    display_text: str
+    content_ledger: tuple[str, ...]
+    asset_ids: tuple[str, ...]
+    extra_references: tuple[ContentReference, ...] = ()
+
+
+def _render_state(
     context: _SceneContext,
-    *,
-    state_id: str,
-    start_frame: int,
-    end_frame: int,
-    evidence_rectangles: tuple[Rectangle, ...],
+    state: VisualState,
 ) -> RenderedSceneState:
     scene_id = context.scene.id
+    if state.id == "mute_safe_copy":
+        return _render_mute_safe(context, state)
+
     references: list[ContentReference] = [
         context.theme_reference,
         context.narration_reference,
         *(source.reference for source in context.source_references),
     ]
-    asset_ids: tuple[str, ...] = ()
-    if scene_id == "problem":
-        svg, display_text, asset_ids = _problem_svg(context)
+    if (scene_id, state.id) == ("problem", "question"):
+        visual = _problem_svg(context, state)
         essential = (COPY_RECTANGLE,)
     elif scene_id == "visible-workflow":
-        svg, display_text, editor_reference = _editor_svg(context, evidence_rectangles)
-        references.append(editor_reference)
-        essential = evidence_rectangles
-    elif scene_id == "caught-defect":
-        svg, display_text = _teaching_svg(context, evidence_rectangles)
-        references.extend((context.teaching.source_reference, context.teaching.output_reference))
-        essential = evidence_rectangles
-    elif scene_id == "shared-policy":
-        svg, display_text, asset_ids = _policy_svg(context, evidence_rectangles)
-        references.append(_asset_reference(context.root, context.assets.require("policy-map")))
-        essential = evidence_rectangles
-    elif scene_id == "guarded-execution":
-        svg, display_text = _runner_svg(context, evidence_rectangles)
-        references.extend(context.runner.references)
-        essential = evidence_rectangles
-    elif scene_id == "promise":
-        svg, display_text, asset_ids = _promise_svg(context)
-        references.append(_asset_reference(context.root, context.assets.require("apseudo-mark")))
+        visual = _editor_svg(context, state)
+        essential = state.evidence_rectangles
+    elif (scene_id, state.id) in {
+        ("caught-defect", "teaching-source"),
+        ("caught-defect", "teaching-diagnostics"),
+    }:
+        visual = _teaching_svg(context, state)
+        essential = state.evidence_rectangles
+    elif (scene_id, state.id) == ("shared-policy", "system-map"):
+        visual = _policy_svg(context, state)
+        essential = state.evidence_rectangles
+    elif (scene_id, state.id) == ("guarded-execution", "runner"):
+        visual = _runner_svg(context, state)
+        essential = state.evidence_rectangles
+    elif (scene_id, state.id) == ("promise", "end-card"):
+        visual = _promise_svg(context, state)
         essential = (COPY_RECTANGLE,)
     else:
-        raise SceneError(f"scene {scene_id!r}: no approved renderer")
+        raise SceneError(f"scene/state {scene_id!r}/{state.id!r}: no approved renderer")
+    references.extend(visual.extra_references)
+    references.extend(
+        _asset_reference(context.assets.require(asset_id)) for asset_id in visual.asset_ids
+    )
     _validate_essential_geometry(essential, context.theme.title_safe, scene_id)
     return RenderedSceneState(
         scene_id=scene_id,
-        state_id=state_id,
-        start_frame=start_frame,
-        end_frame=end_frame,
-        svg=svg,
-        evidence_rectangles=evidence_rectangles,
+        state_id=state.id,
+        start_frame=state.start_frame,
+        end_frame=state.end_frame,
+        svg=visual.svg,
+        evidence_rectangles=state.evidence_rectangles,
         essential_rectangles=essential,
         copy_rectangle=None,
         caption_rectangle=CAPTION_RECTANGLE,
-        display_text=display_text,
+        display_text=visual.display_text,
+        content_ledger=visual.content_ledger,
         references=_unique_references(references),
-        asset_ids=asset_ids,
+        asset_ids=visual.asset_ids,
     )
 
 
 def _render_mute_safe(
     context: _SceneContext,
-    *,
-    start_frame: int,
-    end_frame: int,
+    state: VisualState,
 ) -> RenderedSceneState:
+    if state.evidence_rectangles:
+        raise SceneError(f"scene {context.scene.id!r}: mute state cannot claim evidence")
+    content_ledger = (context.segment.mute_safe_copy,)
+    asset_ids = (context.theme.font_sans_asset_id,)
     root = _svg_root(
         context,
-        "mute_safe_copy",
+        state.id,
         evidence_rectangles=(),
         extra={"data-caption-clear": "true"},
     )
@@ -558,40 +557,56 @@ def _render_mute_safe(
     _validate_essential_geometry((COPY_RECTANGLE,), context.theme.title_safe, context.scene.id)
     return RenderedSceneState(
         scene_id=context.scene.id,
-        state_id="mute_safe_copy",
-        start_frame=start_frame,
-        end_frame=end_frame,
-        svg=_serialize_svg(root),
+        state_id=state.id,
+        start_frame=state.start_frame,
+        end_frame=state.end_frame,
+        svg=_serialize_svg(root, content_ledger),
         evidence_rectangles=(),
         essential_rectangles=(COPY_RECTANGLE,),
         copy_rectangle=COPY_RECTANGLE,
         caption_rectangle=CAPTION_RECTANGLE,
         display_text=context.segment.mute_safe_copy,
-        references=(context.theme_reference, context.narration_reference),
-        asset_ids=(),
+        content_ledger=content_ledger,
+        references=_unique_references(
+            (
+                context.theme_reference,
+                context.narration_reference,
+                *(_asset_reference(context.assets.require(asset_id)) for asset_id in asset_ids),
+            )
+        ),
+        asset_ids=asset_ids,
     )
 
 
-def _problem_svg(context: _SceneContext) -> tuple[bytes, str, tuple[str, ...]]:
-    root = _svg_root(context, "problem", evidence_rectangles=())
+def _problem_svg(context: _SceneContext, state: VisualState) -> _RenderedVisual:
+    label = "Dense instructions. Hidden decisions."
+    display_text = context.segment.caption
+    content_ledger = (label, display_text)
+    root = _svg_root(context, state.id, evidence_rectangles=())
     _background(root, context.theme.colors["ink"])
     _add_label(
         root,
-        "Dense instructions. Hidden decisions.",
+        label,
         context.theme,
         x=240,
         y=310,
         color="blue",
     )
-    _add_copy(root, context.segment.caption, context.theme, COPY_RECTANGLE)
-    return _serialize_svg(root), context.segment.caption, ()
+    _add_copy(root, display_text, context.theme, COPY_RECTANGLE)
+    return _RenderedVisual(
+        svg=_serialize_svg(root, content_ledger),
+        display_text=display_text,
+        content_ledger=content_ledger,
+        asset_ids=(context.theme.font_sans_asset_id,),
+    )
 
 
 def _editor_svg(
     context: _SceneContext,
-    evidence_rectangles: tuple[Rectangle, ...],
-) -> tuple[bytes, str, ContentReference]:
+    state: VisualState,
+) -> _RenderedVisual:
     editor = context.editor
+    evidence_rectangles = state.evidence_rectangles
     expected = _tuple_rectangle(editor.evidence_rectangle)
     destination = _tuple_rectangle(editor.destination_rectangle)
     if (
@@ -610,7 +625,10 @@ def _editor_svg(
         or editor.source_path != HERO_SOURCE_PATH
     ):
         raise SceneError("visible-workflow: editor crop, source, scale, or caption band changed")
-    frame = editor.frames[0]
+    try:
+        frame = next(frame for frame in editor.frames if frame.id == state.id)
+    except StopIteration as exc:
+        raise SceneError(f"visible-workflow: state {state.id!r} has no exact editor frame") from exc
     try:
         png = frame.path.read_bytes()
     except OSError as exc:
@@ -621,7 +639,13 @@ def _editor_svg(
     if _digest(hero) != editor.source_sha256:
         raise SceneError("visible-workflow: editor source bytes changed at the capture revision")
 
-    root = _svg_root(context, "visible-workflow", evidence_rectangles=evidence_rectangles)
+    source_lines = hero.splitlines(keepends=True)
+    source_range = b"".join(source_lines[frame.first_line - 1 : frame.last_line])
+    if _digest(source_range) != frame.source_range_sha256:
+        raise SceneError("visible-workflow: editor source range bytes changed")
+    display_text = source_range.decode("utf-8")
+    content_ledger = (display_text,)
+    root = _svg_root(context, state.id, evidence_rectangles=evidence_rectangles)
     _background(root, context.theme.colors["ink"])
     definitions = ElementTree.SubElement(root, _svg("defs"))
     clip = ElementTree.SubElement(
@@ -655,42 +679,57 @@ def _editor_svg(
             "href": f"data:image/png;base64,{base64.b64encode(png).decode('ascii')}",
             "data-native-scale": "1",
             "data-source-sha256": frame.png_sha256,
+            "data-editor-frame-id": frame.id,
+            "data-source-range": f"{frame.first_line}-{frame.last_line}",
         },
     )
     reference = ContentReference(
         kind="capture",
-        path=_reference_path(context.root, frame.path),
+        path=f"{CAPTURE_MANIFEST_RELATIVE_PATH.as_posix()}#editor-frame={frame.id}",
         sha256=frame.png_sha256,
         revision=context.revision,
     )
-    return _serialize_svg(root), hero.decode("utf-8"), reference
+    return _RenderedVisual(
+        svg=_serialize_svg(root, content_ledger),
+        display_text=display_text,
+        content_ledger=content_ledger,
+        asset_ids=(context.theme.font_mono_asset_id,),
+        extra_references=(reference,),
+    )
 
 
 def _teaching_svg(
     context: _SceneContext,
-    evidence_rectangles: tuple[Rectangle, ...],
-) -> tuple[bytes, str]:
+    state: VisualState,
+) -> _RenderedVisual:
+    evidence_rectangles = state.evidence_rectangles
     rectangle = _one_evidence_rectangle(evidence_rectangles, "caught-defect")
-    root = _svg_root(context, "caught-defect", evidence_rectangles=evidence_rectangles)
+    label = "Teaching example — deliberately invalid"
+    if state.id == "teaching-source":
+        display_text = context.teaching.command
+        exact_lines = [
+            "$ " + context.teaching.command,
+            *context.teaching.source.decode("utf-8").splitlines(),
+        ]
+        references = (context.teaching.source_reference,)
+    elif state.id == "teaching-diagnostics":
+        display_text = context.teaching.output.decode("utf-8")
+        exact_lines = display_text.splitlines()
+        references = (context.teaching.output_reference,)
+    else:
+        raise SceneError(f"caught-defect: unsupported state {state.id!r}")
+    content_ledger = (label, display_text, *exact_lines)
+    root = _svg_root(context, state.id, evidence_rectangles=evidence_rectangles)
     _background(root, context.theme.colors["ink"])
     _terminal_panel(root, rectangle, context.theme)
     _add_label(
         root,
-        "Teaching example — deliberately invalid",
+        label,
         context.theme,
         x=rectangle.x + 36,
         y=rectangle.y + 48,
         color="coral",
     )
-    source_lines = context.teaching.source.decode("utf-8").splitlines()
-    diagnostic_lines = context.teaching.output.decode("utf-8").splitlines()
-    exact_lines = [
-        "$ " + context.teaching.command,
-        "",
-        *source_lines,
-        "",
-        *diagnostic_lines,
-    ]
     code_x = rectangle.x + 36
     visible_lines = _wrap_code_lines(
         exact_lines,
@@ -703,16 +742,26 @@ def _teaching_svg(
         context.theme,
         x=code_x,
         y=rectangle.y + 102,
-        max_lines=19,
+        max_lines=18,
         exact_lines=exact_lines,
     )
-    return _serialize_svg(root), context.teaching.command
+    return _RenderedVisual(
+        svg=_serialize_svg(root, content_ledger),
+        display_text=display_text,
+        content_ledger=content_ledger,
+        asset_ids=(
+            context.theme.font_sans_asset_id,
+            context.theme.font_mono_asset_id,
+        ),
+        extra_references=references,
+    )
 
 
 def _policy_svg(
     context: _SceneContext,
-    evidence_rectangles: tuple[Rectangle, ...],
-) -> tuple[bytes, str, tuple[str, ...]]:
+    state: VisualState,
+) -> _RenderedVisual:
+    evidence_rectangles = state.evidence_rectangles
     rectangle = _one_evidence_rectangle(evidence_rectangles, "shared-policy")
     source = context.source_references[0].content.decode("utf-8")
     rule_lines = source.splitlines()[171:173]
@@ -721,13 +770,17 @@ def _policy_svg(
             "shared-policy: pinned rule source range no longer names APSEUDO-WHILE-001"
         )
     asset = context.assets.require("policy-map")
-    asset_bytes = asset.path.read_bytes()
-    root = _svg_root(context, "shared-policy", evidence_rectangles=evidence_rectangles)
+    asset_bytes = _verified_asset_bytes(asset)
+    label = "One shared policy"
+    display_text = "\n".join(rule_lines)
+    map_labels = ("Policy core", "Editor", "MCP", "Runner", "Hooks", "Pre-commit", "CI")
+    content_ledger = (label, display_text, *rule_lines, *map_labels)
+    root = _svg_root(context, state.id, evidence_rectangles=evidence_rectangles)
     _background(root, context.theme.colors["ink"])
     _terminal_panel(root, rectangle, context.theme)
     _add_label(
         root,
-        "One shared policy",
+        label,
         context.theme,
         x=rectangle.x + 36,
         y=rectangle.y + 48,
@@ -758,21 +811,39 @@ def _policy_svg(
             "data-asset-sha256": asset.sha256,
         },
     )
-    return _serialize_svg(root), "\n".join(rule_lines), (asset.id,)
+    return _RenderedVisual(
+        svg=_serialize_svg(root, content_ledger),
+        display_text=display_text,
+        content_ledger=content_ledger,
+        asset_ids=(
+            asset.id,
+            context.theme.font_sans_asset_id,
+            context.theme.font_mono_asset_id,
+        ),
+    )
 
 
 def _runner_svg(
     context: _SceneContext,
-    evidence_rectangles: tuple[Rectangle, ...],
-) -> tuple[bytes, str]:
+    state: VisualState,
+) -> _RenderedVisual:
+    evidence_rectangles = state.evidence_rectangles
     rectangle = _one_evidence_rectangle(evidence_rectangles, "guarded-execution")
-    root = _svg_root(context, "guarded-execution", evidence_rectangles=evidence_rectangles)
+    root = _svg_root(context, state.id, evidence_rectangles=evidence_rectangles)
     _background(root, context.theme.colors["ink"])
     _terminal_panel(root, rectangle, context.theme)
     mode_label = (
         "Verified preflight-only"
         if context.runner.mode == "preflight-only"
         else "Accepted guarded execution"
+    )
+    display_text = context.runner.display_command
+    exact_lines = ["$ " + context.runner.display_command, "", context.runner.reason]
+    content_ledger = (
+        mode_label,
+        display_text,
+        context.runner.reason,
+        *(line for line in exact_lines if line),
     )
     _add_label(
         root,
@@ -782,7 +853,6 @@ def _runner_svg(
         y=rectangle.y + 48,
         color="mint" if context.runner.mode == "accepted" else "blue",
     )
-    exact_lines = ["$ " + context.runner.display_command, "", context.runner.reason]
     code_x = rectangle.x + 36
     _add_code_lines(
         root,
@@ -793,13 +863,24 @@ def _runner_svg(
         max_lines=17,
         exact_lines=exact_lines,
     )
-    return _serialize_svg(root), context.runner.display_command
+    return _RenderedVisual(
+        svg=_serialize_svg(root, content_ledger),
+        display_text=display_text,
+        content_ledger=content_ledger,
+        asset_ids=(
+            context.theme.font_sans_asset_id,
+            context.theme.font_mono_asset_id,
+        ),
+        extra_references=context.runner.references,
+    )
 
 
-def _promise_svg(context: _SceneContext) -> tuple[bytes, str, tuple[str, ...]]:
+def _promise_svg(context: _SceneContext, state: VisualState) -> _RenderedVisual:
     asset = context.assets.require("apseudo-mark")
-    asset_bytes = asset.path.read_bytes()
-    root = _svg_root(context, "promise", evidence_rectangles=())
+    asset_bytes = _verified_asset_bytes(asset)
+    display_text = context.segment.mute_safe_copy
+    content_ledger = (display_text,)
+    root = _svg_root(context, state.id, evidence_rectangles=())
     _background(root, context.theme.colors["ink"])
     ElementTree.SubElement(
         root,
@@ -816,11 +897,16 @@ def _promise_svg(context: _SceneContext) -> tuple[bytes, str, tuple[str, ...]]:
     )
     _add_copy(
         root,
-        context.segment.mute_safe_copy,
+        display_text,
         context.theme,
         COPY_RECTANGLE,
     )
-    return _serialize_svg(root), context.segment.mute_safe_copy, (asset.id,)
+    return _RenderedVisual(
+        svg=_serialize_svg(root, content_ledger),
+        display_text=display_text,
+        content_ledger=content_ledger,
+        asset_ids=(asset.id, context.theme.font_sans_asset_id),
+    )
 
 
 def _validate_cross_inputs(
@@ -846,8 +932,29 @@ def _validate_cross_inputs(
         asset = assets.require(asset_id)
         if asset.kind != "font":
             raise SceneError(f"theme font asset {asset_id!r} is not classified as a font")
+    for scene in project.scenes:
+        mute_states = tuple(state for state in scene.visual_states if state.id == "mute_safe_copy")
+        if len(mute_states) != 1 or mute_states[0] is not scene.visual_states[-1]:
+            raise SceneError(f"scene {scene.id!r}: expected one final declared mute state")
+        mute = mute_states[0]
+        if mute.end_frame - mute.start_frame < theme.mute_safe_frames:
+            raise SceneError(
+                f"scene {scene.id!r}: declared mute state is shorter than the theme minimum"
+            )
     if evidence.editor is None:
         raise SceneError("real editor evidence is required")
+    editor_states = tuple(
+        state.id
+        for scene in project.scenes
+        if scene.id == "visible-workflow"
+        for state in scene.visual_states
+        if state.id != "mute_safe_copy"
+    )
+    editor_frames = tuple(frame.id for frame in evidence.editor.frames)
+    if len(set(editor_frames)) != len(editor_frames) or editor_states != editor_frames:
+        raise SceneError(
+            "visible-workflow: declared states must match every editor frame exactly once"
+        )
 
 
 def _teaching_inputs(
@@ -905,7 +1012,7 @@ def _teaching_inputs(
     )
 
 
-def _runner_inputs(evidence: EvidenceManifest) -> _RunnerInputs:
+def _runner_inputs(root: Path, evidence: EvidenceManifest) -> _RunnerInputs:
     runner = evidence.runner
     if runner is None:
         raise SceneError("guarded-execution: runner evidence ledger is missing")
@@ -919,8 +1026,10 @@ def _runner_inputs(evidence: EvidenceManifest) -> _RunnerInputs:
     except StopIteration as exc:
         raise SceneError("guarded-execution: required runner evidence is missing") from exc
     try:
-        commands_value: object = json.loads(commands_record.path.read_bytes())
-        outcome_value: object = json.loads(outcome_record.path.read_bytes())
+        commands_bytes = _verified_evidence_bytes(commands_record.path, commands_record.sha256)
+        outcome_bytes = _verified_evidence_bytes(outcome_record.path, outcome_record.sha256)
+        commands_value: object = json.loads(commands_bytes)
+        outcome_value: object = json.loads(outcome_bytes)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise SceneError("guarded-execution: runner evidence is unreadable") from exc
     commands = _object(commands_value, "runner-commands")
@@ -953,7 +1062,7 @@ def _runner_inputs(evidence: EvidenceManifest) -> _RunnerInputs:
     references = tuple(
         ContentReference(
             kind="capture",
-            path=record.path.as_posix(),
+            path=_relative_or_error(root, record.path, "runner evidence"),
             sha256=record.sha256,
             revision=runner.revision,
         )
@@ -981,25 +1090,51 @@ def _source_reference(root: Path, revision: str, absolute_path: Path) -> _Source
     )
 
 
-def _path_reference(root: Path, path: Path, kind: ReferenceKind) -> ContentReference:
+def _path_reference(
+    root: Path,
+    path: Path,
+    kind: ReferenceKind,
+    *,
+    expected_sha256: str | None = None,
+) -> ContentReference:
     try:
         content = path.read_bytes()
     except OSError as exc:
         raise SceneError(f"{kind}: referenced input could not be read") from exc
+    sha256 = _digest(content)
+    if expected_sha256 is not None and sha256 != expected_sha256:
+        raise SceneError(f"{kind}: referenced input bytes changed")
     return ContentReference(
         kind=kind,
         path=_relative_or_error(root, path, kind),
-        sha256=_digest(content),
+        sha256=sha256,
     )
 
 
-def _asset_reference(root: Path, asset: AssetRecord) -> ContentReference:
-    path = (
-        _relative_or_error(root, asset.repository_path, f"asset {asset.id!r}")
-        if asset.repository_path is not None
-        else asset.path.as_posix()
-    )
+def _asset_reference(asset: AssetRecord) -> ContentReference:
+    _verified_asset_bytes(asset)
+    path = f"{ASSET_PROVENANCE_RELATIVE_PATH.as_posix()}#asset={asset.id}"
     return ContentReference(kind="asset", path=path, sha256=asset.sha256)
+
+
+def _verified_asset_bytes(asset: AssetRecord) -> bytes:
+    try:
+        content = asset.path.read_bytes()
+    except OSError as exc:
+        raise SceneError(f"asset {asset.id!r}: asset bytes could not be read") from exc
+    if _digest(content) != asset.sha256:
+        raise SceneError(f"asset {asset.id!r}: asset bytes changed")
+    return content
+
+
+def _verified_evidence_bytes(path: Path, expected_sha256: str) -> bytes:
+    try:
+        content = path.read_bytes()
+    except OSError as exc:
+        raise SceneError("guarded-execution: runner evidence is unreadable") from exc
+    if _digest(content) != expected_sha256:
+        raise SceneError("guarded-execution: runner evidence bytes changed")
+    return content
 
 
 def _svg_root(
@@ -1077,7 +1212,6 @@ def _add_label(
             "fill": theme.colors[color],
             "font-family": theme.font_sans,
             "font-size": str(theme.label_size),
-            "font-weight": "700",
         },
     )
     element.text = text
@@ -1107,7 +1241,6 @@ def _add_copy(
             "fill": theme.colors["paper"],
             "font-family": theme.font_sans,
             "font-size": str(theme.copy_size),
-            "font-weight": "700",
             "text-anchor": "middle",
             "aria-label": text,
             "data-copy-rectangle": _rectangle_string(rectangle),
@@ -1165,7 +1298,16 @@ def _add_code_lines(
         span.tail = "\n"
 
 
-def _serialize_svg(root: ElementTree.Element) -> bytes:
+def _serialize_svg(
+    root: ElementTree.Element,
+    content_ledger: tuple[str, ...],
+) -> bytes:
+    if not content_ledger or any(not value for value in content_ledger):
+        raise SceneError("scene content ledger: values must be nonempty")
+    root.set(
+        "data-content-ledger-json",
+        json.dumps(list(content_ledger), ensure_ascii=False, separators=(",", ":")),
+    )
     return ElementTree.tostring(
         root, encoding="utf-8", xml_declaration=True, short_empty_elements=True
     )
@@ -1387,21 +1529,6 @@ def _relative_or_error(root: Path, path: Path, field: str) -> str:
     if not resolved.is_relative_to(root):
         raise SceneError(f"{field}: path escapes the repository")
     return resolved.relative_to(root).as_posix()
-
-
-def _reference_path(root: Path, path: Path) -> str:
-    """Keep injected evidence traceable without weakening production path validation.
-
-    ``compose_scene_states`` can only receive editor frames that
-    ``verify_evidence_manifest`` already confined below the repository capture
-    root. The lower-level renderer also accepts typed evidence for isolated
-    callers, so its provenance record preserves an external path instead of
-    pretending those bytes were repository-owned.
-    """
-    resolved = path.resolve()
-    if resolved.is_relative_to(root):
-        return resolved.relative_to(root).as_posix()
-    return resolved.as_posix()
 
 
 def _unique_references(

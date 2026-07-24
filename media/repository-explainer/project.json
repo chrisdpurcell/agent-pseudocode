@@ -28,6 +28,12 @@
 				{
 					"id": "question",
 					"start_frame": 0,
+					"end_frame": 390,
+					"evidence_rectangles": []
+				},
+				{
+					"id": "mute_safe_copy",
+					"start_frame": 390,
 					"end_frame": 450,
 					"evidence_rectangles": []
 				}
@@ -40,10 +46,22 @@
 			"source_paths": ["docs/apseudo-docs/examples/review-loop.apseudo"],
 			"visual_states": [
 				{
-					"id": "workflow",
+					"id": "editor-lines-1-14",
 					"start_frame": 450,
-					"end_frame": 1050,
+					"end_frame": 720,
 					"evidence_rectangles": [{ "x": 96, "y": 54, "width": 1728, "height": 786 }]
+				},
+				{
+					"id": "editor-lines-15-27",
+					"start_frame": 720,
+					"end_frame": 990,
+					"evidence_rectangles": [{ "x": 96, "y": 54, "width": 1728, "height": 786 }]
+				},
+				{
+					"id": "mute_safe_copy",
+					"start_frame": 990,
+					"end_frame": 1050,
+					"evidence_rectangles": []
 				}
 			]
 		},
@@ -54,10 +72,22 @@
 			"source_paths": ["tests/fixtures/invalid/unbounded_while.apseudo"],
 			"visual_states": [
 				{
-					"id": "diagnostic",
+					"id": "teaching-source",
 					"start_frame": 1050,
+					"end_frame": 1395,
+					"evidence_rectangles": [{ "x": 120, "y": 90, "width": 1680, "height": 750 }]
+				},
+				{
+					"id": "teaching-diagnostics",
+					"start_frame": 1395,
+					"end_frame": 1740,
+					"evidence_rectangles": [{ "x": 120, "y": 90, "width": 1680, "height": 750 }]
+				},
+				{
+					"id": "mute_safe_copy",
+					"start_frame": 1740,
 					"end_frame": 1800,
-					"evidence_rectangles": [{ "x": 120, "y": 90, "width": 1680, "height": 840 }]
+					"evidence_rectangles": []
 				}
 			]
 		},
@@ -70,8 +100,14 @@
 				{
 					"id": "system-map",
 					"start_frame": 1800,
-					"end_frame": 2550,
+					"end_frame": 2490,
 					"evidence_rectangles": [{ "x": 120, "y": 90, "width": 1680, "height": 840 }]
+				},
+				{
+					"id": "mute_safe_copy",
+					"start_frame": 2490,
+					"end_frame": 2550,
+					"evidence_rectangles": []
 				}
 			]
 		},
@@ -84,8 +120,14 @@
 				{
 					"id": "runner",
 					"start_frame": 2550,
-					"end_frame": 3450,
+					"end_frame": 3390,
 					"evidence_rectangles": [{ "x": 120, "y": 90, "width": 1680, "height": 840 }]
+				},
+				{
+					"id": "mute_safe_copy",
+					"start_frame": 3390,
+					"end_frame": 3450,
+					"evidence_rectangles": []
 				}
 			]
 		},
@@ -98,6 +140,12 @@
 				{
 					"id": "end-card",
 					"start_frame": 3450,
+					"end_frame": 3990,
+					"evidence_rectangles": []
+				},
+				{
+					"id": "mute_safe_copy",
+					"start_frame": 3990,
 					"end_frame": 4050,
 					"evidence_rectangles": []
 				}

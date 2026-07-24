@@ -19,7 +19,7 @@
 			"source": "Procedurally authored from SVG paths, rectangles, and text for this repository",
 			"license_id": "MIT",
 			"generation_method": "Deterministic hand-authored SVG primitives; no external graphic input",
-			"sha256": "ea01cffe8abd2aff0941039285057c427342a25bea42eb3422635a2667fb1db1"
+			"sha256": "6fb6fae858533cc9805cb6a36fe6e07d6d21c1acfdfd76899b7e413a26206580"
 		},
 		{
 			"id": "noto-sans-regular",

@@ -7,6 +7,8 @@ import hashlib
 import json
 import math
 import struct
+import subprocess
+import sys
 import zlib
 from dataclasses import replace
 from pathlib import Path
@@ -18,7 +20,8 @@ import pytest
 from video_pipeline.captions import load_narration
 from video_pipeline.capture import EditorEvidence, EditorFrame, verify_evidence_manifest
 from video_pipeline.manifest import load_project
-from video_pipeline.models import Rectangle
+from video_pipeline.models import ProjectManifest, Rectangle
+from video_pipeline.scenes import RenderedSceneState
 
 REPOSITORY_ROOT = Path(__file__).parents[2]
 PRODUCTION_ROOT = REPOSITORY_ROOT / "media" / "repository-explainer"
@@ -27,6 +30,7 @@ NARRATION_PATH = PRODUCTION_ROOT / "narration.json"
 CAPTURE_MANIFEST_PATH = PRODUCTION_ROOT / "captures" / "manifest.json"
 THEME_PATH = PRODUCTION_ROOT / "theme.json"
 ASSET_PROVENANCE_PATH = PRODUCTION_ROOT / "asset-provenance.json"
+APPROVED_DIGESTS_PATH = Path(__file__).with_name("fixtures") / "approved-scene-digests.json"
 CAPTION_RECTANGLE = Rectangle(x=96, y=864, width=1728, height=162)
 # Mirrors the renderer's pinned Noto Sans Mono ASCII advance so these tests
 # estimate each actual SVG text run instead of trusting declared rectangles.
@@ -43,10 +47,10 @@ def _png_chunk(kind: bytes, payload: bytes) -> bytes:
     )
 
 
-def _temporary_editor_png() -> bytes:
+def _temporary_editor_png(rgb: bytes) -> bytes:
     """Return an unmistakable test-only 1920x1080 PNG without production pixels."""
     width, height = 1920, 1080
-    row = b"\x00" + b"\xff\x00\xff" * width
+    row = b"\x00" + rgb * width
     return (
         b"\x89PNG\r\n\x1a\n"
         + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
@@ -55,27 +59,37 @@ def _temporary_editor_png() -> bytes:
     )
 
 
-def _test_editor_evidence(tmp_path: Path, source_sha256: str) -> EditorEvidence:
-    fixture_path = tmp_path / "TEST-ONLY-NOT-PRODUCTION-editor-substrate.png"
-    fixture_path.write_bytes(_temporary_editor_png())
-    fixture_hash = hashlib.sha256(fixture_path.read_bytes()).hexdigest()
-    frame = EditorFrame(
-        id="TEST-ONLY-TEMPORARY-FRAME",
-        path=fixture_path,
-        png_sha256=fixture_hash,
-        first_line=1,
-        last_line=27,
-        source_range_sha256=source_sha256,
-        spectacle_argv=(
-            "spectacle",
-            "--current",
-            "--background",
-            "--nonotify",
-            "--output",
-            str(fixture_path),
-        ),
-        output_argument=str(fixture_path),
-    )
+def _test_editor_evidence(tmp_path: Path, source: bytes, source_sha256: str) -> EditorEvidence:
+    source_lines = source.splitlines(keepends=True)
+    frames: list[EditorFrame] = []
+    for frame_id, first_line, last_line, color in (
+        ("editor-lines-1-14", 1, 14, b"\xff\x00\xff"),
+        ("editor-lines-15-27", 15, 27, b"\x00\xff\xff"),
+    ):
+        fixture_path = tmp_path / f"TEST-ONLY-NOT-PRODUCTION-{frame_id}.png"
+        fixture_path.write_bytes(_temporary_editor_png(color))
+        fixture_hash = hashlib.sha256(fixture_path.read_bytes()).hexdigest()
+        frames.append(
+            EditorFrame(
+                id=frame_id,
+                path=fixture_path,
+                png_sha256=fixture_hash,
+                first_line=first_line,
+                last_line=last_line,
+                source_range_sha256=hashlib.sha256(
+                    b"".join(source_lines[first_line - 1 : last_line])
+                ).hexdigest(),
+                spectacle_argv=(
+                    "spectacle",
+                    "--current",
+                    "--background",
+                    "--nonotify",
+                    "--output",
+                    str(fixture_path),
+                ),
+                output_argument=str(fixture_path),
+            )
+        )
     return EditorEvidence(
         operator_role="TEST-ONLY fixture creator",
         application="TEST-ONLY synthetic substrate",
@@ -95,7 +109,7 @@ def _test_editor_evidence(tmp_path: Path, source_sha256: str) -> EditorEvidence:
         palette_background="#000000",
         source_path="docs/apseudo-docs/examples/review-loop.apseudo",
         source_sha256=source_sha256,
-        frames=(frame, frame),
+        frames=tuple(frames),
     )
 
 
@@ -116,7 +130,13 @@ def _render_test_states(tmp_path: Path):
         allow_blocked_editor=True,
     )
     teaching = next(command for command in evidence.commands if command.id == "hero-lint")
-    editor = _test_editor_evidence(tmp_path, teaching.source_sha256 or "")
+    hero = subprocess.run(
+        ["git", "show", f"{evidence.revision}:docs/apseudo-docs/examples/review-loop.apseudo"],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout
+    editor = _test_editor_evidence(tmp_path, hero, teaching.source_sha256 or "")
     evidence = replace(evidence, editor=editor, editor_blocker=None)
     theme = load_theme(THEME_PATH)
     assets = load_asset_catalog(ASSET_PROVENANCE_PATH, repository_root=REPOSITORY_ROOT)
@@ -171,6 +191,46 @@ def _text_run_bounds(
     return math.floor(left), y - font_size, math.ceil(right), y + math.ceil(font_size * 0.25)
 
 
+def _state_timeline(
+    project_or_states: ProjectManifest | tuple[RenderedSceneState, ...],
+) -> list[tuple[str, str, int, int]]:
+    if isinstance(project_or_states, ProjectManifest):
+        return [
+            (scene.id, state.id, state.start_frame, state.end_frame)
+            for scene in project_or_states.scenes
+            for state in scene.visual_states
+        ]
+    return [
+        (state.scene_id, state.state_id, state.start_frame, state.end_frame)
+        for state in project_or_states
+    ]
+
+
+def _rendered_text_width(text: str, font_path: Path, font_size: int) -> int:
+    completed = subprocess.run(
+        [
+            "magick",
+            "-background",
+            "none",
+            "-fill",
+            "white",
+            "-font",
+            str(font_path),
+            "-pointsize",
+            str(font_size),
+            f"label:{text}",
+            "-format",
+            "%w",
+            "info:",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    return int(completed.stdout)
+
+
 def test_tc_t5_001__fixed_inputs__produce_deterministic_provenanced_geometry(
     tmp_path: Path,
 ) -> None:
@@ -187,24 +247,27 @@ def test_tc_t5_001__fixed_inputs__produce_deterministic_provenanced_geometry(
     )
 
     assert first == second
-    assert len(first) == 12
+    assert len(first) == sum(len(scene.visual_states) for scene in project.scenes)
+    assert _state_timeline(first) == _state_timeline(project)
     assert [state.digest for state in first] == [state.digest for state in second]
-    for scene in project.scenes:
-        primary = next(
-            state
-            for state in first
-            if state.scene_id == scene.id and state.state_id != "mute_safe_copy"
+    for state in first:
+        manifest_state = next(
+            manifest_state
+            for scene in project.scenes
+            for manifest_state in scene.visual_states
+            if scene.id == state.scene_id and manifest_state.id == state.state_id
         )
-        assert primary.evidence_rectangles == scene.visual_states[0].evidence_rectangles
-        assert hashlib.sha256(primary.svg).hexdigest() == primary.digest
-        root = ElementTree.fromstring(primary.svg)
+        assert state.evidence_rectangles == manifest_state.evidence_rectangles
+        assert hashlib.sha256(state.svg).hexdigest() == state.digest
+        root = ElementTree.fromstring(state.svg)
         assert root.attrib["width"] == "1920"
         assert root.attrib["height"] == "1080"
         assert root.attrib["viewBox"] == "0 0 1920 1080"
-        assert all(reference.sha256 for reference in primary.references)
-        assert set(primary.asset_ids) <= assets.ids
+        assert root.attrib["data-state-id"] == state.state_id
+        assert all(reference.sha256 for reference in state.references)
+        assert set(state.asset_ids) <= assets.ids
 
-    teaching = next(state for state in first if state.scene_id == "caught-defect")
+    teaching = next(state for state in first if state.state_id == "teaching-source")
     assert (
         teaching.display_text
         == "uv run apseudo-lint --stdin-filename tests/fixtures/invalid/unbounded_while.apseudo "
@@ -231,7 +294,10 @@ def test_tc_t5_001__fixed_inputs__produce_deterministic_provenanced_geometry(
         workflow_scene.visual_states[0],
         evidence_rectangles=(Rectangle(x=120, y=90, width=1680, height=840),),
     )
-    mismatched_scene = replace(workflow_scene, visual_states=(mismatched_state,))
+    mismatched_scene = replace(
+        workflow_scene,
+        visual_states=(mismatched_state, *workflow_scene.visual_states[1:]),
+    )
     scenes = list(project.scenes)
     scenes[1] = mismatched_scene
     mismatched_project = replace(project, scenes=tuple(scenes))
@@ -318,7 +384,7 @@ def test_tc_t5_002__every_svg_text_run__stays_inside_title_safe_area(
                     left < safe.x
                     or top < safe.y
                     or right > safe.x + safe.width
-                    or bottom > safe.y + safe.height
+                    or bottom > CAPTION_RECTANGLE.y
                 ):
                     violations.append(
                         f"{state.scene_id}/{state.state_id}: "
@@ -328,11 +394,58 @@ def test_tc_t5_002__every_svg_text_run__stays_inside_title_safe_area(
     assert not violations, "\n".join(violations)
 
 
+def test_tc_t5_002__actual_regular_font_bounds_and_resolution__match_every_text_run(
+    tmp_path: Path,
+) -> None:
+    _, _, _, _, assets, states = _render_test_states(tmp_path)
+    sans = assets.require("noto-sans-regular")
+    mono = assets.require("noto-sans-mono-regular")
+    expected_paths = {
+        "Noto Sans": sans.path,
+        "Noto Sans Mono": mono.path,
+    }
+    for family, asset in (("Noto Sans", sans), ("Noto Sans Mono", mono)):
+        resolved = subprocess.run(
+            ["fc-match", "-f", "%{file}", f"{family}:style=Regular"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        ).stdout
+        assert Path(resolved) == asset.path
+        assert hashlib.sha256(asset.path.read_bytes()).hexdigest() == asset.sha256
+    policy_map = ElementTree.fromstring(assets.require("policy-map").path.read_bytes())
+    assert all("font-weight" not in element.attrib for element in policy_map.iter())
+
+    for state in states:
+        root = ElementTree.fromstring(state.svg)
+        assert all("font-weight" not in element.attrib for element in root.iter())
+        for text_element in root.iter():
+            if not text_element.tag.endswith("text"):
+                continue
+            runs = [child for child in text_element if child.tag.endswith("tspan")] or [
+                text_element
+            ]
+            for run in runs:
+                if not (run.text or "").strip():
+                    continue
+                width = _rendered_text_width(
+                    run.text or "",
+                    expected_paths[text_element.attrib["font-family"]],
+                    int(text_element.attrib["font-size"]),
+                )
+                x = int(run.attrib.get("x", text_element.attrib["x"]))
+                anchor = text_element.attrib.get("text-anchor", "start")
+                left = x - width // 2 if anchor == "middle" else x - width if anchor == "end" else x
+                assert left >= 96
+                assert left + width <= 1824
+
+
 def test_tc_t5_002__wrapped_code_tspans__preserve_exact_semantic_line_ledgers(
     tmp_path: Path,
 ) -> None:
     _, _, evidence, _, _, states = _render_test_states(tmp_path)
-    code_blocks: dict[str, ElementTree.Element] = {}
+    code_blocks: dict[tuple[str, str], ElementTree.Element] = {}
     for state in states:
         root = ElementTree.fromstring(state.svg)
         blocks = [
@@ -343,68 +456,203 @@ def test_tc_t5_002__wrapped_code_tspans__preserve_exact_semantic_line_ledgers(
         ]
         if blocks:
             assert len(blocks) == 1
-            code_blocks[state.scene_id] = blocks[0]
+            code_blocks[(state.scene_id, state.state_id)] = blocks[0]
 
-    assert set(code_blocks) == {"caught-defect", "shared-policy", "guarded-execution"}
+    assert set(code_blocks) == {
+        ("caught-defect", "teaching-source"),
+        ("caught-defect", "teaching-diagnostics"),
+        ("shared-policy", "system-map"),
+        ("guarded-execution", "runner"),
+    }
     for block in code_blocks.values():
         assert _exact_line_ledger(block)
 
     teaching = next(command for command in evidence.commands if command.id == "teaching-defect")
     teaching_source = teaching.source_path
     assert teaching_source is not None
-    exact_teaching_lines = [
+    exact_source_lines = [
         "$ "
         + "uv run apseudo-lint --stdin-filename "
         + "tests/fixtures/invalid/unbounded_while.apseudo "
         + "< tests/fixtures/invalid/unbounded_while.apseudo",
-        "",
         *(REPOSITORY_ROOT / teaching_source).read_text(encoding="utf-8").splitlines(),
-        "",
-        *teaching.promoted_outputs[0].path.read_text(encoding="utf-8").splitlines(),
     ]
-    encoded_lines = _exact_line_ledger(code_blocks["caught-defect"])
-    assert encoded_lines == exact_teaching_lines
-    assert [span.text or "" for span in code_blocks["caught-defect"]] != exact_teaching_lines
+    exact_diagnostic_lines = (
+        teaching.promoted_outputs[0].path.read_text(encoding="utf-8").splitlines()
+    )
+    source_block = code_blocks[("caught-defect", "teaching-source")]
+    diagnostic_block = code_blocks[("caught-defect", "teaching-diagnostics")]
+    assert _exact_line_ledger(source_block) == exact_source_lines
+    assert _exact_line_ledger(diagnostic_block) == exact_diagnostic_lines
+    assert max(int(span.attrib["y"]) for span in source_block) < CAPTION_RECTANGLE.y
+    assert max(int(span.attrib["y"]) for span in diagnostic_block) < CAPTION_RECTANGLE.y
 
 
 def test_tc_t5_003__editor_substrate__uses_native_crop_without_scene_copy(
     tmp_path: Path,
 ) -> None:
     _, narration, evidence, _, _, states = _render_test_states(tmp_path)
-    editor_state = next(
+    editor = evidence.editor
+    assert editor is not None
+    editor_states = [
         state
         for state in states
         if state.scene_id == "visible-workflow" and state.state_id != "mute_safe_copy"
-    )
-    editor = evidence.editor
-    assert editor is not None
-    root = ElementTree.fromstring(editor_state.svg)
-    image = next(element for element in root.iter() if element.tag.endswith("image"))
-    clip_rect = next(
-        element
-        for element in root.iter()
-        if element.tag.endswith("rect") and element.attrib.get("id") == "editor-native-crop"
-    )
-
-    assert image.attrib["x"] == "96"
-    assert image.attrib["y"] == "-66"
-    assert image.attrib["width"] == "1920"
-    assert image.attrib["height"] == "1080"
-    assert image.attrib["data-native-scale"] == "1"
-    assert image.attrib["data-source-sha256"] == editor.frames[0].png_sha256
-    assert clip_rect.attrib == {
-        "id": "editor-native-crop",
-        "x": "96",
-        "y": "54",
-        "width": "1728",
-        "height": "786",
-    }
+    ]
+    assert [state.state_id for state in editor_states] == [frame.id for frame in editor.frames]
+    for state, frame in zip(editor_states, editor.frames, strict=True):
+        root = ElementTree.fromstring(state.svg)
+        image = next(element for element in root.iter() if element.tag.endswith("image"))
+        clip_rect = next(
+            element
+            for element in root.iter()
+            if element.tag.endswith("rect") and element.attrib.get("id") == "editor-native-crop"
+        )
+        assert image.attrib["x"] == "96"
+        assert image.attrib["y"] == "-66"
+        assert image.attrib["width"] == "1920"
+        assert image.attrib["height"] == "1080"
+        assert image.attrib["data-native-scale"] == "1"
+        assert image.attrib["data-source-sha256"] == frame.png_sha256
+        assert image.attrib["data-editor-frame-id"] == frame.id
+        assert image.attrib["data-source-range"] == f"{frame.first_line}-{frame.last_line}"
+        assert clip_rect.attrib == {
+            "id": "editor-native-crop",
+            "x": "96",
+            "y": "54",
+            "width": "1728",
+            "height": "786",
+        }
     workflow_copy = next(
         segment.mute_safe_copy
         for segment in narration.segments
         if segment.scene_id == "visible-workflow"
     )
-    assert workflow_copy not in _normalized_text(editor_state.svg)
+    assert all(workflow_copy not in _normalized_text(state.svg) for state in editor_states)
+
+
+def test_tc_t5_003__state_content_and_asset_ledgers__close_every_reference(
+    tmp_path: Path,
+) -> None:
+    _, _, _, theme, assets, states = _render_test_states(tmp_path)
+    for state in states:
+        root = ElementTree.fromstring(state.svg)
+        ledger_value: object = json.loads(root.attrib["data-content-ledger-json"])
+        assert isinstance(ledger_value, list)
+        ledger = cast(list[object], ledger_value)
+        assert ledger and all(isinstance(value, str) and value for value in ledger)
+        assert tuple(ledger) == getattr(state, "content_ledger", None)
+        assert state.display_text in ledger
+        assert state.references
+        for reference in state.references:
+            path_text = reference.path.split("#", maxsplit=1)[0]
+            path = Path(path_text)
+            assert not path.is_absolute()
+            assert ".." not in path.parts
+        expected_fonts = (
+            {theme.font_mono_asset_id}
+            if state.scene_id == "visible-workflow" and state.state_id != "mute_safe_copy"
+            else {theme.font_sans_asset_id, theme.font_mono_asset_id}
+            if state.scene_id in {"caught-defect", "shared-policy", "guarded-execution"}
+            and state.state_id != "mute_safe_copy"
+            else {theme.font_sans_asset_id}
+        )
+        assert expected_fonts <= set(state.asset_ids)
+        for asset_id in state.asset_ids:
+            asset = assets.require(asset_id)
+            assert any(
+                reference.kind == "asset"
+                and reference.sha256 == asset.sha256
+                and reference.path.endswith(f"#asset={asset_id}")
+                for reference in state.references
+            )
+
+
+def test_tc_t5_003__mutated_verified_assets_and_runner_bytes__fail_closed(
+    tmp_path: Path,
+) -> None:
+    project, narration, evidence, theme, assets, _ = _render_test_states(tmp_path)
+    from video_pipeline.scenes import SceneError, render_scene_states
+
+    policy = assets.require("policy-map")
+    asset_path = tmp_path / "mutated-policy-map.svg"
+    asset_path.write_bytes(policy.path.read_bytes())
+    replaced_policy = replace(policy, repository_path=None, system_path=asset_path)
+    mutated_assets = replace(
+        assets,
+        assets=tuple(
+            replaced_policy if asset.id == policy.id else asset for asset in assets.assets
+        ),
+    )
+    asset_path.write_bytes(asset_path.read_bytes() + b"\n")
+    with pytest.raises(SceneError, match="asset bytes changed"):
+        render_scene_states(
+            repository_root=REPOSITORY_ROOT,
+            project=project,
+            narration=narration,
+            evidence=evidence,
+            theme=theme,
+            assets=mutated_assets,
+        )
+
+    runner = evidence.runner
+    assert runner is not None
+    commands = next(
+        record for record in runner.evidence if record.path.name == "runner-commands.json"
+    )
+    runner_path = tmp_path / "runner-commands.json"
+    runner_path.write_bytes(commands.path.read_bytes())
+    replaced_commands = replace(commands, path=runner_path)
+    mutated_runner = replace(
+        runner,
+        evidence=tuple(
+            replaced_commands if record.path.name == "runner-commands.json" else record
+            for record in runner.evidence
+        ),
+    )
+    runner_path.write_bytes(runner_path.read_bytes() + b"\n")
+    with pytest.raises(SceneError, match="runner evidence bytes changed"):
+        render_scene_states(
+            repository_root=REPOSITORY_ROOT,
+            project=project,
+            narration=narration,
+            evidence=replace(evidence, runner=mutated_runner),
+            theme=theme,
+            assets=assets,
+        )
+
+
+def test_tc_t5_003__approved_state_digests__match_across_fresh_processes(
+    tmp_path: Path,
+) -> None:
+    assert APPROVED_DIGESTS_PATH.exists(), "approved per-state digest fixture is missing"
+    approved = json.loads(APPROVED_DIGESTS_PATH.read_text(encoding="utf-8"))
+    script = """
+import json
+import sys
+import tempfile
+from pathlib import Path
+root = Path.cwd()
+sys.path.insert(0, str(root / "media/repository-explainer"))
+sys.path.insert(0, str(root / "tests/video"))
+from test_scenes import _render_test_states
+with tempfile.TemporaryDirectory(prefix="scene-digest-") as directory:
+    *_, states = _render_test_states(Path(directory))
+print(json.dumps({f"{state.scene_id}/{state.state_id}": state.digest for state in states}, sort_keys=True))
+"""
+    runs = [
+        subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=REPOSITORY_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        ).stdout.strip()
+        for _ in range(2)
+    ]
+    assert runs[0] == runs[1]
+    assert json.loads(runs[0]) == approved
 
 
 def test_compose_scene_states__blocked_editor__reports_locked_editor_only() -> None:

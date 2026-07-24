@@ -18,6 +18,22 @@ from video_pipeline.models import ProjectManifest, Rectangle
 COMMITTED_MANIFEST_PATH = (
     Path(__file__).parents[2] / "media" / "repository-explainer" / "project.json"
 )
+EXPECTED_STATE_TIMELINE = (
+    ("problem", "question", 0, 390),
+    ("problem", "mute_safe_copy", 390, 450),
+    ("visible-workflow", "editor-lines-1-14", 450, 720),
+    ("visible-workflow", "editor-lines-15-27", 720, 990),
+    ("visible-workflow", "mute_safe_copy", 990, 1050),
+    ("caught-defect", "teaching-source", 1050, 1395),
+    ("caught-defect", "teaching-diagnostics", 1395, 1740),
+    ("caught-defect", "mute_safe_copy", 1740, 1800),
+    ("shared-policy", "system-map", 1800, 2490),
+    ("shared-policy", "mute_safe_copy", 2490, 2550),
+    ("guarded-execution", "runner", 2550, 3390),
+    ("guarded-execution", "mute_safe_copy", 3390, 3450),
+    ("promise", "end-card", 3450, 3990),
+    ("promise", "mute_safe_copy", 3990, 4050),
+)
 
 
 def _load_manifest(path: Path, repository_root: Path) -> ProjectManifest:
@@ -57,7 +73,18 @@ def test_loads_approved_4050_frame_six_scene_manifest() -> None:
     ]
     assert (manifest.media.width, manifest.media.height, manifest.media.fps) == (1920, 1080, 30)
     assert manifest.media.total_frames == 4050
-    assert manifest.evidence_dominant_frames == 3000
+    assert [
+        (scene.id, state.id, state.start_frame, state.end_frame)
+        for scene in manifest.scenes
+        for state in scene.visual_states
+    ] == list(EXPECTED_STATE_TIMELINE)
+    assert all(
+        state.end_frame - state.start_frame >= 60
+        for scene in manifest.scenes
+        for state in scene.visual_states
+        if state.id == "mute_safe_copy"
+    )
+    assert manifest.evidence_dominant_frames == 2760
     assert 0.6 <= manifest.evidence_dominant_frames / manifest.media.total_frames <= 0.8
     assert manifest.scenes[1].visual_states[0].evidence_rectangles == (
         Rectangle(x=96, y=54, width=1728, height=786),
@@ -221,26 +248,67 @@ def _replace_visual_states(
 
 
 def _below_evidence_share(payload: dict[str, object]) -> None:
-    _state(payload, 1)["evidence_rectangles"] = []
-
-
-def _exactly_sixty_percent_evidence_share(payload: dict[str, object]) -> None:
+    _replace_visual_states(
+        payload,
+        0,
+        [
+            {
+                "id": "opening-evidence",
+                "start_frame": 0,
+                "end_frame": 180,
+                "evidence_rectangles": [_full_frame_rectangle()],
+            },
+            {
+                "id": "question-copy",
+                "start_frame": 180,
+                "end_frame": 450,
+                "evidence_rectangles": [],
+            },
+        ],
+    )
     _replace_visual_states(
         payload,
         1,
         [
             {
-                "id": "brief-evidence",
+                "id": "workflow-copy",
                 "start_frame": 450,
-                "end_frame": 480,
+                "end_frame": 1050,
+                "evidence_rectangles": [],
+            }
+        ],
+    )
+
+
+def _exactly_sixty_percent_evidence_share(payload: dict[str, object]) -> None:
+    _replace_visual_states(
+        payload,
+        0,
+        [
+            {
+                "id": "brief-evidence",
+                "start_frame": 0,
+                "end_frame": 210,
                 "evidence_rectangles": [_full_frame_rectangle()],
             },
             {
-                "id": "workflow-copy",
-                "start_frame": 480,
-                "end_frame": 1050,
+                "id": "question-copy",
+                "start_frame": 210,
+                "end_frame": 450,
                 "evidence_rectangles": [],
             },
+        ],
+    )
+    _replace_visual_states(
+        payload,
+        1,
+        [
+            {
+                "id": "workflow-copy",
+                "start_frame": 450,
+                "end_frame": 1050,
+                "evidence_rectangles": [],
+            }
         ],
     )
 
@@ -253,13 +321,25 @@ def _exactly_eighty_percent_evidence_share(payload: dict[str, object]) -> None:
             {
                 "id": "opening-evidence",
                 "start_frame": 0,
-                "end_frame": 240,
+                "end_frame": 450,
+                "evidence_rectangles": [_full_frame_rectangle()],
+            },
+        ],
+    )
+    _replace_visual_states(
+        payload,
+        5,
+        [
+            {
+                "id": "closing-evidence",
+                "start_frame": 3450,
+                "end_frame": 3480,
                 "evidence_rectangles": [_full_frame_rectangle()],
             },
             {
-                "id": "question-copy",
-                "start_frame": 240,
-                "end_frame": 450,
+                "id": "closing-copy",
+                "start_frame": 3480,
+                "end_frame": 4050,
                 "evidence_rectangles": [],
             },
         ],
@@ -267,7 +347,12 @@ def _exactly_eighty_percent_evidence_share(payload: dict[str, object]) -> None:
 
 
 def _above_evidence_share(payload: dict[str, object]) -> None:
-    _state(payload, 0)["evidence_rectangles"] = [_full_frame_rectangle()]
+    for scene_index in (0, 5):
+        for state in cast(
+            list[dict[str, object]],
+            _scene(payload, scene_index)["visual_states"],
+        ):
+            state["evidence_rectangles"] = [_full_frame_rectangle()]
 
 
 @pytest.mark.parametrize(
@@ -334,7 +419,7 @@ def test_accepts_contiguous_states_and_touching_evidence_rectangles(
     manifest = _load_manifest(write_manifest(repository_root, payload), repository_root)
 
     assert len(manifest.scenes[1].visual_states) == 2
-    assert manifest.evidence_dominant_frames == 3000
+    assert manifest.evidence_dominant_frames == 2820
 
 
 @pytest.mark.parametrize(

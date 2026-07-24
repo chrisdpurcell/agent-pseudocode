@@ -22,7 +22,6 @@
     fill="#F5F7FA"
     font-family="Noto Sans, sans-serif"
     font-size="52"
-    font-weight="700"
     text-anchor="middle"
   >
     Policy core
@@ -39,7 +38,6 @@
     fill="#F5F7FA"
     font-family="Noto Sans, sans-serif"
     font-size="50"
-    font-weight="600"
     text-anchor="middle"
   >
     <text x="190" y="125">Editor</text>
