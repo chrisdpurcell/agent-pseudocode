@@ -260,6 +260,7 @@ def generate_narration(
     package = load_narration(narration_path, project)
     script = build_locked_script(package)
     series_hash = _series_hash(script, package)
+    _require_permission_smoke_pass(series_hash)
     canonical_manifest = _canonical_take_manifest(series_hash)
     if manifest_path is not None and manifest_path != canonical_manifest:
         raise SpeechTerminalError(
@@ -1152,6 +1153,19 @@ def _load_smoke_state(path: Path) -> dict[str, object]:
     if state.get("schema_version") != 1:
         raise SpeechTerminalError("permission smoke state is invalid")
     return state
+
+
+def _require_permission_smoke_pass(series_hash: str) -> None:
+    """Require the canonical one-shot proof before production can consume a take.
+
+    This check stays ahead of the take-ledger lock and reservation so every
+    non-pass state fails without spending cap or reaching the provider.
+    """
+    state = _load_smoke_state(_canonical_smoke_state(series_hash))
+    if state.get("status") != "pass" or state.get("series_hash") != series_hash:
+        raise SpeechTerminalError(
+            "canonical permission smoke must pass before production narration"
+        )
 
 
 def _finish_smoke_state(path: Path, status: str) -> None:

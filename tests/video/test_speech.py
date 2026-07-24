@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import threading
@@ -239,6 +240,82 @@ def _only_series_manifest() -> Path:
     return manifests[0]
 
 
+def _series_hash(project: ProjectManifest) -> str:
+    package = load_narration(NARRATION_PATH, project)
+    canonical = json.dumps(
+        {
+            "instructions": package.instructions,
+            "model": package.model,
+            "script": build_locked_script(package),
+            "voice": package.voice,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def _pass_permission_smoke(project: ProjectManifest, evidence_path: Path, wav_bytes: bytes) -> None:
+    transport = _ScriptedTransport(
+        deque(
+            (
+                _speech_response(wav_bytes),
+                *(HttpResponse(status=403, headers={}, body=b"denied") for _ in range(3)),
+            )
+        )
+    )
+    smoke = run_permission_smoke(
+        narration_path=NARRATION_PATH,
+        project=project,
+        evidence_path=evidence_path,
+        api_key="test-key",
+        transport=transport,
+        checked_date="2026-07-23",
+        probes=PERMISSION_PROBES,
+        mode="permission-smoke",
+    )
+    assert smoke["status"] == "pass"
+
+
+@pytest.mark.parametrize("smoke_status", [None, "not-run", "running", "fail", "failed"])
+def test_production_requires_canonical_passed_smoke_before_reservation(
+    tmp_path: Path, smoke_status: str | None
+) -> None:
+    project = _project(tmp_path, f"smoke-{smoke_status or 'missing'}")
+    series_hash = _series_hash(project)
+    smoke_state_path = _test_work_root / "permission-smoke" / f"{series_hash}.json"
+    if smoke_status is not None:
+        smoke_state_path.parent.mkdir(parents=True)
+        smoke_state_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "series_hash": series_hash,
+                    "status": smoke_status,
+                    "checked_date": "2026-07-23",
+                }
+            ),
+            encoding="utf-8",
+        )
+    transport = _ScriptedTransport(deque((_speech_response(_wav([30, 40, 50, 60, 70, 80])),)))
+    ledger_path = _test_work_root / "narration-series" / f"{series_hash}.json"
+    ledger_path.parent.mkdir(parents=True)
+    ledger_path.write_bytes(b"unchanged-sentinel")
+
+    with pytest.raises(SpeechTerminalError, match="permission smoke must pass"):
+        generate_narration(
+            narration_path=NARRATION_PATH,
+            project=project,
+            output_dir=tmp_path / "blocked-output",
+            api_key="test-key",
+            transport=transport,
+            sleep=lambda _: None,
+        )
+
+    assert transport.requests == []
+    assert ledger_path.read_bytes() == b"unchanged-sentinel"
+
+
 def test_tc_t6_001__local_http_contract_and_permission_smoke__record_narrow_evidence(
     tmp_path: Path,
 ) -> None:
@@ -259,14 +336,6 @@ def test_tc_t6_001__local_http_contract_and_permission_smoke__record_narrow_evid
 
     with _local_speech_server(wav_bytes) as (base_url, server_state):
         transport = UrllibTransport(base_url=base_url, allow_insecure_for_tests=True)
-        result = generate_narration(
-            narration_path=NARRATION_PATH,
-            project=project,
-            output_dir=output_dir,
-            api_key=SECRET_SHAPED_VALUE,
-            transport=transport,
-            sleep=lambda _: None,
-        )
         smoke = run_permission_smoke(
             narration_path=NARRATION_PATH,
             project=project,
@@ -276,6 +345,14 @@ def test_tc_t6_001__local_http_contract_and_permission_smoke__record_narrow_evid
             checked_date="2026-07-23",
             probes=PERMISSION_PROBES,
             mode="permission-smoke",
+        )
+        result = generate_narration(
+            narration_path=NARRATION_PATH,
+            project=project,
+            output_dir=output_dir,
+            api_key=SECRET_SHAPED_VALUE,
+            transport=transport,
+            sleep=lambda _: None,
         )
         third_result = generate_narration(
             narration_path=NARRATION_PATH,
@@ -314,7 +391,7 @@ def test_tc_t6_001__local_http_contract_and_permission_smoke__record_narrow_evid
     assert speech_requests[0][2]["authorization"] == f"Bearer {SECRET_SHAPED_VALUE}"
     assert result.selected_wav.read_bytes() == wav_bytes
     assert len(result.segment_wavs) == len(package.segments)
-    assert result.take_count == 1
+    assert result.take_count == 2
     assert result.manifest_path.parent == _test_work_root / "narration-series"
     assert result.manifest_path.name == f"{result.series_hash}.json"
     assert third_result.take_count == 3
@@ -530,10 +607,16 @@ def test_tc_t6_001__local_http_contract_and_permission_smoke__record_narrow_evid
             sleep=lambda _: None,
         )
 
+    override_project = _project(tmp_path, "override")
+    _pass_permission_smoke(
+        override_project,
+        tmp_path / "override-evidence.json",
+        wav_bytes,
+    )
     with pytest.raises(SpeechTerminalError, match="canonical narration state path"):
         generate_narration(
             narration_path=NARRATION_PATH,
-            project=_project(tmp_path, "override"),
+            project=override_project,
             output_dir=tmp_path / "override-output",
             manifest_path=tmp_path / "caller-selected" / "take-series.json",
             api_key="test-key",
@@ -545,6 +628,7 @@ def test_tc_t6_001__local_http_contract_and_permission_smoke__record_narrow_evid
 def test_tc_t6_002__full_wav_guards__bound_takes_retries_and_spend(tmp_path: Path) -> None:
     project = _project(tmp_path, "retry")
     accepted_wav = _wav([30, 40, 50, 60, 70, 80])
+    _pass_permission_smoke(project, tmp_path / "retry-evidence.json", accepted_wav)
     transient_then_ok = _ScriptedTransport(
         deque(
             (
@@ -561,7 +645,7 @@ def test_tc_t6_002__full_wav_guards__bound_takes_retries_and_spend(tmp_path: Pat
         transport=transient_then_ok,
         sleep=lambda _: None,
     )
-    assert result.take_count == 2
+    assert result.take_count == 3
     assert len(transient_then_ok.requests) == 2
     assert result.measured_segment_frames == {
         "problem": 30,
@@ -573,6 +657,7 @@ def test_tc_t6_002__full_wav_guards__bound_takes_retries_and_spend(tmp_path: Pat
     }
 
     realistic_project = _project(tmp_path, "realistic")
+    _pass_permission_smoke(realistic_project, tmp_path / "realistic-evidence.json", accepted_wav)
     realistic_result = generate_narration(
         narration_path=NARRATION_PATH,
         project=realistic_project,
@@ -594,10 +679,12 @@ def test_tc_t6_002__full_wav_guards__bound_takes_retries_and_spend(tmp_path: Pat
             )
         )
     )
+    terminal_project = _project(tmp_path, "terminal")
+    _pass_permission_smoke(terminal_project, tmp_path / "terminal-evidence.json", accepted_wav)
     with pytest.raises(SpeechTerminalError, match="authentication"):
         generate_narration(
             narration_path=NARRATION_PATH,
-            project=_project(tmp_path, "terminal"),
+            project=terminal_project,
             output_dir=tmp_path / "terminal-output",
             api_key="test-key",
             transport=terminal,
@@ -610,11 +697,13 @@ def test_tc_t6_002__full_wav_guards__bound_takes_retries_and_spend(tmp_path: Pat
             (
                 OSError("offline"),
                 HttpResponse(status=503, headers={}, body=b"retry"),
-                HttpResponse(status=429, headers={}, body=b"retry"),
             )
         )
     )
     unavailable_project = _project(tmp_path, "unavailable")
+    _pass_permission_smoke(
+        unavailable_project, tmp_path / "unavailable-evidence.json", accepted_wav
+    )
     with pytest.raises(ProviderUnavailableError, match=r"AW-004.*blocked"):
         generate_narration(
             narration_path=NARRATION_PATH,
@@ -631,9 +720,10 @@ def test_tc_t6_002__full_wav_guards__bound_takes_retries_and_spend(tmp_path: Pat
     package = load_narration(NARRATION_PATH, project)
     first_budget = package.segments[0].end_frame - package.segments[0].start_frame
     overlong_wav = _wav([first_budget + 1, 40, 50, 60, 70, 80])
-    cap_transport = _ScriptedTransport(deque(_speech_response(overlong_wav) for _ in range(3)))
+    cap_transport = _ScriptedTransport(deque(_speech_response(overlong_wav) for _ in range(2)))
     cap_project = _project(tmp_path, "cap")
-    for _ in range(3):
+    _pass_permission_smoke(cap_project, tmp_path / "cap-evidence.json", accepted_wav)
+    for _ in range(2):
         with pytest.raises(TakeRejectedError, match=r"fixed .*frame budget"):
             generate_narration(
                 narration_path=NARRATION_PATH,
@@ -652,9 +742,10 @@ def test_tc_t6_002__full_wav_guards__bound_takes_retries_and_spend(tmp_path: Pat
             transport=cap_transport,
             sleep=lambda _: None,
         )
-    assert len(cap_transport.requests) == 3
+    assert len(cap_transport.requests) == 2
 
     concurrent_project = _project(tmp_path, "concurrent")
+    _pass_permission_smoke(concurrent_project, tmp_path / "concurrent-evidence.json", accepted_wav)
     concurrent_transport = _SlowRejectingTransport(_speech_response(overlong_wav))
     exceptions: list[SpeechError] = []
     exception_lock = threading.Lock()
@@ -681,15 +772,25 @@ def test_tc_t6_002__full_wav_guards__bound_takes_retries_and_spend(tmp_path: Pat
     for thread in threads:
         thread.join(timeout=5)
     assert all(not thread.is_alive() for thread in threads)
-    assert concurrent_transport.request_count == 3
-    assert sum(isinstance(exc, TakeRejectedError) for exc in exceptions) == 3
-    assert sum(isinstance(exc, TakeLimitError) for exc in exceptions) == 1
+    assert concurrent_transport.request_count == 2
+    assert sum(isinstance(exc, TakeRejectedError) for exc in exceptions) == 2
+    assert sum(isinstance(exc, TakeLimitError) for exc in exceptions) == 2
 
     mixed_project = _project(tmp_path, "mixed-concurrent")
     mixed_transport = _ConcurrentSmokeTransport(_speech_response(overlong_wav))
     mixed_exceptions: list[SpeechError] = []
     mixed_exception_lock = threading.Lock()
-    mixed_start = threading.Barrier(4)
+    run_permission_smoke(
+        narration_path=NARRATION_PATH,
+        project=mixed_project,
+        evidence_path=tmp_path / "mixed-evidence.json",
+        api_key="test-key",
+        transport=mixed_transport,
+        checked_date="2026-07-23",
+        probes=PERMISSION_PROBES,
+        mode="permission-smoke",
+    )
+    mixed_start = threading.Barrier(3)
 
     def generate_in_mixed_race() -> None:
         mixed_start.wait()
@@ -706,28 +807,10 @@ def test_tc_t6_002__full_wav_guards__bound_takes_retries_and_spend(tmp_path: Pat
             with mixed_exception_lock:
                 mixed_exceptions.append(exc)
 
-    def smoke_in_mixed_race() -> None:
-        mixed_start.wait()
-        try:
-            run_permission_smoke(
-                narration_path=NARRATION_PATH,
-                project=mixed_project,
-                evidence_path=tmp_path / "mixed-evidence.json",
-                api_key="test-key",
-                transport=mixed_transport,
-                checked_date="2026-07-23",
-                probes=PERMISSION_PROBES,
-                mode="permission-smoke",
-            )
-        except SpeechError as exc:
-            with mixed_exception_lock:
-                mixed_exceptions.append(exc)
-
     mixed_threads = [
         threading.Thread(target=generate_in_mixed_race),
         threading.Thread(target=generate_in_mixed_race),
         threading.Thread(target=generate_in_mixed_race),
-        threading.Thread(target=smoke_in_mixed_race),
     ]
     for thread in mixed_threads:
         thread.start()
@@ -736,12 +819,15 @@ def test_tc_t6_002__full_wav_guards__bound_takes_retries_and_spend(tmp_path: Pat
     assert all(not thread.is_alive() for thread in mixed_threads)
     assert sum(request.path == "/v1/audio/speech" for request in mixed_transport.requests) == 3
     assert json.loads(_only_series_manifest().read_text(encoding="utf-8"))["take_count"] == 3
-    assert len(mixed_exceptions) in {3, 4}
+    assert sum(isinstance(exc, TakeRejectedError) for exc in mixed_exceptions) == 2
+    assert sum(isinstance(exc, TakeLimitError) for exc in mixed_exceptions) == 1
 
+    spend_project = _project(tmp_path, "spend")
+    _pass_permission_smoke(spend_project, tmp_path / "spend-evidence.json", accepted_wav)
     with pytest.raises(SpendLimitError, match="USD 1"):
         generate_narration(
             narration_path=NARRATION_PATH,
-            project=_project(tmp_path, "spend"),
+            project=spend_project,
             output_dir=tmp_path / "spend-output",
             api_key="test-key",
             transport=_ScriptedTransport(deque((_speech_response(accepted_wav),))),
@@ -754,6 +840,11 @@ def test_tc_t6_003__evidence_and_dry_run__exclude_secrets_and_itemized_billing(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     project = _project(tmp_path, "evidence")
+    _pass_permission_smoke(
+        project,
+        tmp_path / "evidence-permission-smoke.json",
+        _wav([30, 40, 50, 60, 70, 80]),
+    )
     secret = "".join(("s", "k", "-", "proj-super-secret-shaped-value"))
     denial = json.dumps({"error": "denied", "credential": DENIAL_SECRET})
     transport = _ScriptedTransport(
