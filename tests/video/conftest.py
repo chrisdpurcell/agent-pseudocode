@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
@@ -12,6 +13,7 @@ import pytest
 @pytest.fixture
 def repository_root(tmp_path: Path) -> Path:
     """Return a repository-shaped root whose selected output path is ignored."""
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
     (tmp_path / ".gitignore").write_text("dist/\n", encoding="utf-8")
     return tmp_path
 

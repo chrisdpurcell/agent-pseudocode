@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from collections.abc import Iterable
 from itertools import pairwise
 from pathlib import Path
@@ -405,20 +406,24 @@ def _resolve_output_path(value: str, output_root: Path, field: str) -> Path:
 
 
 def _is_ignored_output_root(output_root: Path, repository_root: Path) -> bool:
-    ignore_path = repository_root / ".gitignore"
-    if not ignore_path.exists():
-        return False
-    relative = output_root.relative_to(repository_root).as_posix()
-    for raw_pattern in ignore_path.read_text(encoding="utf-8").splitlines():
-        pattern = raw_pattern.strip()
-        if not pattern or pattern.startswith(("!", "#")):
-            continue
-        normalized = pattern.removeprefix("/")
-        if normalized.endswith("/") and relative.startswith(normalized):
-            return True
-        if relative == normalized or relative.startswith(f"{normalized}/"):
-            return True
-    return False
+    relative = f"{output_root.relative_to(repository_root).as_posix()}/"
+    try:
+        completed = subprocess.run(
+            ["git", "check-ignore", "--no-index", "--quiet", "--", relative],
+            cwd=repository_root,
+            check=False,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=10,
+        )
+    except FileNotFoundError as exc:
+        raise ManifestError("output.root: Git ignore engine is unavailable") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise ManifestError("output.root: Git ignore evaluation timed out") from exc
+    if completed.returncode not in {0, 1}:
+        raise ManifestError("output.root: Git ignore evaluation failed")
+    return completed.returncode == 0
 
 
 def _object(value: object, field: str) -> dict[str, object]:

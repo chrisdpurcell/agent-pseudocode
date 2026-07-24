@@ -162,6 +162,31 @@ def test_rejects_paths_outside_owned_roots(
         _load_manifest(write_manifest(repository_root, absolute_output), repository_root)
 
 
+def test_rejects_explicitly_unignored_output_root(
+    repository_root: Path,
+    approved_manifest_data: dict[str, object],
+    write_manifest: Callable[[Path, Mapping[str, object]], Path],
+) -> None:
+    (repository_root / ".gitignore").write_text("dist/video\n!dist/video\n", encoding="utf-8")
+
+    with pytest.raises(ManifestError, match=re.escape("output.root")):
+        _load_manifest(write_manifest(repository_root, approved_manifest_data), repository_root)
+
+
+def test_accepts_recursively_glob_ignored_output_root(
+    repository_root: Path,
+    approved_manifest_data: dict[str, object],
+    write_manifest: Callable[[Path, Mapping[str, object]], Path],
+) -> None:
+    (repository_root / ".gitignore").write_text("dist/**/video/\n", encoding="utf-8")
+
+    manifest = _load_manifest(
+        write_manifest(repository_root, approved_manifest_data), repository_root
+    )
+
+    assert manifest.output.root == repository_root / "dist" / "video"
+
+
 def _state_interval_gap(payload: dict[str, object]) -> None:
     _state(payload, 1)["start_frame"] = 451
 
