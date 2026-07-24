@@ -251,6 +251,40 @@ def test_tc_t8_001__packet_and_progressive_contract__rejects_forged_boundary() -
     assert duration.evidence["packet_after_program_boundary"] is True
 
 
+def test_tc_t8_001__packet_boundary__checks_every_packet_in_stream_time_base() -> None:
+    from video_pipeline.verify import LoudnessMeasurement, verify_media_variant
+
+    hidden_overrun = _probe_payload()
+    packets = cast(list[dict[str, object]], hidden_overrun["packets"])
+    packets.insert(
+        -1,
+        {
+            "stream_index": 1,
+            "pts": 6_480_000,
+            "duration": 480,
+        },
+    )
+    overrun_rows = verify_media_variant(
+        "speaker",
+        hidden_overrun,
+        LoudnessMeasurement(-28.0, -6.2),
+    )
+    assert next(row for row in overrun_rows if row.id == "MEDIA-speaker-duration").status == "fail"
+
+    scaled_time_base = _probe_payload()
+    audio = cast(dict[str, object], cast(list[object], scaled_time_base["streams"])[1])
+    audio["time_base"] = "1/96000"
+    for packet in cast(list[dict[str, object]], scaled_time_base["packets"]):
+        packet["pts"] = cast(int, packet["pts"]) * 2
+        packet["duration"] = cast(int, packet["duration"]) * 2
+    scaled_rows = verify_media_variant(
+        "speaker",
+        scaled_time_base,
+        LoudnessMeasurement(-28.0, -6.2),
+    )
+    assert next(row for row in scaled_rows if row.id == "MEDIA-speaker-duration").status == "pass"
+
+
 def test_tc_t8_002__must_gate_aggregation__blocks_every_corrupted_fixture() -> None:
     from video_pipeline.verify import GateResult, aggregate_report
 
@@ -464,6 +498,156 @@ def test_tc_t8_002__required_artifact_secret_scan__is_closed_and_detects_entropy
     assert missing_row.evidence["missing_roles"] == sorted(REQUIRED_DELIVERY_INVENTORY)
 
 
+@pytest.mark.parametrize(
+    ("secret_value", "expected_classification"),
+    [
+        pytest.param(
+            "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE",
+            "credential-token",
+            id="aws-access-key",
+        ),
+        pytest.param(
+            "token=xoxb-fixture-slack-token-value",
+            "credential-token",
+            id="slack-token-assignment",
+        ),
+        pytest.param(
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+            "credential-token",
+            id="jwt-segment",
+        ),
+    ],
+)
+def test_tc_t8_002__secret_scan__detects_common_credential_shapes(
+    tmp_path: Path,
+    secret_value: str,
+    expected_classification: str,
+) -> None:
+    from video_pipeline.verify import (
+        REQUIRED_DELIVERY_INVENTORY,
+        verify_required_artifact_secrets,
+    )
+
+    deliverables: dict[str, Path] = {}
+    for role, name in REQUIRED_DELIVERY_INVENTORY.items():
+        path = tmp_path / name
+        path.write_text("safe fixture\n", encoding="utf-8")
+        deliverables[role] = path
+    deliverables["delivery_json"].write_text(secret_value, encoding="utf-8")
+
+    row = verify_required_artifact_secrets(deliverables, ())
+
+    assert row.status == "fail"
+    assert {
+        finding["classification"]
+        for finding in cast(list[dict[str, str]], row.evidence["findings"])
+    } == {expected_classification}
+
+
+def test_tc_t8_002__production_secret_scan__covers_tracked_source_logs_and_media_review(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import (
+        REQUIRED_DELIVERY_INVENTORY,
+        verify_required_artifact_secrets,
+    )
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    source_root = tmp_path / "media" / "repository-explainer"
+    source_root.mkdir(parents=True)
+    source = source_root / "production.py"
+    source.write_text("SAFE = True\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "add", "media/repository-explainer/production.py"],
+        cwd=tmp_path,
+        check=True,
+    )
+    runner_logs = tmp_path / "dist" / "video" / "work" / "runner-runs"
+    verification_evidence = tmp_path / "dist" / "video" / "work" / "verification-evidence"
+    runner_logs.mkdir(parents=True)
+    verification_evidence.mkdir(parents=True)
+    (runner_logs / "runner.log").write_text("safe bounded run\n", encoding="utf-8")
+    video_digest = "a" * 64
+    pcm_digest = "b" * 64
+    media_review: dict[str, object] = {
+        "schema_version": 1,
+        "outputs": {
+            variant: {
+                "decoded_video_sha256": video_digest,
+                "decoded_pcm_sha256": pcm_digest,
+                "ocr_secret_findings": [],
+                "transcript_secret_findings": [],
+            }
+            for variant in ("narrated", "speaker")
+        },
+    }
+    review_path = verification_evidence / "media-security-review.json"
+    review_path.write_text(json.dumps(media_review), encoding="utf-8")
+    deliverables: dict[str, Path] = {}
+    for role, name in REQUIRED_DELIVERY_INVENTORY.items():
+        path = tmp_path / name
+        path.write_text("safe delivery fixture\n", encoding="utf-8")
+        deliverables[role] = path
+    manifest = {
+        "outputs": {
+            variant: {
+                "decoded_video_sha256": video_digest,
+                "decoded_pcm_sha256": pcm_digest,
+            }
+            for variant in ("narrated", "speaker")
+        }
+    }
+    unrelated_cache = tmp_path / "dist" / "video" / "work" / "cache"
+    unrelated_cache.mkdir()
+    (unrelated_cache / "not-production-evidence.log").write_text(
+        "OPENAI_API_KEY=sk-fixture-cache-value",
+        encoding="utf-8",
+    )
+
+    passing = verify_required_artifact_secrets(
+        deliverables,
+        (),
+        repository_root=tmp_path,
+        render_manifest=manifest,
+    )
+    assert passing.status == "pass"
+    assert passing.evidence["tracked_source_files_scanned"] == [
+        "media/repository-explainer/production.py"
+    ]
+    assert "dist/video/work/cache" not in json.dumps(passing.evidence)
+
+    source.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n", encoding="utf-8")
+    source_row = verify_required_artifact_secrets(
+        deliverables,
+        (),
+        repository_root=tmp_path,
+        render_manifest=manifest,
+    )
+    assert source_row.status == "fail"
+    assert {
+        (finding["artifact"], finding["classification"])
+        for finding in cast(list[dict[str, str]], source_row.evidence["findings"])
+    } >= {
+        (
+            "source:media/repository-explainer/production.py",
+            "credential-token",
+        )
+    }
+
+    source.write_text("SAFE = True\n", encoding="utf-8")
+    review_path.unlink()
+    missing_review = verify_required_artifact_secrets(
+        deliverables,
+        (),
+        repository_root=tmp_path,
+        render_manifest=manifest,
+    )
+    assert missing_review.status == "fail"
+    assert missing_review.evidence["missing_scan_coverage"] == [
+        "dist/video/work/verification-evidence/media-security-review.json"
+    ]
+
+
 def test_tc_t8_003__exact_reproduction__matches_semantics_but_ignores_container_hash() -> None:
     from video_pipeline.verify import semantic_manifest_sha256, verify_reproduction
 
@@ -553,6 +737,7 @@ def test_tc_t8_003__offline_reproduction_command__is_fixed_network_denied_and_ke
         selected_wav_sha256=hashlib.sha256(b"selected").hexdigest(),
         python=Path(sys.executable),
         bwrap=Path("/usr/bin/bwrap"),
+        runtime_roots=(Path("/usr"), Path("/lib64"), Path(sys.base_prefix)),
     )
 
     assert command[:4] == (
@@ -562,6 +747,19 @@ def test_tc_t8_003__offline_reproduction_command__is_fixed_network_denied_and_ke
         "--new-session",
     )
     assert "--clearenv" in command
+    assert ("--ro-bind", "/", "/") not in tuple(
+        tuple(command[index : index + 3]) for index in range(len(command) - 2)
+    )
+    read_only_sources = {
+        command[index + 1] for index, value in enumerate(command[:-2]) if value == "--ro-bind"
+    }
+    assert read_only_sources == {
+        "/usr",
+        "/lib64",
+        str(Path(sys.base_prefix).resolve()),
+        str(selected.resolve()),
+    }
+    assert str(REPOSITORY_ROOT) not in read_only_sources
     assert "PYTHONPATH" in command
     assert "VIDEO_PIPELINE_OFFLINE_REPRODUCTION" in command
     assert "OPENAI_API_KEY" not in command
@@ -569,7 +767,7 @@ def test_tc_t8_003__offline_reproduction_command__is_fixed_network_denied_and_ke
         "-m",
         "video_pipeline.verify",
         "--offline-render",
-        str(selected.resolve()),
+        "/input/selected-narration.wav",
         "--selected-wav-sha256",
         hashlib.sha256(b"selected").hexdigest(),
     )
@@ -620,6 +818,68 @@ def test_tc_t8_002__strict_manifest_and_asset_ledger__reject_tampering(tmp_path:
     }
 
 
+def test_tc_t8_002__manifest_and_provenance__reject_open_schemas_and_unapproved_revision(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import verify_asset_provenance, verify_render_manifest
+
+    state = _state("mute_safe_copy", 0, 60)
+    media = MediaSettings(width=100, height=100, fps=20, total_frames=60)
+    manifest = _render_manifest_for_states((state,), media)
+    inputs = cast(dict[str, object], manifest["inputs"])
+    inputs["claimed_procedural_input"] = {"sha256": "9" * 64}
+    manifest["source_revision"] = "a" * 40
+    manifest["synthesis"] = {
+        "external_music_inputs": [],
+        "generation_method": "trust me",
+    }
+    provenance = {
+        "schema_version": 1,
+        "assets": [
+            {
+                "id": "font",
+                "kind": "font",
+                "repository_path": "font.bin",
+                "system_path": None,
+                "source": "Fixture",
+                "license_id": "OFL-1.1",
+                "generation_method": None,
+                "sha256": hashlib.sha256(b"font").hexdigest(),
+                "claimed_procedural": True,
+            }
+        ],
+    }
+    (tmp_path / "font.bin").write_bytes(b"font")
+
+    manifest_row = verify_render_manifest(
+        manifest,
+        media=media,
+        states=(state,),
+        repository_root=REPOSITORY_ROOT,
+        approved_source_revision="b" * 40,
+    )
+    rights_row, _ = verify_asset_provenance(provenance, repository_root=tmp_path)
+
+    manifest_findings = cast(list[dict[str, object]], manifest_row.evidence["findings"])
+    assert any(
+        finding["field"] == "inputs" and finding["reason"] == "unexpected-schema"
+        for finding in manifest_findings
+    )
+    assert any(
+        finding["field"] == "source_revision" and finding["reason"] == "unapproved-source-revision"
+        for finding in manifest_findings
+    )
+    assert any(
+        finding["field"] == "synthesis" and finding["reason"] == "fixed-contract-mismatch"
+        for finding in manifest_findings
+    )
+    rights_findings = cast(list[dict[str, object]], rights_row.evidence["findings"])
+    assert any(
+        finding["field"] == "assets[0]" and finding["reason"] == "unexpected-schema"
+        for finding in rights_findings
+    )
+
+
 def test_tc_t8_002__closed_world_provenance__requires_selected_wav_and_procedural_audio(
     tmp_path: Path,
 ) -> None:
@@ -667,6 +927,147 @@ def test_tc_t8_002__closed_world_provenance__requires_selected_wav_and_procedura
         "procedural_tonal_bed_and_cues",
         "selected_narration_wav",
     ]
+
+
+def test_tc_t8_002__closed_world_provenance__rejects_arbitrary_procedural_claim(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import verify_closed_world_provenance
+
+    selected = tmp_path / "agent-pseudocode-explainer-narration-selected.wav"
+    selected.write_bytes(b"selected narration")
+    font = tmp_path / "font.bin"
+    font.write_bytes(b"font")
+    state = _state("mute_safe_copy", 0, 60)
+    media = MediaSettings(width=100, height=100, fps=20, total_frames=60)
+    manifest = _render_manifest_for_states((state,), media)
+    selected_digest = hashlib.sha256(selected.read_bytes()).hexdigest()
+    cast(
+        dict[str, object],
+        cast(dict[str, object], manifest["inputs"])["selected_narration_wav"],
+    )["sha256"] = selected_digest
+    manifest["synthesis"] = {
+        "method": "FFmpeg sine sources mixed in the render filter graph",
+        "sample_rate": 48_000,
+        "total_samples": 144_000,
+        "bed": {"frequency_hz": 110, "volume": "0.06"},
+        "cues": {
+            "frequency_hz": 660,
+            "duration_samples": 3840,
+            "fade_start_sample": 1440,
+            "fade_samples": 2400,
+            "volume": "0.15",
+            "start_frames": [],
+            "start_samples": [],
+        },
+        "external_music_inputs": [],
+    }
+    assets = {
+        "schema_version": 1,
+        "assets": [
+            {
+                "id": "font",
+                "kind": "font",
+                "repository_path": "font.bin",
+                "system_path": None,
+                "source": "Fixture",
+                "license_id": "OFL-1.1",
+                "generation_method": None,
+                "sha256": hashlib.sha256(font.read_bytes()).hexdigest(),
+            },
+            {
+                "id": "selected_narration_wav",
+                "kind": "audio",
+                "repository_path": None,
+                "system_path": str(selected),
+                "source": "Fixture narration",
+                "license_id": None,
+                "generation_method": "OpenAI speech fixture",
+                "sha256": selected_digest,
+            },
+            {
+                "id": "procedural_tonal_bed_and_cues",
+                "kind": "audio",
+                "repository_path": None,
+                "system_path": None,
+                "source": "Claimed procedural audio",
+                "license_id": None,
+                "generation_method": "trust me",
+                "sha256": "0" * 64,
+            },
+        ],
+    }
+
+    row = verify_closed_world_provenance(
+        manifest,
+        states=(state,),
+        asset_provenance=assets,
+        repository_root=tmp_path,
+        selected_wav=selected,
+    )
+
+    assert row.status == "fail"
+    mismatches = cast(list[dict[str, object]], row.evidence["mismatches"])
+    assert {(finding["input"], finding["reason"]) for finding in mismatches} >= {
+        (
+            "selected_narration_wav",
+            "selected-narration-provenance-mismatch",
+        ),
+        (
+            "procedural_tonal_bed_and_cues",
+            "fixed-synthesis-provenance-mismatch",
+        ),
+    }
+
+
+def test_tc_t8_002__asset_provenance__accepts_fixed_procedural_audio_without_path(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import verify_asset_provenance
+
+    synthesis: dict[str, object] = {
+        "method": "FFmpeg sine sources mixed in the render filter graph",
+        "sample_rate": 48_000,
+        "total_samples": 144_000,
+        "bed": {"frequency_hz": 110, "volume": "0.06"},
+        "cues": {
+            "frequency_hz": 660,
+            "duration_samples": 3840,
+            "fade_start_sample": 1440,
+            "fade_samples": 2400,
+            "volume": "0.15",
+            "start_frames": [],
+            "start_samples": [],
+        },
+        "external_music_inputs": [],
+    }
+    payload = {
+        "schema_version": 1,
+        "assets": [
+            {
+                "id": "procedural_tonal_bed_and_cues",
+                "kind": "audio",
+                "repository_path": None,
+                "system_path": None,
+                "source": "Repository render pipeline fixed synthesis contract",
+                "license_id": None,
+                "generation_method": "FFmpeg sine sources mixed in the render filter graph",
+                "sha256": hashlib.sha256(
+                    json.dumps(
+                        synthesis,
+                        ensure_ascii=True,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    ).encode()
+                ).hexdigest(),
+            }
+        ],
+    }
+
+    row, classified = verify_asset_provenance(payload, repository_root=tmp_path)
+
+    assert row.status == "pass"
+    assert classified == frozenset({"procedural_tonal_bed_and_cues"})
 
 
 @pytest.mark.parametrize(
@@ -829,7 +1230,7 @@ def test_tc_t8_002__candidate_analyzers__derive_hashes_samples_and_speech_contra
     state = _state("mute_safe_copy", 0, 30)
     manifest = _render_manifest_for_states(
         (state,),
-        MediaSettings(width=160, height=90, fps=30, total_frames=30),
+        MediaSettings(width=160, height=100, fps=30, total_frames=30),
     )
     outputs = cast(dict[str, dict[str, object]], manifest["outputs"])
     for output in outputs.values():
@@ -847,17 +1248,69 @@ def test_tc_t8_002__candidate_analyzers__derive_hashes_samples_and_speech_contra
         manifest=manifest,
         states=(state,),
         mode="diagnostic",
-        diagnostic_media=MediaSettings(width=160, height=90, fps=30, total_frames=30),
+        diagnostic_media=MediaSettings(width=160, height=100, fps=30, total_frames=30),
     )
     by_id = {row.id: row for row in rows}
 
     assert by_id["CANDIDATE-semantic-hashes"].status == "fail"
     actual = cast(dict[str, object], by_id["CANDIDATE-semantic-hashes"].evidence["actual"])
     assert actual["caption_sha256"] == hashlib.sha256(captions.read_bytes()).hexdigest()
+    container_gate = by_id["CANDIDATE-container-hashes"]
+    assert container_gate.status == "fail"
+    container_actual = cast(dict[str, str], container_gate.evidence["actual"])
+    assert container_actual == {
+        "narrated": hashlib.sha256(narrated.read_bytes()).hexdigest(),
+        "speaker": hashlib.sha256(speaker.read_bytes()).hexdigest(),
+    }
     assert by_id["FRAME-final-samples"].status == "pass"
     assert by_id["FRAME-final-samples"].evidence["sampled_frames"] == [5, 19, 29]
     assert by_id["CAPTION-speaker"].evidence["derivation"] == "decoded-speaker-picture"
-    assert by_id["AUDIO-speaker-speech"].evidence["derivation"] == "decoded-speaker-pcm"
+    speaker_audio_gate = by_id["AUDIO-speaker-speech"]
+    assert speaker_audio_gate.status == "fail"
+    assert (
+        speaker_audio_gate.evidence["derivation"]
+        == "decoded-speaker-pcm-vs-independently-synthesized-fixed-bed"
+    )
+    assert (
+        speaker_audio_gate.evidence["actual_decoded_pcm_sha256"]
+        != speaker_audio_gate.evidence["expected_procedural_pcm_sha256"]
+    )
+
+
+def test_tc_t8_002__final_frame_contrast__rejects_black_on_black_composite(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import verify_candidate_media
+
+    narrated = tmp_path / "agent-pseudocode-explainer-narrated.mp4"
+    speaker = tmp_path / "agent-pseudocode-explainer-speaker.mp4"
+    captions = tmp_path / "agent-pseudocode-explainer-captions.srt"
+    _write_short_mp4(narrated, high_contrast=False)
+    speaker.write_bytes(narrated.read_bytes())
+    captions.write_text("", encoding="utf-8")
+    state = _state("mute_safe_copy", 0, 30)
+
+    rows = verify_candidate_media(
+        {
+            "narrated_mp4": narrated,
+            "speaker_mp4": speaker,
+            "captions_srt": captions,
+        },
+        manifest=_render_manifest_for_states(
+            (state,),
+            MediaSettings(width=160, height=100, fps=30, total_frames=30),
+        ),
+        states=(state,),
+        mode="diagnostic",
+        diagnostic_media=MediaSettings(width=160, height=100, fps=30, total_frames=30),
+    )
+
+    sample_gate = next(row for row in rows if row.id == "FRAME-final-samples")
+    assert sample_gate.status == "fail"
+    samples = cast(list[dict[str, object]], sample_gate.evidence["samples"])
+    assert samples
+    assert all(sample["decoded_frame_sha256"] for sample in samples)
+    assert all(sample["minimum_pixel_contrast"] == 1.0 for sample in samples)
 
 
 def test_tc_t8_002__candidate_analyzers__fail_closed_on_corrupt_media(
@@ -881,7 +1334,7 @@ def test_tc_t8_002__candidate_analyzers__fail_closed_on_corrupt_media(
         manifest={},
         states=(),
         mode="diagnostic",
-        diagnostic_media=MediaSettings(width=160, height=90, fps=30, total_frames=30),
+        diagnostic_media=MediaSettings(width=160, height=100, fps=30, total_frames=30),
     )
 
     assert len(rows) == 1
@@ -1028,6 +1481,101 @@ def test_tc_t8_002__production_inventory__rejects_missing_or_substituted_names(
     ]
 
 
+def test_tc_t8_002__production_inventory__requires_exact_final_directory_and_regular_files(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import REQUIRED_DELIVERY_INVENTORY, verify_delivery_inventory
+
+    final = tmp_path / "dist" / "video" / "final"
+    final.mkdir(parents=True)
+    deliverables: dict[str, Path] = {}
+    for role, name in REQUIRED_DELIVERY_INVENTORY.items():
+        path = final / name
+        path.write_bytes(b"fixture")
+        deliverables[role] = path
+
+    assert verify_delivery_inventory(deliverables, expected_directory=final).status == "pass"
+
+    speaker = deliverables["speaker_mp4"]
+    speaker.unlink()
+    speaker.symlink_to(deliverables["narrated_mp4"])
+    symlink_row = verify_delivery_inventory(deliverables, expected_directory=final)
+    assert symlink_row.status == "fail"
+    assert symlink_row.evidence["non_regular_roles"] == ["speaker_mp4"]
+
+    speaker.unlink()
+    outside = tmp_path / REQUIRED_DELIVERY_INVENTORY["speaker_mp4"]
+    outside.write_bytes(b"fixture")
+    deliverables["speaker_mp4"] = outside
+    outside_row = verify_delivery_inventory(deliverables, expected_directory=final)
+    assert outside_row.status == "fail"
+    assert outside_row.evidence["wrong_directory_roles"] == ["speaker_mp4"]
+
+
+def test_tc_t8_002__delivery_metadata__requires_exact_schema_and_actual_file_hashes(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.captions import AI_NARRATION_DISCLOSURE
+    from video_pipeline.verify import (
+        REQUIRED_DELIVERY_INVENTORY,
+        verify_approved_revisions,
+        verify_delivery_metadata,
+    )
+
+    deliverables: dict[str, Path] = {}
+    for role, name in REQUIRED_DELIVERY_INVENTORY.items():
+        path = tmp_path / name
+        path.write_bytes(role.encode())
+        deliverables[role] = path
+    artifacts = {
+        role: {
+            "filename": path.name,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+        for role, path in deliverables.items()
+        if role != "delivery_json"
+    }
+    delivery = {
+        "schema_version": 1,
+        "status": "final",
+        "ai_narration_disclosure": AI_NARRATION_DISCLOSURE,
+        "source_revision": "a" * 40,
+        "capture_revision": "b" * 40,
+        "artifacts": artifacts,
+    }
+
+    assert verify_delivery_metadata(delivery, deliverables).status == "pass"
+    assert (
+        verify_approved_revisions(
+            delivery,
+            {"revision": "b" * 40},
+        ).status
+        == "pass"
+    )
+    assert (
+        verify_approved_revisions(
+            delivery,
+            {"revision": "c" * 40},
+        ).status
+        == "fail"
+    )
+
+    extra = copy.deepcopy(delivery)
+    extra["owner_approved"] = True
+    assert verify_delivery_metadata(extra, deliverables).status == "fail"
+
+    mismatched = copy.deepcopy(delivery)
+    cast(dict[str, dict[str, str]], mismatched["artifacts"])["speaker_mp4"]["sha256"] = "0" * 64
+    row = verify_delivery_metadata(mismatched, deliverables)
+    assert row.status == "fail"
+    findings = cast(list[dict[str, object]], row.evidence["findings"])
+    assert any(
+        finding["field"] == "artifacts.speaker_mp4.sha256"
+        and finding["reason"] == "actual-file-mismatch"
+        for finding in findings
+    )
+
+
 def test_tc_t8_002__production_entry__fails_closed_when_real_states_are_blocked(
     tmp_path: Path,
 ) -> None:
@@ -1092,7 +1640,7 @@ def _semantic_manifest() -> dict[str, object]:
     }
 
 
-def _write_short_mp4(path: Path) -> None:
+def _write_short_mp4(path: Path, *, high_contrast: bool = True) -> None:
     subprocess.run(
         [
             "ffmpeg",
@@ -1101,13 +1649,20 @@ def _write_short_mp4(path: Path) -> None:
             "-f",
             "lavfi",
             "-i",
-            "color=c=black:s=160x90:r=30:d=1",
+            "color=c=black:s=160x100:r=30:d=1",
             "-f",
             "lavfi",
             "-i",
             "sine=frequency=440:sample_rate=48000:duration=1",
             "-frames:v",
             "30",
+            "-vf",
+            (
+                "drawbox=x=5:y=5:w=80:h=40:color=white:t=4,"
+                "drawbox=x=5:y=80:w=90:h=15:color=white:t=4"
+                if high_contrast
+                else "null"
+            ),
             "-c:v",
             "libopenh264",
             "-pix_fmt",

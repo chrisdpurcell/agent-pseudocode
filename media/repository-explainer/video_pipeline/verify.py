@@ -67,6 +67,13 @@ REQUIRED_DELIVERY_INVENTORY: dict[str, str] = {
     "render_manifest_json": "render-manifest.json",
     "asset_provenance_json": "asset-provenance.json",
 }
+PRODUCTION_LOG_EVIDENCE_ROOTS = (
+    Path("dist/video/work/runner-runs"),
+    Path("dist/video/work/verification-evidence"),
+)
+PROCEDURAL_AUDIO_ASSET_ID = "procedural_tonal_bed_and_cues"
+PROCEDURAL_AUDIO_SOURCE = "Repository render pipeline fixed synthesis contract"
+PROCEDURAL_AUDIO_GENERATION_METHOD = "FFmpeg sine sources mixed in the render filter graph"
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _INTEGRATED_LOUDNESS = re.compile(r"^\s*I:\s*(-?(?:\d+(?:\.\d+)?|inf))\s+LUFS\s*$", re.M)
 _TRUE_PEAK = re.compile(r"^\s*Peak:\s*(-?(?:\d+(?:\.\d+)?|inf))\s+dB(?:FS|TP)\s*$", re.M)
@@ -77,6 +84,7 @@ _SRT_TIMING = re.compile(
     r"(?m)^(?P<start>\d{2}:\d{2}:\d{2},\d{3}) --> "
     r"(?P<end>\d{2}:\d{2}:\d{2},\d{3})$"
 )
+_SIGNAL_LUMA = re.compile(r"^lavfi\.signalstats\.Y(?P<bound>MIN|MAX)=(?P<value>\d+)$", re.M)
 _SECRET_PATTERNS = (
     (
         "credential-assignment",
@@ -92,7 +100,12 @@ _SECRET_PATTERNS = (
     ),
     (
         "credential-token",
-        re.compile(r"\b(?:sk-|ghp_|github_pat_)[A-Za-z0-9_-]{8,}\b", re.I),
+        re.compile(
+            r"\b(?:(?:sk-|ghp_|github_pat_|glpat-|xox[baprs]-)[A-Za-z0-9_-]{8,}|"
+            r"(?:AKIA|ASIA)[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|"
+            r"eyJ[A-Za-z0-9_-]{16,})\b",
+            re.I,
+        ),
     ),
 )
 _RENDER_MANIFEST_FIELDS = {
@@ -227,11 +240,32 @@ def _verify_loaded_delivery(inputs: VerificationInputs) -> VerificationReport:
             "production_required_for_promotion": True,
         },
     )
-    inventory_gate = verify_delivery_inventory(inputs.deliverables)
+    inventory_gate = verify_delivery_inventory(
+        inputs.deliverables,
+        expected_directory=(
+            inputs.repository_root / "dist" / "video" / "final"
+            if inputs.mode == "production"
+            else None
+        ),
+    )
+    delivery_gate = verify_delivery_metadata(inputs.delivery, inputs.deliverables)
     manifest_gate = verify_render_manifest(
         inputs.render_manifest,
         media=expected_media,
         states=inputs.states,
+        repository_root=(inputs.repository_root if inputs.mode == "production" else None),
+        approved_source_revision=(
+            cast(str, inputs.delivery.get("source_revision"))
+            if inputs.mode == "production"
+            and isinstance(inputs.delivery.get("source_revision"), str)
+            else None
+        ),
+        approved_capture_revision=(
+            cast(str, inputs.delivery.get("capture_revision"))
+            if inputs.mode == "production"
+            and isinstance(inputs.delivery.get("capture_revision"), str)
+            else None
+        ),
     )
     rights_gate, classified_ids = verify_asset_provenance(
         inputs.asset_provenance,
@@ -309,7 +343,12 @@ def _verify_loaded_delivery(inputs: VerificationInputs) -> VerificationReport:
                     "AUDIO-speaker-speech",
                 }
             ),
-            verify_required_artifact_secrets(inputs.deliverables, inputs.states),
+            verify_required_artifact_secrets(
+                inputs.deliverables,
+                inputs.states,
+                repository_root=inputs.repository_root,
+                render_manifest=inputs.render_manifest,
+            ),
             verify_renderer_layout(inputs.states, inputs.render_manifest),
         )
     share_gate = verify_evidence_frame_share(
@@ -365,6 +404,7 @@ def _verify_loaded_delivery(inputs: VerificationInputs) -> VerificationReport:
         (
             mode_gate,
             inventory_gate,
+            delivery_gate,
             manifest_gate,
             rights_gate,
             closed_world_rights_gate,
@@ -410,7 +450,10 @@ def verify_production_delivery(
             "state_count": len(states),
         },
     )
-    inventory_gate = verify_delivery_inventory(deliverables)
+    inventory_gate = verify_delivery_inventory(
+        deliverables,
+        expected_directory=root / "dist" / "video" / "final",
+    )
     if inventory_gate.status == "fail":
         return aggregate_report((source_gate, inventory_gate))
     try:
@@ -423,6 +466,10 @@ def verify_production_delivery(
             "asset provenance",
         )
         delivery = _read_json_mapping(deliverables["delivery_json"], "delivery metadata")
+        capture_manifest = _read_json_mapping(
+            root / "media/repository-explainer/captures/manifest.json",
+            "capture manifest",
+        )
     except VerificationError as exc:
         return aggregate_report(
             (
@@ -435,6 +482,9 @@ def verify_production_delivery(
                 ),
             )
         )
+    revision_gate = verify_approved_revisions(delivery, capture_manifest)
+    if revision_gate.status == "fail":
+        return aggregate_report((source_gate, inventory_gate, revision_gate))
     report = _verify_loaded_delivery(
         VerificationInputs(
             mode="production",
@@ -458,12 +508,16 @@ def verify_production_delivery(
         )
     )
     return aggregate_report(
-        (source_gate, *report.gates),
+        (source_gate, revision_gate, *report.gates),
         checksums=report.checksums,
     )
 
 
-def verify_delivery_inventory(deliverables: Mapping[str, Path]) -> GateResult:
+def verify_delivery_inventory(
+    deliverables: Mapping[str, Path],
+    *,
+    expected_directory: Path | None = None,
+) -> GateResult:
     """Require the exact production roles and stable filenames."""
     actual_roles = set(deliverables)
     required_roles = set(REQUIRED_DELIVERY_INVENTORY)
@@ -478,18 +532,156 @@ def verify_delivery_inventory(deliverables: Mapping[str, Path]) -> GateResult:
     ]
     missing_roles = sorted(required_roles - actual_roles)
     unexpected_roles = sorted(actual_roles - required_roles)
-    unreadable_roles = sorted(
-        role for role, path in deliverables.items() if role in required_roles and not path.is_file()
+    non_regular_roles = sorted(
+        role
+        for role, path in deliverables.items()
+        if role in required_roles and (path.is_symlink() or not path.is_file())
+    )
+    expected_resolved = expected_directory.resolve() if expected_directory is not None else None
+    wrong_directory_roles = sorted(
+        role
+        for role, path in deliverables.items()
+        if role in required_roles
+        and expected_resolved is not None
+        and path.expanduser().absolute().parent != expected_resolved
     )
     return _gate(
         "INVENTORY-delivery",
-        not missing_roles and not unexpected_roles and not name_mismatches and not unreadable_roles,
+        not missing_roles
+        and not unexpected_roles
+        and not name_mismatches
+        and not non_regular_roles
+        and not wrong_directory_roles,
         {
             "required": dict(REQUIRED_DELIVERY_INVENTORY),
+            "expected_directory": (
+                str(expected_resolved) if expected_resolved is not None else None
+            ),
             "missing_roles": missing_roles,
             "unexpected_roles": unexpected_roles,
             "name_mismatches": name_mismatches,
-            "unreadable_roles": unreadable_roles,
+            "non_regular_roles": non_regular_roles,
+            "wrong_directory_roles": wrong_directory_roles,
+        },
+    )
+
+
+def verify_delivery_metadata(
+    delivery: Mapping[str, object],
+    deliverables: Mapping[str, Path],
+) -> GateResult:
+    """Bind the exact final-delivery ledger to every non-self artifact byte."""
+    findings: list[dict[str, object]] = []
+    expected_fields = {
+        "schema_version",
+        "status",
+        "ai_narration_disclosure",
+        "source_revision",
+        "capture_revision",
+        "artifacts",
+    }
+    if set(delivery) != expected_fields:
+        findings.append(
+            {
+                "field": "delivery",
+                "reason": "unexpected-schema",
+                "expected_fields": sorted(expected_fields),
+                "actual_fields": sorted(delivery),
+            }
+        )
+    if delivery.get("schema_version") != 1:
+        findings.append({"field": "schema_version", "reason": "expected-1"})
+    if delivery.get("status") != "final":
+        findings.append({"field": "status", "reason": "expected-final"})
+    if delivery.get("ai_narration_disclosure") != AI_NARRATION_DISCLOSURE:
+        findings.append(
+            {
+                "field": "ai_narration_disclosure",
+                "reason": "required-disclosure-missing",
+            }
+        )
+    for field_name in ("source_revision", "capture_revision"):
+        if (
+            not isinstance(delivery.get(field_name), str)
+            or re.fullmatch(r"[0-9a-f]{40}", cast(str, delivery.get(field_name, ""))) is None
+        ):
+            findings.append(
+                {
+                    "field": field_name,
+                    "reason": "expected-explicit-full-git-object-id",
+                }
+            )
+    artifacts = _mapping(delivery.get("artifacts"))
+    expected_roles = set(REQUIRED_DELIVERY_INVENTORY) - {"delivery_json"}
+    if set(artifacts) != expected_roles:
+        findings.append(
+            {
+                "field": "artifacts",
+                "reason": "unexpected-inventory",
+                "expected_roles": sorted(expected_roles),
+                "actual_roles": sorted(artifacts),
+            }
+        )
+    for role in sorted(expected_roles):
+        record = _mapping(artifacts.get(role))
+        path = deliverables.get(role)
+        if set(record) != {"filename", "sha256"}:
+            findings.append(
+                {
+                    "field": f"artifacts.{role}",
+                    "reason": "unexpected-schema",
+                }
+            )
+            continue
+        expected_name = REQUIRED_DELIVERY_INVENTORY[role]
+        if record.get("filename") != expected_name:
+            findings.append(
+                {
+                    "field": f"artifacts.{role}.filename",
+                    "reason": "stable-name-mismatch",
+                }
+            )
+        actual_digest = _file_sha256_or_none(path) if path is not None else None
+        if record.get("sha256") != actual_digest or not _is_sha256(actual_digest):
+            findings.append(
+                {
+                    "field": f"artifacts.{role}.sha256",
+                    "reason": "actual-file-mismatch",
+                    "actual_sha256": actual_digest,
+                }
+            )
+    return _gate(
+        "DELIVERY-metadata",
+        not findings,
+        {
+            "required_artifact_roles": sorted(expected_roles),
+            "findings": findings,
+        },
+    )
+
+
+def verify_approved_revisions(
+    delivery: Mapping[str, object],
+    capture_manifest: Mapping[str, object],
+) -> GateResult:
+    """Bind delivery approval to the capture revision used by rendered evidence."""
+    source_revision = delivery.get("source_revision")
+    capture_revision = delivery.get("capture_revision")
+    recorded_capture_revision = capture_manifest.get("revision")
+    passed = (
+        isinstance(source_revision, str)
+        and re.fullmatch(r"[0-9a-f]{40}", source_revision) is not None
+        and isinstance(capture_revision, str)
+        and re.fullmatch(r"[0-9a-f]{40}", capture_revision) is not None
+        and capture_revision == recorded_capture_revision
+    )
+    return _gate(
+        "SOURCE-approved-revisions",
+        passed,
+        {
+            "approved_source_revision": source_revision,
+            "approved_capture_revision": capture_revision,
+            "capture_manifest_revision": recorded_capture_revision,
         },
     )
 
@@ -497,12 +689,19 @@ def verify_delivery_inventory(deliverables: Mapping[str, Path]) -> GateResult:
 def verify_required_artifact_secrets(
     deliverables: Mapping[str, Path],
     states: Sequence[RenderedSceneState],
+    *,
+    repository_root: Path | None = None,
+    render_manifest: Mapping[str, object] | None = None,
 ) -> GateResult:
-    """Scan the complete production inventory and rendered scene bytes."""
+    """Scan delivery bytes plus closed production source, logs, and media review."""
     required_roles = set(REQUIRED_DELIVERY_INVENTORY)
     missing_roles = sorted(required_roles - set(deliverables))
     findings: list[dict[str, str]] = []
     scanned: list[str] = []
+    tracked_source_names: list[str] = []
+    missing_scan_coverage: list[str] = []
+    non_regular_scan_paths: list[str] = []
+    media_review_findings: list[dict[str, object]] = []
     for role in sorted(required_roles & set(deliverables)):
         scanned.append(role)
         path = deliverables[role]
@@ -516,13 +715,68 @@ def verify_required_artifact_secrets(
             include_entropy=True,
         ):
             findings.append({"artifact": artifact, "classification": classification})
+    if repository_root is not None:
+        root = repository_root.resolve()
+        try:
+            tracked_source_paths = _tracked_production_source_paths(root)
+        except VerificationError:
+            tracked_source_paths = ()
+            missing_scan_coverage.append("tracked:media/repository-explainer")
+        for path in tracked_source_paths:
+            relative = path.relative_to(root).as_posix()
+            tracked_source_names.append(relative)
+            if path.is_symlink() or not path.is_file():
+                non_regular_scan_paths.append(relative)
+                continue
+            artifact = f"source:{relative}"
+            scanned.append(artifact)
+            for classification in _scan_file_secret_classes(path):
+                findings.append({"artifact": artifact, "classification": classification})
+        for relative_root in PRODUCTION_LOG_EVIDENCE_ROOTS:
+            scan_root = root / relative_root
+            if scan_root.is_symlink() or not scan_root.is_dir():
+                missing_scan_coverage.append(relative_root.as_posix())
+                continue
+            for path in sorted(scan_root.rglob("*")):
+                relative = path.relative_to(root).as_posix()
+                if path.is_symlink() or (not path.is_file() and not path.is_dir()):
+                    non_regular_scan_paths.append(relative)
+                    continue
+                if path.is_dir():
+                    continue
+                artifact = f"log-evidence:{relative}"
+                scanned.append(artifact)
+                for classification in _scan_file_secret_classes(path):
+                    findings.append({"artifact": artifact, "classification": classification})
+        review_relative = Path("dist/video/work/verification-evidence/media-security-review.json")
+        review_path = root / review_relative
+        if not review_path.is_file() or review_path.is_symlink():
+            if review_relative.as_posix() not in missing_scan_coverage:
+                missing_scan_coverage.append(review_relative.as_posix())
+        elif render_manifest is None:
+            media_review_findings.append({"reason": "render-manifest-unavailable"})
+        else:
+            media_review_findings.extend(
+                _verify_media_security_review(review_path, render_manifest)
+            )
     return _gate(
         "SECURITY-secrets",
-        not missing_roles and not findings,
+        not missing_roles
+        and not findings
+        and not missing_scan_coverage
+        and not non_regular_scan_paths
+        and not media_review_findings,
         {
             "artifacts_scanned": scanned,
             "missing_roles": missing_roles,
             "findings": findings,
+            "tracked_source_files_scanned": tracked_source_names,
+            "required_log_evidence_roots": [
+                path.as_posix() for path in PRODUCTION_LOG_EVIDENCE_ROOTS
+            ],
+            "missing_scan_coverage": sorted(missing_scan_coverage),
+            "non_regular_scan_paths": sorted(non_regular_scan_paths),
+            "media_review_findings": media_review_findings,
             "high_entropy_minimum_bits_per_character": 4.5,
             "secret_values_recorded": False,
         },
@@ -625,12 +879,32 @@ def verify_candidate_media(
             "expected": expected_semantics,
         },
     )
+    outputs = _mapping(manifest.get("outputs"))
+    container_actual = {
+        "narrated": _file_sha256_or_none(narrated),
+        "speaker": _file_sha256_or_none(speaker),
+    }
+    container_expected = {
+        variant: _mapping(outputs.get(variant)).get("sha256") for variant in ("narrated", "speaker")
+    }
+    container_gate = _gate(
+        "CANDIDATE-container-hashes",
+        container_actual == container_expected
+        and all(_is_sha256(value) for value in container_actual.values()),
+        {
+            "comparison": "exact-candidate-file-sha256",
+            "actual": container_actual,
+            "expected": container_expected,
+            "semantic_reproduction_excludes_container_metadata": True,
+        },
+    )
     caption_frames, caption_findings = _caption_transition_frames(
         caption_bytes,
         fps=expected_media.fps,
         total_frames=expected_media.total_frames,
     )
     required_samples = required_frame_samples(states, caption_frames)
+    state_index = {(state.scene_id, state.state_id): state for state in states}
     sample_findings: list[dict[str, object]] = []
     sample_hashes: list[dict[str, object]] = []
     for variant, frame, scene_id, state_id in required_samples:
@@ -639,6 +913,18 @@ def verify_candidate_media(
             digest = _decoded_frame_hash(
                 path,
                 frame=frame,
+                width=expected_media.width,
+                height=expected_media.height,
+                ffmpeg=ffmpeg,
+            )
+            state = state_index[(scene_id, state_id)]
+            contrast_rectangles = state.essential_rectangles
+            if variant == "narrated" and frame in caption_frames:
+                contrast_rectangles = (*contrast_rectangles, state.caption_rectangle)
+            minimum_contrast = _decoded_frame_pixel_contrast(
+                path,
+                frame=frame,
+                rectangles=contrast_rectangles,
                 width=expected_media.width,
                 height=expected_media.height,
                 ffmpeg=ffmpeg,
@@ -661,8 +947,21 @@ def verify_candidate_media(
                     "scene_id": scene_id,
                     "state_id": state_id,
                     "decoded_frame_sha256": digest,
+                    "minimum_pixel_contrast": minimum_contrast,
+                    "contrast_threshold": 4.5,
                 }
             )
+            if minimum_contrast < 4.5:
+                sample_findings.append(
+                    {
+                        "variant": variant,
+                        "frame": frame,
+                        "scene_id": scene_id,
+                        "state_id": state_id,
+                        "reason": "composited-pixel-contrast-below-threshold",
+                        "minimum_pixel_contrast": minimum_contrast,
+                    }
+                )
     sample_gate = _gate(
         "FRAME-final-samples",
         not caption_findings
@@ -677,7 +976,6 @@ def verify_candidate_media(
             "derivation": "decoded-candidate-frames-and-caption-source",
         },
     )
-    outputs = _mapping(manifest.get("outputs"))
     speaker_output = _mapping(outputs.get("speaker"))
     shared_picture = _mapping(manifest.get("shared_picture"))
     actual_speaker = actual_outputs["speaker"]
@@ -697,20 +995,43 @@ def verify_candidate_media(
             "speaker_inputs": speaker_output.get("inputs"),
         },
     )
-    speaker_audio_clean = actual_speaker["decoded_pcm_sha256"] == speaker_output.get(
-        "decoded_pcm_sha256"
-    ) and speaker_output.get("inputs") == ["shared_picture", "procedural_tonal_bed_and_cues"]
+    synthesis = _mapping(manifest.get("synthesis"))
+    expected_synthesis = _expected_synthesis_contract(states, expected_media)
+    try:
+        independently_synthesized_pcm = _synthesized_speaker_pcm_hash(
+            states,
+            media=expected_media,
+            ffmpeg=ffmpeg,
+        )
+        synthesis_error: str | None = None
+    except RenderError as exc:
+        independently_synthesized_pcm = None
+        synthesis_error = type(exc).__name__
+    speaker_audio_clean = (
+        actual_speaker["decoded_pcm_sha256"] == independently_synthesized_pcm
+        and synthesis == expected_synthesis
+        and speaker_output.get("inputs") == ["shared_picture", "procedural_tonal_bed_and_cues"]
+    )
     speech_gate = _gate(
         "AUDIO-speaker-speech",
         speaker_audio_clean,
         {
-            "derivation": "decoded-speaker-pcm",
+            "derivation": "decoded-speaker-pcm-vs-independently-synthesized-fixed-bed",
             "actual_decoded_pcm_sha256": actual_speaker["decoded_pcm_sha256"],
-            "expected_procedural_pcm_sha256": speaker_output.get("decoded_pcm_sha256"),
+            "expected_procedural_pcm_sha256": independently_synthesized_pcm,
+            "declared_synthesis_matches_fixed_contract": synthesis == expected_synthesis,
             "speaker_inputs": speaker_output.get("inputs"),
+            "synthesis_error_class": synthesis_error,
         },
     )
-    return (*media_gates, semantic_gate, sample_gate, caption_gate, speech_gate)
+    return (
+        *media_gates,
+        semantic_gate,
+        container_gate,
+        sample_gate,
+        caption_gate,
+        speech_gate,
+    )
 
 
 def verify_renderer_layout(
@@ -833,6 +1154,7 @@ def _parse_compact_packets(raw: str) -> list[dict[str, object]]:
             continue
         packet: dict[str, object] = {}
         skip_samples: int | None = None
+        discard_padding: int | None = None
         for packet_field in line.split("|"):
             name, separator, value = packet_field.partition("=")
             if not separator:
@@ -844,11 +1166,14 @@ def _parse_compact_packets(raw: str) -> list[dict[str, object]]:
                 packet[name] = parsed
             elif name.endswith(":skip_samples"):
                 skip_samples = _integer_or_none(value)
-        if skip_samples is not None:
+            elif name.endswith(":discard_padding"):
+                discard_padding = _integer_or_none(value)
+        if skip_samples is not None or discard_padding is not None:
             packet["side_data_list"] = [
                 {
                     "side_data_type": "Skip Samples",
-                    "skip_samples": skip_samples,
+                    "skip_samples": skip_samples or 0,
+                    "discard_padding": discard_padding or 0,
                 }
             ]
         packets.append(packet)
@@ -1541,6 +1866,7 @@ def build_offline_reproduction_command(
     selected_wav: Path,
     selected_wav_sha256: str,
     python: Path,
+    runtime_roots: Sequence[Path],
     bwrap: Path = Path("/usr/bin/bwrap"),
 ) -> tuple[str, ...]:
     """Build the fixed clean-checkout render command inside a denied network namespace."""
@@ -1559,46 +1885,101 @@ def build_offline_reproduction_command(
         or not os.access(resolved_bwrap, os.X_OK)
     ):
         raise VerificationError("offline reproduction executables are unavailable")
-    python_path = (resolved_checkout / "media" / "repository-explainer").as_posix()
-    return (
+    resolved_runtime_roots: list[Path] = []
+    for runtime_root in runtime_roots:
+        resolved_runtime = runtime_root.expanduser().absolute()
+        if (
+            resolved_runtime == Path("/")
+            or not resolved_runtime.exists()
+            or resolved_checkout.is_relative_to(resolved_runtime)
+            or resolved_selected.is_relative_to(resolved_runtime)
+        ):
+            raise VerificationError("offline reproduction runtime root is over-broad")
+        if resolved_runtime not in resolved_runtime_roots:
+            resolved_runtime_roots.append(resolved_runtime)
+    if not resolved_runtime_roots:
+        raise VerificationError("offline reproduction requires explicit runtime roots")
+    sandbox_checkout = Path("/workspace")
+    sandbox_selected = Path("/input/selected-narration.wav")
+    python_path = (sandbox_checkout / "media" / "repository-explainer").as_posix()
+    command = [
         str(resolved_bwrap),
         "--unshare-net",
         "--die-with-parent",
         "--new-session",
         "--clearenv",
-        "--ro-bind",
-        "/",
-        "/",
-        "--bind",
-        str(resolved_checkout),
-        str(resolved_checkout),
         "--tmpfs",
-        "/tmp",
-        "--dir",
-        "/tmp/home",
-        "--setenv",
-        "HOME",
-        "/tmp/home",
-        "--setenv",
-        "PATH",
-        "/usr/local/bin:/usr/bin:/bin",
-        "--setenv",
-        "PYTHONPATH",
-        python_path,
-        "--setenv",
-        "VIDEO_PIPELINE_OFFLINE_REPRODUCTION",
-        "1",
-        "--chdir",
-        str(resolved_checkout),
-        "--",
-        str(resolved_python),
-        "-m",
-        "video_pipeline.verify",
-        "--offline-render",
-        str(resolved_selected),
-        "--selected-wav-sha256",
-        selected_wav_sha256,
+        "/",
+        "--proc",
+        "/proc",
+        "--dev",
+        "/dev",
+    ]
+    parent_directories = {
+        parent
+        for runtime_root in resolved_runtime_roots
+        for parent in runtime_root.parents
+        if parent != Path("/")
+    }
+    for parent in sorted(parent_directories, key=lambda value: (len(value.parts), str(value))):
+        command.extend(("--dir", str(parent)))
+    for runtime_root in resolved_runtime_roots:
+        command.extend(("--ro-bind", str(runtime_root), str(runtime_root)))
+    command.extend(
+        (
+            "--dir",
+            "/input",
+            "--ro-bind",
+            str(resolved_selected),
+            str(sandbox_selected),
+        )
     )
+    command.extend(
+        (
+            "--bind",
+            str(resolved_checkout),
+            str(sandbox_checkout),
+            "--tmpfs",
+            "/tmp",
+            "--dir",
+            "/tmp/home",
+            "--setenv",
+            "HOME",
+            "/tmp/home",
+            "--setenv",
+            "PATH",
+            "/usr/bin",
+            "--setenv",
+            "PYTHONPATH",
+            python_path,
+            "--setenv",
+            "VIDEO_PIPELINE_OFFLINE_REPRODUCTION",
+            "1",
+            "--chdir",
+            str(sandbox_checkout),
+            "--",
+            str(resolved_python),
+            "-m",
+            "video_pipeline.verify",
+            "--offline-render",
+            str(sandbox_selected),
+            "--selected-wav-sha256",
+            selected_wav_sha256,
+        )
+    )
+    return tuple(command)
+
+
+def _offline_runtime_roots(python: Path) -> tuple[Path, ...]:
+    candidates = (
+        Path("/usr"),
+        Path("/lib"),
+        Path("/lib64"),
+        Path("/etc/fonts"),
+        Path("/etc/ld.so.cache"),
+        python.resolve().parent.parent,
+    )
+    return tuple(dict.fromkeys(path.absolute() for path in candidates if path.exists()))
 
 
 def run_offline_reproduction(
@@ -1687,11 +2068,13 @@ def run_offline_reproduction(
                     "fail",
                     {"reason": "clean-checkout-precondition-failed"},
                 )
+            selected_python = Path(sys.executable) if python is None else python
             command = build_offline_reproduction_command(
                 checkout=checkout,
                 selected_wav=selected_wav,
                 selected_wav_sha256=selected_wav_sha256,
-                python=Path(sys.executable) if python is None else python,
+                python=selected_python,
+                runtime_roots=_offline_runtime_roots(selected_python),
             )
             _run_reproduction_process(
                 command,
@@ -1778,6 +2161,9 @@ def verify_render_manifest(
     *,
     media: MediaSettings,
     states: Sequence[RenderedSceneState],
+    repository_root: Path | None = None,
+    approved_source_revision: str | None = None,
+    approved_capture_revision: str | None = None,
 ) -> GateResult:
     """Strictly validate the T7 manifest and its renderer state ledger."""
     findings: list[dict[str, object]] = []
@@ -1802,6 +2188,15 @@ def verify_render_manifest(
             {
                 "field": "source_revision",
                 "reason": "expected-full-git-object-id",
+                "actual": source_revision,
+            }
+        )
+    if approved_source_revision is not None and source_revision != approved_source_revision:
+        findings.append(
+            {
+                "field": "source_revision",
+                "reason": "unapproved-source-revision",
+                "expected": approved_source_revision,
                 "actual": source_revision,
             }
         )
@@ -1863,6 +2258,24 @@ def verify_render_manifest(
         )
     for name in ("narrated", "speaker"):
         output = _mapping(outputs.get(name))
+        expected_output_fields = {
+            "path",
+            "inputs",
+            "sha256",
+            "decoded_video_sha256",
+            "decoded_pcm_sha256",
+            "decoded_audio_samples_per_channel",
+            "probe",
+        }
+        if set(output) != expected_output_fields:
+            findings.append(
+                {
+                    "field": f"outputs.{name}",
+                    "reason": "unexpected-schema",
+                    "expected_fields": sorted(expected_output_fields),
+                    "actual_fields": sorted(output),
+                }
+            )
         expected_inputs = (
             [
                 "shared_picture",
@@ -1897,6 +2310,42 @@ def verify_render_manifest(
                 }
             )
     inputs = _mapping(manifest.get("inputs"))
+    expected_input_fields = {
+        "project_contract",
+        "captions_srt",
+        "selected_narration_wav",
+        "render_recipe",
+    }
+    if set(inputs) != expected_input_fields:
+        findings.append(
+            {
+                "field": "inputs",
+                "reason": "unexpected-schema",
+                "expected_fields": sorted(expected_input_fields),
+                "actual_fields": sorted(inputs),
+            }
+        )
+    input_schemas = {
+        "project_contract": {"sha256"},
+        "captions_srt": {"path", "sha256"},
+        "selected_narration_wav": {
+            "path",
+            "sha256",
+            "provider_required_for_reproduction",
+        },
+        "render_recipe": {"path", "sha256"},
+    }
+    for input_name, expected_fields in input_schemas.items():
+        record = _mapping(inputs.get(input_name))
+        if set(record) != expected_fields:
+            findings.append(
+                {
+                    "field": f"inputs.{input_name}",
+                    "reason": "unexpected-schema",
+                    "expected_fields": sorted(expected_fields),
+                    "actual_fields": sorted(record),
+                }
+            )
     for input_name in ("captions_srt", "selected_narration_wav", "render_recipe"):
         record = _mapping(inputs.get(input_name))
         if not _is_sha256(record.get("sha256")):
@@ -1915,6 +2364,60 @@ def verify_render_manifest(
                 "actual": selected_narration.get("provider_required_for_reproduction"),
             }
         )
+    recipe = _mapping(inputs.get("render_recipe"))
+    if (
+        repository_root is not None
+        and approved_source_revision is not None
+        and source_revision == approved_source_revision
+    ):
+        recipe_path = recipe.get("path")
+        expected_recipe_path = "media/repository-explainer/video_pipeline/render.py"
+        if recipe_path != expected_recipe_path:
+            findings.append(
+                {
+                    "field": "inputs.render_recipe.path",
+                    "reason": "unexpected-render-recipe",
+                    "expected": expected_recipe_path,
+                    "actual": recipe_path,
+                }
+            )
+        else:
+            try:
+                recipe_bytes = _reference_bytes(
+                    repository_root,
+                    expected_recipe_path,
+                    approved_source_revision,
+                )
+            except VerificationError:
+                findings.append(
+                    {
+                        "field": "inputs.render_recipe.sha256",
+                        "reason": "approved-recipe-unavailable",
+                    }
+                )
+            else:
+                if recipe.get("sha256") != hashlib.sha256(recipe_bytes).hexdigest():
+                    findings.append(
+                        {
+                            "field": "inputs.render_recipe.sha256",
+                            "reason": "approved-recipe-mismatch",
+                        }
+                    )
+    if approved_capture_revision is not None:
+        for state_index, state in enumerate(states):
+            for reference_index, reference in enumerate(state.references):
+                if (
+                    reference.revision is not None
+                    and reference.revision != approved_capture_revision
+                ):
+                    findings.append(
+                        {
+                            "field": (
+                                f"states[{state_index}].references[{reference_index}].revision"
+                            ),
+                            "reason": "unapproved-capture-revision",
+                        }
+                    )
     audio_targets = _mapping(manifest.get("audio_targets"))
     expected_targets = {
         "narrated": {"integrated_lufs": -16, "true_peak_dbtp": -1},
@@ -1940,12 +2443,14 @@ def verify_render_manifest(
             }
         )
     synthesis = _mapping(manifest.get("synthesis"))
-    if synthesis.get("external_music_inputs") != []:
+    expected_synthesis = _expected_synthesis_contract(states, media)
+    if synthesis != expected_synthesis:
         findings.append(
             {
-                "field": "synthesis.external_music_inputs",
-                "expected": [],
-                "actual": synthesis.get("external_music_inputs"),
+                "field": "synthesis",
+                "reason": "fixed-contract-mismatch",
+                "expected_sha256": _canonical_sha256(expected_synthesis),
+                "actual_sha256": _canonical_sha256(synthesis),
             }
         )
     return _gate(
@@ -1965,10 +2470,31 @@ def verify_asset_provenance(
     assets = cast(list[object], assets_value) if isinstance(assets_value, list) else []
     findings: list[dict[str, object]] = []
     classified: set[str] = set()
+    if set(payload) != {"schema_version", "assets"}:
+        findings.append({"field": "asset-provenance", "reason": "unexpected-schema"})
     if payload.get("schema_version") != 1 or not assets:
         findings.append({"field": "asset-provenance", "reason": "invalid-schema-or-empty-assets"})
     for index, value in enumerate(assets):
         record = _mapping(value)
+        expected_fields = {
+            "id",
+            "kind",
+            "repository_path",
+            "system_path",
+            "source",
+            "license_id",
+            "generation_method",
+            "sha256",
+        }
+        if set(record) != expected_fields:
+            findings.append(
+                {
+                    "field": f"assets[{index}]",
+                    "reason": "unexpected-schema",
+                    "expected_fields": sorted(expected_fields),
+                    "actual_fields": sorted(record),
+                }
+            )
         asset_id = record.get("id")
         if not isinstance(asset_id, str) or not asset_id or asset_id in classified:
             findings.append({"field": f"assets[{index}].id", "reason": "missing-or-duplicate"})
@@ -1988,6 +2514,23 @@ def verify_asset_provenance(
             findings.append({"asset_id": asset_id, "reason": "unclassified-rights"})
         repository_path = record.get("repository_path")
         system_path = record.get("system_path")
+        if asset_id == PROCEDURAL_AUDIO_ASSET_ID:
+            if (
+                record.get("kind") != "audio"
+                or repository_path is not None
+                or system_path is not None
+                or source != PROCEDURAL_AUDIO_SOURCE
+                or license_id is not None
+                or generation != PROCEDURAL_AUDIO_GENERATION_METHOD
+                or not _is_sha256(record.get("sha256"))
+            ):
+                findings.append(
+                    {
+                        "asset_id": asset_id,
+                        "reason": "invalid-fixed-procedural-provenance",
+                    }
+                )
+            continue
         raw_path = repository_path if isinstance(repository_path, str) else system_path
         if not isinstance(raw_path, str) or (
             isinstance(repository_path, str) == isinstance(system_path, str)
@@ -2042,7 +2585,7 @@ def verify_closed_world_provenance(
     required_ids = {
         *(asset_id for state in states for asset_id in state.asset_ids),
         "selected_narration_wav",
-        "procedural_tonal_bed_and_cues",
+        PROCEDURAL_AUDIO_ASSET_ID,
     }
     missing = sorted(required_ids - set(records))
     mismatches: list[dict[str, object]] = []
@@ -2050,29 +2593,43 @@ def verify_closed_world_provenance(
     selected_input = _mapping(inputs.get("selected_narration_wav"))
     selected_asset = records.get("selected_narration_wav")
     selected_digest = _file_sha256_or_none(selected_wav)
+    try:
+        selected_repository_path = (
+            selected_wav.resolve().relative_to(repository_root.resolve()).as_posix()
+        )
+    except ValueError:
+        selected_repository_path = None
     if selected_asset is not None and (
         selected_asset.get("kind") != "audio"
+        or selected_asset.get("repository_path") != selected_repository_path
+        or selected_asset.get("system_path") is not None
+        or selected_asset.get("source") != "OpenAI Speech API gpt-4o-mini-tts voice marin"
+        or selected_asset.get("license_id") is not None
+        or selected_asset.get("generation_method") != "OpenAI Speech API selected narration WAV"
         or selected_asset.get("sha256") != selected_input.get("sha256")
         or selected_asset.get("sha256") != selected_digest
     ):
         mismatches.append(
             {
                 "input": "selected_narration_wav",
-                "reason": "path-or-checksum-not-bound-to-render-input",
+                "reason": "selected-narration-provenance-mismatch",
             }
         )
     synthesis = _mapping(manifest.get("synthesis"))
-    procedural = records.get("procedural_tonal_bed_and_cues")
+    procedural = records.get(PROCEDURAL_AUDIO_ASSET_ID)
     if procedural is not None and (
         procedural.get("kind") != "audio"
-        or not isinstance(procedural.get("generation_method"), str)
-        or not cast(str, procedural.get("generation_method", "")).strip()
-        or synthesis.get("external_music_inputs") != []
+        or procedural.get("repository_path") is not None
+        or procedural.get("system_path") is not None
+        or procedural.get("source") != PROCEDURAL_AUDIO_SOURCE
+        or procedural.get("license_id") is not None
+        or procedural.get("generation_method") != PROCEDURAL_AUDIO_GENERATION_METHOD
+        or procedural.get("sha256") != _canonical_sha256(synthesis)
     ):
         mismatches.append(
             {
-                "input": "procedural_tonal_bed_and_cues",
-                "reason": "procedural-generation-not-closed",
+                "input": PROCEDURAL_AUDIO_ASSET_ID,
+                "reason": "fixed-synthesis-provenance-mismatch",
             }
         )
     toolchain = _mapping(manifest.get("toolchain"))
@@ -2247,6 +2804,105 @@ def _decoded_candidate_hashes(
     }
 
 
+def _expected_synthesis_contract(
+    states: Sequence[RenderedSceneState],
+    media: MediaSettings,
+) -> dict[str, object]:
+    scene_start_frames = _scene_start_frames(states)
+    return {
+        "method": "FFmpeg sine sources mixed in the render filter graph",
+        "sample_rate": 48_000,
+        "total_samples": round(media.total_frames / media.fps * 48_000),
+        "bed": {"frequency_hz": 110, "volume": "0.06"},
+        "cues": {
+            "frequency_hz": 660,
+            "duration_samples": 3840,
+            "fade_start_sample": 1440,
+            "fade_samples": 2400,
+            "volume": "0.15",
+            "start_frames": scene_start_frames[1:],
+            "start_samples": [
+                round(frame / media.fps * 48_000) for frame in scene_start_frames[1:]
+            ],
+        },
+        "external_music_inputs": [],
+    }
+
+
+def _scene_start_frames(states: Sequence[RenderedSceneState]) -> list[int]:
+    seen: set[str] = set()
+    starts: list[int] = []
+    for state in states:
+        if state.scene_id not in seen:
+            seen.add(state.scene_id)
+            starts.append(state.start_frame)
+    return starts
+
+
+def _synthesized_speaker_pcm_hash(
+    states: Sequence[RenderedSceneState],
+    *,
+    media: MediaSettings,
+    ffmpeg: str,
+) -> str:
+    contract = _expected_synthesis_contract(states, media)
+    total_samples = cast(int, contract["total_samples"])
+    scene_starts = _scene_start_frames(states)
+    filters = [
+        (
+            "sine=frequency=110:sample_rate=48000,"
+            f"atrim=end_sample={total_samples},asetpts=N/SR/TB,volume=0.06,"
+            "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[bed_0]"
+        )
+    ]
+    cue_labels: list[str] = []
+    for index, start_frame in enumerate(scene_starts[1:], start=1):
+        cue_label = f"cue_{index}"
+        cue_labels.append(cue_label)
+        delay_samples = round(start_frame / media.fps * 48_000)
+        filters.append(
+            "sine=frequency=660:sample_rate=48000,"
+            "atrim=end_sample=3840,"
+            "afade=t=out:start_sample=1440:nb_samples=2400,"
+            f"adelay={delay_samples}S:all=1,"
+            f"apad=whole_len={total_samples},atrim=end_sample={total_samples},"
+            "asetpts=N/SR/TB,volume=0.15,"
+            f"aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[{cue_label}]"
+        )
+    mixed_inputs = "[bed_0]" + "".join(f"[{label}]" for label in cue_labels)
+    filters.append(
+        f"{mixed_inputs}amix=inputs={1 + len(cue_labels)}:"
+        "duration=longest:dropout_transition=0:normalize=0,"
+        f"atrim=end_sample={total_samples},asetpts=N/SR/TB,"
+        "loudnorm=I=-28:LRA=7:TP=-6:linear=true,"
+        "aresample=48000:first_pts=0,"
+        f"apad=whole_len={total_samples},atrim=end_sample={total_samples},"
+        "asetpts=N/SR/TB[speaker_audio]"
+    )
+    digest, byte_count = hash_command_output(
+        (
+            ffmpeg,
+            "-v",
+            "error",
+            "-filter_complex",
+            ";".join(filters),
+            "-map",
+            "[speaker_audio]",
+            "-c:a",
+            "pcm_s16le",
+            "-f",
+            "s16le",
+            "-",
+        ),
+        "independent procedural speaker-bed synthesis",
+        timeout_seconds=600,
+        max_output_bytes=total_samples * 4,
+    )
+    if byte_count != total_samples * 4:
+        raise RenderError("independent speaker-bed synthesis missed the program boundary")
+    return digest
+
+
 def _decoded_frame_hash(
     path: Path,
     *,
@@ -2281,6 +2937,69 @@ def _decoded_frame_hash(
     if byte_count != width * height * 3:
         raise RenderError(f"candidate frame {frame} did not decode exactly once")
     return digest
+
+
+def _decoded_frame_pixel_contrast(
+    path: Path,
+    *,
+    frame: int,
+    rectangles: Sequence[Rectangle],
+    width: int,
+    height: int,
+    ffmpeg: str,
+) -> float:
+    if not rectangles:
+        raise RenderError(f"candidate frame {frame} has no contrast regions")
+    ratios: list[float] = []
+    for rectangle in rectangles:
+        if (
+            rectangle.width <= 0
+            or rectangle.height <= 0
+            or rectangle.x < 0
+            or rectangle.y < 0
+            or rectangle.x + rectangle.width > width
+            or rectangle.y + rectangle.height > height
+        ):
+            raise RenderError(f"candidate frame {frame} has an invalid contrast region")
+        result = _run_media_analyzer(
+            (
+                ffmpeg,
+                "-v",
+                "error",
+                "-i",
+                str(path),
+                "-map",
+                "0:v:0",
+                "-vf",
+                (
+                    f"select=eq(n\\,{frame}),"
+                    f"crop={rectangle.width}:{rectangle.height}:{rectangle.x}:{rectangle.y},"
+                    "signalstats,metadata=print:file=-"
+                ),
+                "-frames:v",
+                "1",
+                "-f",
+                "null",
+                "-",
+            ),
+            path=path,
+            timeout=120,
+            operation=f"candidate frame {frame} pixel contrast",
+        )
+        values = {
+            match.group("bound"): int(match.group("value"))
+            for match in _SIGNAL_LUMA.finditer(result.stdout)
+        }
+        if set(values) != {"MIN", "MAX"}:
+            raise RenderError(f"candidate frame {frame} did not expose pixel luminance bounds")
+        darker, lighter = sorted((_video_luma(values["MIN"]), _video_luma(values["MAX"])))
+        ratios.append((lighter + 0.05) / (darker + 0.05))
+    return round(min(ratios), 4)
+
+
+def _video_luma(value: int) -> float:
+    normalized = min(1.0, max(0.0, (value - 16) / 219))
+    return normalized / 12.92 if normalized <= 0.04045 else ((normalized + 0.055) / 1.055) ** 2.4
 
 
 def _caption_transition_frames(
@@ -2342,6 +3061,80 @@ def _scan_file_secret_classes(path: Path) -> tuple[str, ...]:
         return ("unreadable-required-artifact",)
 
 
+def _tracked_production_source_paths(repository_root: Path) -> tuple[Path, ...]:
+    try:
+        result = run_capture_process(
+            (
+                "git",
+                "ls-files",
+                "-z",
+                "--",
+                "media/repository-explainer",
+            ),
+            cwd=repository_root,
+            environment=build_child_environment({}),
+            timeout=120,
+            operation="production source inventory",
+            screen_output=False,
+        )
+    except RunnerCaptureError as exc:
+        raise VerificationError("production source inventory failed") from exc
+    if result.returncode != 0:
+        raise VerificationError("production source inventory failed")
+    names = tuple(name for name in result.stdout.split("\0") if name)
+    if not names:
+        raise VerificationError("production source inventory is empty")
+    paths: list[Path] = []
+    for name in names:
+        relative = Path(name)
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or not relative.is_relative_to(Path("media/repository-explainer"))
+        ):
+            raise VerificationError("production source inventory escaped its root")
+        paths.append(repository_root / relative)
+    return tuple(paths)
+
+
+def _verify_media_security_review(
+    path: Path,
+    render_manifest: Mapping[str, object],
+) -> list[dict[str, object]]:
+    findings: list[dict[str, object]] = []
+    try:
+        review = _read_json_mapping(path, "media security review")
+    except VerificationError:
+        return [{"reason": "media-review-unreadable"}]
+    if set(review) != {"schema_version", "outputs"} or review.get("schema_version") != 1:
+        findings.append({"reason": "media-review-schema-mismatch"})
+    reviewed_outputs = _mapping(review.get("outputs"))
+    manifest_outputs = _mapping(render_manifest.get("outputs"))
+    if set(reviewed_outputs) != {"narrated", "speaker"}:
+        findings.append({"reason": "media-review-output-inventory-mismatch"})
+    expected_fields = {
+        "decoded_video_sha256",
+        "decoded_pcm_sha256",
+        "ocr_secret_findings",
+        "transcript_secret_findings",
+    }
+    for variant in ("narrated", "speaker"):
+        reviewed = _mapping(reviewed_outputs.get(variant))
+        manifest_output = _mapping(manifest_outputs.get(variant))
+        if set(reviewed) != expected_fields:
+            findings.append({"variant": variant, "reason": "media-review-schema-mismatch"})
+            continue
+        if reviewed.get("decoded_video_sha256") != manifest_output.get(
+            "decoded_video_sha256"
+        ) or reviewed.get("decoded_pcm_sha256") != manifest_output.get("decoded_pcm_sha256"):
+            findings.append({"variant": variant, "reason": "decoded-hash-binding-mismatch"})
+        if reviewed.get("ocr_secret_findings") != []:
+            findings.append({"variant": variant, "reason": "ocr-secret-findings"})
+        if reviewed.get("transcript_secret_findings") != []:
+            findings.append({"variant": variant, "reason": "transcript-secret-findings"})
+    return findings
+
+
 def _secret_classes(text: str, *, include_entropy: bool) -> tuple[str, ...]:
     for classification, pattern in _SECRET_PATTERNS:
         if pattern.search(text):
@@ -2390,6 +3183,38 @@ def _derive_packet_boundary(
             "packet_final_sample_exclusive": None,
             "priming_skip_samples": None,
         }
+    streams_value = probe.get("streams")
+    streams = cast(list[object], streams_value) if isinstance(streams_value, list) else []
+    audio_stream = next(
+        (
+            _mapping(value)
+            for value in streams
+            if _mapping(value).get("index") == audio_stream_index
+        ),
+        _mapping(None),
+    )
+    time_base = audio_stream.get("time_base")
+    match = (
+        re.fullmatch(r"(?P<numerator>\d+)/(?P<denominator>\d+)", time_base)
+        if isinstance(time_base, str)
+        else None
+    )
+    if match is None:
+        return {
+            "packet_after_program_boundary": True,
+            "packet_final_sample_exclusive": None,
+            "priming_skip_samples": None,
+            "invalid_packet_count": len(packets),
+        }
+    numerator = int(match.group("numerator"))
+    denominator = int(match.group("denominator"))
+    if numerator <= 0 or denominator <= 0:
+        return {
+            "packet_after_program_boundary": True,
+            "packet_final_sample_exclusive": None,
+            "priming_skip_samples": None,
+            "invalid_packet_count": len(packets),
+        }
     first_side_data = packets[0].get("side_data_list")
     side_data = (
         cast(list[dict[str, object]], first_side_data)
@@ -2405,32 +3230,51 @@ def _derive_packet_boundary(
         ),
         None,
     )
-    final = packets[-1]
-    pts = _integer_or_none(final.get("pts"))
-    duration = _integer_or_none(final.get("duration"))
-    final_side_value = final.get("side_data_list")
-    final_side = (
-        cast(list[dict[str, object]], final_side_value)
-        if isinstance(final_side_value, list)
-        and all(isinstance(value, dict) for value in cast(list[object], final_side_value))
-        else []
-    )
-    discard_padding = next(
-        (
-            _integer_or_none(value.get("discard_padding"))
-            for value in final_side
-            if value.get("side_data_type") == "Skip Samples"
-        ),
-        0,
-    )
-    if pts is None or duration is None or discard_padding is None:
-        final_sample: int | None = None
-    else:
-        final_sample = pts + duration - discard_padding
+    packet_ends: list[int] = []
+    invalid_packet_count = 0
+    packet_after_boundary = False
+    for packet in packets:
+        pts = _integer_or_none(packet.get("pts"))
+        duration = _integer_or_none(packet.get("duration"))
+        side_value = packet.get("side_data_list")
+        packet_side = (
+            cast(list[dict[str, object]], side_value)
+            if isinstance(side_value, list)
+            and all(isinstance(value, dict) for value in cast(list[object], side_value))
+            else []
+        )
+        discard_padding = next(
+            (
+                _integer_or_none(value.get("discard_padding", 0))
+                for value in packet_side
+                if value.get("side_data_type") == "Skip Samples"
+            ),
+            0,
+        )
+        if pts is None or duration is None or duration <= 0 or discard_padding is None:
+            invalid_packet_count += 1
+            continue
+        start_numerator = pts * numerator * 48_000
+        end_numerator = (pts + duration) * numerator * 48_000
+        if start_numerator % denominator or end_numerator % denominator:
+            invalid_packet_count += 1
+            continue
+        start_sample = start_numerator // denominator
+        end_sample = end_numerator // denominator - discard_padding
+        if end_sample < start_sample:
+            invalid_packet_count += 1
+            continue
+        packet_ends.append(end_sample)
+        if start_sample >= expected_samples or end_sample > expected_samples:
+            packet_after_boundary = True
+    final_sample = max(packet_ends) if packet_ends else None
     return {
-        "packet_after_program_boundary": final_sample is None or final_sample > expected_samples,
+        "packet_after_program_boundary": (
+            packet_after_boundary or invalid_packet_count > 0 or final_sample is None
+        ),
         "packet_final_sample_exclusive": final_sample,
         "priming_skip_samples": priming,
+        "invalid_packet_count": invalid_packet_count,
     }
 
 
