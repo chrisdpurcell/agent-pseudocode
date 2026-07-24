@@ -13,7 +13,7 @@ from typing import cast
 import pytest
 
 from video_pipeline.manifest import ManifestError, load_project
-from video_pipeline.models import ProjectManifest
+from video_pipeline.models import ProjectManifest, Rectangle
 
 COMMITTED_MANIFEST_PATH = (
     Path(__file__).parents[2] / "media" / "repository-explainer" / "project.json"
@@ -58,6 +58,10 @@ def test_loads_approved_4050_frame_six_scene_manifest() -> None:
     assert (manifest.media.width, manifest.media.height, manifest.media.fps) == (1920, 1080, 30)
     assert manifest.media.total_frames == 4050
     assert manifest.evidence_dominant_frames == 3000
+    assert 0.6 <= manifest.evidence_dominant_frames / manifest.media.total_frames <= 0.8
+    assert manifest.scenes[1].visual_states[0].evidence_rectangles == (
+        Rectangle(x=96, y=54, width=1728, height=786),
+    )
 
 
 def test_module_help_describes_the_local_pipeline() -> None:

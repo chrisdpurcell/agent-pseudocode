@@ -43,7 +43,7 @@
 					"id": "workflow",
 					"start_frame": 450,
 					"end_frame": 1050,
-					"evidence_rectangles": [{ "x": 120, "y": 90, "width": 1680, "height": 840 }]
+					"evidence_rectangles": [{ "x": 96, "y": 54, "width": 1728, "height": 786 }]
 				}
 			]
 		},

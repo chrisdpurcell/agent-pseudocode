@@ -60,6 +60,9 @@ ASSET_PROVENANCE_RELATIVE_PATH = Path("media/repository-explainer/asset-provenan
 _SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _HEX_COLOR = re.compile(r"#[0-9A-Fa-f]{6}")
+# The pinned Noto Sans Mono ASCII glyphs advance 600 of 1000 units. This
+# cross-file metric matches the per-run bounds asserted in test_scenes.py.
+_MONO_GLYPH_ADVANCE_EM = 0.6
 
 ElementTree.register_namespace("", _SVG_NAMESPACE)
 
@@ -679,24 +682,29 @@ def _teaching_svg(
         y=rectangle.y + 48,
         color="coral",
     )
-    command_lines = _wrap_shell_text(context.teaching.command, 86)
     source_lines = context.teaching.source.decode("utf-8").splitlines()
     diagnostic_lines = context.teaching.output.decode("utf-8").splitlines()
-    visible_lines = [
-        "$ " + command_lines[0],
-        *("  " + line for line in command_lines[1:]),
+    exact_lines = [
+        "$ " + context.teaching.command,
         "",
         *source_lines,
         "",
         *diagnostic_lines,
     ]
+    code_x = rectangle.x + 36
+    visible_lines = _wrap_code_lines(
+        exact_lines,
+        theme=context.theme,
+        x=code_x,
+    )
     _add_code_lines(
         root,
         visible_lines,
         context.theme,
-        x=rectangle.x + 36,
+        x=code_x,
         y=rectangle.y + 102,
-        max_lines=18,
+        max_lines=19,
+        exact_lines=exact_lines,
     )
     return _serialize_svg(root), context.teaching.command
 
@@ -725,13 +733,16 @@ def _policy_svg(
         y=rectangle.y + 48,
         color="mint",
     )
+    exact_lines = list(rule_lines)
+    code_x = rectangle.x + 36
     _add_code_lines(
         root,
-        rule_lines,
+        _wrap_code_lines(exact_lines, theme=context.theme, x=code_x),
         context.theme,
-        x=rectangle.x + 36,
+        x=code_x,
         y=rectangle.y + 104,
         max_lines=12,
+        exact_lines=exact_lines,
     )
     ElementTree.SubElement(
         root,
@@ -771,20 +782,16 @@ def _runner_svg(
         y=rectangle.y + 48,
         color="mint" if context.runner.mode == "accepted" else "blue",
     )
-    command_lines = _wrap_shell_text(context.runner.display_command, 86)
-    reason_lines = textwrap.wrap(
-        context.runner.reason,
-        width=86,
-        break_long_words=False,
-        break_on_hyphens=False,
-    )
+    exact_lines = ["$ " + context.runner.display_command, "", context.runner.reason]
+    code_x = rectangle.x + 36
     _add_code_lines(
         root,
-        ["$ " + command_lines[0], *("  " + line for line in command_lines[1:]), "", *reason_lines],
+        _wrap_code_lines(exact_lines, theme=context.theme, x=code_x),
         context.theme,
-        x=rectangle.x + 36,
+        x=code_x,
         y=rectangle.y + 104,
         max_lines=17,
+        exact_lines=exact_lines,
     )
     return _serialize_svg(root), context.runner.display_command
 
@@ -1127,6 +1134,7 @@ def _add_code_lines(
     x: int,
     y: int,
     max_lines: int,
+    exact_lines: Sequence[str],
 ) -> None:
     if len(lines) > max_lines:
         raise SceneError(f"scene code layout: {len(lines)} lines exceed the {max_lines}-line frame")
@@ -1140,6 +1148,11 @@ def _add_code_lines(
             "font-family": theme.font_mono,
             "font-size": str(theme.code_size),
             "xml:space": "preserve",
+            "data-exact-lines-json": json.dumps(
+                list(exact_lines),
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
         },
     )
     for index, line in enumerate(lines):
@@ -1188,16 +1201,39 @@ def _validate_essential_geometry(
             )
 
 
-def _wrap_shell_text(command: str, width: int) -> list[str]:
-    lines = textwrap.wrap(
-        command,
-        width=width,
-        break_long_words=False,
-        break_on_hyphens=False,
-    )
-    if " ".join(lines) != command:
-        raise SceneError("display command: wrapping changed the recorded shell text")
-    return lines
+def _wrap_code_lines(
+    lines: Sequence[str],
+    *,
+    theme: SceneTheme,
+    x: int,
+) -> list[str]:
+    available_width = theme.title_safe.x + theme.title_safe.width - x
+    glyph_width = theme.code_size * _MONO_GLYPH_ADVANCE_EM
+    width = int(available_width // glyph_width)
+    if width <= 0:
+        raise SceneError("scene code layout: no safe horizontal space remains")
+    wrapped: list[str] = []
+    for line in lines:
+        if not line:
+            wrapped.append("")
+            continue
+        if not line.isascii():
+            raise SceneError("scene code layout: only pinned ASCII glyph metrics are supported")
+        indentation = line[: len(line) - len(line.lstrip())]
+        visual_lines = textwrap.wrap(
+            line,
+            width=width,
+            subsequent_indent=indentation,
+            break_long_words=False,
+            break_on_hyphens=False,
+            replace_whitespace=False,
+        )
+        if not visual_lines or any(
+            len(visual_line) * glyph_width > available_width for visual_line in visual_lines
+        ):
+            raise SceneError("scene code layout: one token exceeds the safe text width")
+        wrapped.extend(visual_lines)
+    return wrapped
 
 
 def _git_source(root: Path, revision: str, path: str) -> bytes:

@@ -5,10 +5,12 @@ from __future__ import annotations
 import binascii
 import hashlib
 import json
+import math
 import struct
 import zlib
 from dataclasses import replace
 from pathlib import Path
+from typing import cast
 from xml.etree import ElementTree
 
 import pytest
@@ -16,7 +18,7 @@ import pytest
 from video_pipeline.captions import load_narration
 from video_pipeline.capture import EditorEvidence, EditorFrame, verify_evidence_manifest
 from video_pipeline.manifest import load_project
-from video_pipeline.models import ProjectManifest, Rectangle
+from video_pipeline.models import Rectangle
 
 REPOSITORY_ROOT = Path(__file__).parents[2]
 PRODUCTION_ROOT = REPOSITORY_ROOT / "media" / "repository-explainer"
@@ -25,8 +27,11 @@ NARRATION_PATH = PRODUCTION_ROOT / "narration.json"
 CAPTURE_MANIFEST_PATH = PRODUCTION_ROOT / "captures" / "manifest.json"
 THEME_PATH = PRODUCTION_ROOT / "theme.json"
 ASSET_PROVENANCE_PATH = PRODUCTION_ROOT / "asset-provenance.json"
-EDITOR_RECTANGLE = Rectangle(x=96, y=54, width=1728, height=786)
 CAPTION_RECTANGLE = Rectangle(x=96, y=864, width=1728, height=162)
+# Mirrors the renderer's pinned Noto Sans Mono ASCII advance so these tests
+# estimate each actual SVG text run instead of trusting declared rectangles.
+MONO_GLYPH_ADVANCE_EM = 0.6
+SANS_GLYPH_ESTIMATE_EM = 0.65
 
 
 def _png_chunk(kind: bytes, payload: bytes) -> bytes:
@@ -94,18 +99,6 @@ def _test_editor_evidence(tmp_path: Path, source_sha256: str) -> EditorEvidence:
     )
 
 
-def _editor_ready_project(project: ProjectManifest) -> ProjectManifest:
-    workflow = project.scenes[1]
-    primary = workflow.visual_states[0]
-    workflow = replace(
-        workflow,
-        visual_states=(replace(primary, evidence_rectangles=(EDITOR_RECTANGLE,)),),
-    )
-    scenes = list(project.scenes)
-    scenes[1] = workflow
-    return replace(project, scenes=tuple(scenes))
-
-
 def _render_test_states(tmp_path: Path):
     try:
         from video_pipeline.scenes import (
@@ -115,7 +108,7 @@ def _render_test_states(tmp_path: Path):
         )
     except ModuleNotFoundError:
         pytest.fail("scene renderer is missing")
-    project = _editor_ready_project(load_project(PROJECT_PATH))
+    project = load_project(PROJECT_PATH)
     narration = load_narration(NARRATION_PATH, project)
     evidence = verify_evidence_manifest(
         CAPTURE_MANIFEST_PATH,
@@ -141,6 +134,41 @@ def _render_test_states(tmp_path: Path):
 def _normalized_text(svg: bytes) -> str:
     root = ElementTree.fromstring(svg)
     return " ".join(" ".join(root.itertext()).split())
+
+
+def _exact_line_ledger(text_element: ElementTree.Element) -> list[str]:
+    value: object = json.loads(text_element.attrib["data-exact-lines-json"])
+    assert isinstance(value, list)
+    values = cast(list[object], value)
+    assert all(isinstance(line, str) for line in values)
+    return cast(list[str], values)
+
+
+def _estimated_text_width(text: str, family: str, font_size: int) -> float:
+    advance = MONO_GLYPH_ADVANCE_EM if family == "Noto Sans Mono" else SANS_GLYPH_ESTIMATE_EM
+    return len(text) * font_size * advance
+
+
+def _text_run_bounds(
+    text_element: ElementTree.Element,
+    run: ElementTree.Element,
+) -> tuple[int, int, int, int]:
+    text = run.text or ""
+    font_size = int(text_element.attrib["font-size"])
+    width = _estimated_text_width(text, text_element.attrib["font-family"], font_size)
+    x = int(run.attrib.get("x", text_element.attrib["x"]))
+    y = int(run.attrib.get("y", text_element.attrib["y"]))
+    anchor = text_element.attrib.get("text-anchor", "start")
+    if anchor == "middle":
+        left = x - width / 2
+        right = x + width / 2
+    elif anchor == "end":
+        left = x - width
+        right = x
+    else:
+        left = x
+        right = x + width
+    return math.floor(left), y - font_size, math.ceil(right), y + math.ceil(font_size * 0.25)
 
 
 def test_tc_t5_001__fixed_inputs__produce_deterministic_provenanced_geometry(
@@ -269,6 +297,76 @@ def test_tc_t5_002__all_states__meet_safe_geometry_contrast_and_mute_copy(
         assert b'data-caption-clear="true"' in mute.svg
 
 
+def test_tc_t5_002__every_svg_text_run__stays_inside_title_safe_area(
+    tmp_path: Path,
+) -> None:
+    project, _, _, _, _, states = _render_test_states(tmp_path)
+    safe = project.safe_area.rectangle
+    violations: list[str] = []
+
+    for state in states:
+        root = ElementTree.fromstring(state.svg)
+        for text_element in root.iter():
+            if not text_element.tag.endswith("text"):
+                continue
+            runs = [child for child in text_element if child.tag.endswith("tspan")] or [
+                text_element
+            ]
+            for run in runs:
+                left, top, right, bottom = _text_run_bounds(text_element, run)
+                if (
+                    left < safe.x
+                    or top < safe.y
+                    or right > safe.x + safe.width
+                    or bottom > safe.y + safe.height
+                ):
+                    violations.append(
+                        f"{state.scene_id}/{state.state_id}: "
+                        f"{(run.text or '')!r} -> {(left, top, right, bottom)}"
+                    )
+
+    assert not violations, "\n".join(violations)
+
+
+def test_tc_t5_002__wrapped_code_tspans__preserve_exact_semantic_line_ledgers(
+    tmp_path: Path,
+) -> None:
+    _, _, evidence, _, _, states = _render_test_states(tmp_path)
+    code_blocks: dict[str, ElementTree.Element] = {}
+    for state in states:
+        root = ElementTree.fromstring(state.svg)
+        blocks = [
+            element
+            for element in root.iter()
+            if element.tag.endswith("text")
+            and element.attrib.get("font-family") == "Noto Sans Mono"
+        ]
+        if blocks:
+            assert len(blocks) == 1
+            code_blocks[state.scene_id] = blocks[0]
+
+    assert set(code_blocks) == {"caught-defect", "shared-policy", "guarded-execution"}
+    for block in code_blocks.values():
+        assert _exact_line_ledger(block)
+
+    teaching = next(command for command in evidence.commands if command.id == "teaching-defect")
+    teaching_source = teaching.source_path
+    assert teaching_source is not None
+    exact_teaching_lines = [
+        "$ "
+        + "uv run apseudo-lint --stdin-filename "
+        + "tests/fixtures/invalid/unbounded_while.apseudo "
+        + "< tests/fixtures/invalid/unbounded_while.apseudo",
+        "",
+        *(REPOSITORY_ROOT / teaching_source).read_text(encoding="utf-8").splitlines(),
+        "",
+        *teaching.promoted_outputs[0].path.read_text(encoding="utf-8").splitlines(),
+    ]
+    encoded_lines = _exact_line_ledger(code_blocks["caught-defect"])
+    assert encoded_lines == exact_teaching_lines
+    assert [span.text or "" for span in code_blocks["caught-defect"]] != exact_teaching_lines
+
+
 def test_tc_t5_003__editor_substrate__uses_native_crop_without_scene_copy(
     tmp_path: Path,
 ) -> None:
@@ -310,10 +408,18 @@ def test_tc_t5_003__editor_substrate__uses_native_crop_without_scene_copy(
 
 
 def test_compose_scene_states__blocked_editor__reports_locked_editor_only() -> None:
-    from video_pipeline.scenes import SceneError, compose_scene_states
+    from video_pipeline.scenes import (
+        PRODUCTION_EDITOR_BLOCKER,
+        SceneBlockedError,
+        compose_scene_states,
+    )
 
     with pytest.raises(
-        SceneError,
+        SceneBlockedError,
         match="KDE session is locked; owner-authenticated unlock is required",
-    ):
+    ) as caught:
         compose_scene_states(REPOSITORY_ROOT)
+    assert (
+        str(caught.value) == f"{PRODUCTION_EDITOR_BLOCKER}: editor: blocked: "
+        "KDE session is locked; owner-authenticated unlock is required"
+    )
