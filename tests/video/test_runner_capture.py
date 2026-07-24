@@ -22,9 +22,11 @@ from video_pipeline.runner_capture import (
     REQUIRED_EVIDENCE_NAMES,
     RunnerCaptureError,
     RunnerCaptureResult,
+    UnsafeRunnerCaptureError,
     capture_guarded_runner,
     expand_display_command,
     expected_console_wrapper_bytes,
+    prepare_and_capture_guarded_runner,
     prepare_runner_runtime,
     reject_credential_evidence,
     validation_record_passed,
@@ -108,6 +110,15 @@ args = sys.argv[1:]
 mode = os.environ.get("APSEUDO_TEST_RUNNER_MODE", "accepted")
 
 if args and args[0] == "--check":
+    if mode == "raw-secret-output":
+        print(json.dumps({"PASSWORD": "opaque"}))
+        raise SystemExit(0)
+    if mode == "mutate-runtime-after-check":
+        module_path = pathlib.Path(__file__)
+        module_path.write_text(
+            module_path.read_text(encoding="utf-8") + "\\n# changed between vectors\\n",
+            encoding="utf-8",
+        )
     print("apseudo-run: script validation passed.")
     raise SystemExit(0)
 if args and args[0] == "--render-prompt":
@@ -351,8 +362,13 @@ def _runner_repository(
     runtime_package = fake_runtime / "apseudo_lint"
     runtime_package.mkdir(parents=True)
     (runtime_package / "__init__.py").write_bytes(module_target.read_bytes())
+    fake_runner_source = _fake_runner_body()
     (runtime_package / "runner_cli.py").write_text(
-        _fake_runner_body(),
+        fake_runner_source,
+        encoding="utf-8",
+    )
+    (module_target.parent / "runner_cli.py").write_text(
+        fake_runner_source,
         encoding="utf-8",
     )
     (runtime_package / "cli.py").write_text(
@@ -420,17 +436,11 @@ def _prepare_and_capture(
     environment: Mapping[str, str],
     evidence_root: Path,
 ) -> RunnerCaptureResult:
-    runtime = prepare_runner_runtime(
+    return prepare_and_capture_guarded_runner(
         repository,
         revision=revision,
         operator_python=runner.parent / "python",
         operator_apseudo_run=runner,
-        environment=environment,
-    )
-    return capture_guarded_runner(
-        repository,
-        revision=revision,
-        runtime=runtime,
         evidence_root=evidence_root,
         environment=environment,
     )
@@ -529,6 +539,23 @@ def test_validation_passed__exact_zero_error_schema__returns_true() -> None:
             },
             id="error-count-contradiction",
         ),
+        pytest.param(
+            {
+                "summary": {"diagnostics": 1, "errors": 0, "warnings": 0},
+                "diagnostics": [
+                    {
+                        "path": "fixture.apseudo",
+                        "line": 1,
+                        "column": 1,
+                        "code": "APSEUDO-FIXTURE",
+                        "severity": "info",
+                        "message": "fixture diagnostic",
+                        "unexpected": True,
+                    }
+                ],
+            },
+            id="unknown-diagnostic-field",
+        ),
     ],
 )
 def test_validation_passed__nonproduction_or_contradictory_schema__returns_false(
@@ -601,6 +628,122 @@ def test_capture__module_changes_after_preparation__records_preflight_only(
         )
 
     _assert_preflight_bundle(result, evidence_root, "operator module changed")
+
+
+def test_capture__entrypoint_module_changes_after_preparation__records_preflight_only(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        runtime = prepare_runner_runtime(
+            repository,
+            revision=revision,
+            operator_python=runner.parent / "python",
+            operator_apseudo_run=runner,
+            environment=environment,
+        )
+        runtime.entrypoint_module_path.write_bytes(
+            runtime.entrypoint_module_path.read_bytes() + b"# stale entrypoint module\n"
+        )
+        evidence_root = tmp_path / "promoted"
+
+        result = capture_guarded_runner(
+            repository,
+            revision=revision,
+            runtime=runtime,
+            evidence_root=evidence_root,
+            environment=environment,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "operator entrypoint module changed")
+
+
+def test_capture__environment_changes_after_preparation__records_preflight_only(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        runtime = prepare_runner_runtime(
+            repository,
+            revision=revision,
+            operator_python=runner.parent / "python",
+            operator_apseudo_run=runner,
+            environment=environment,
+        )
+        evidence_root = tmp_path / "promoted"
+
+        result = capture_guarded_runner(
+            repository,
+            revision=revision,
+            runtime=runtime,
+            evidence_root=evidence_root,
+            environment={**environment, "PYTHONPATH": str(tmp_path / "changed-runtime")},
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "operator environment changed")
+
+
+def test_capture__runtime_changes_between_vectors__records_preflight_only(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        evidence_root = tmp_path / "promoted"
+
+        result = _prepare_and_capture(
+            repository,
+            revision,
+            runner,
+            {**environment, "APSEUDO_TEST_RUNNER_MODE": "mutate-runtime-after-check"},
+            evidence_root,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "operator entrypoint module changed")
+
+
+def test_capture__runtime_identity_emits_secret__raises_unsafe_error(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        runtime = prepare_runner_runtime(
+            repository,
+            revision=revision,
+            operator_python=runner.parent / "python",
+            operator_apseudo_run=runner,
+            environment=environment,
+        )
+        runtime.entrypoint_module_path.write_text(
+            'print(\'{"PASSWORD":"opaque"}\')\n'
+            + runtime.entrypoint_module_path.read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+        with pytest.raises(UnsafeRunnerCaptureError, match="credential-like output"):
+            capture_guarded_runner(
+                repository,
+                revision=revision,
+                runtime=runtime,
+                evidence_root=tmp_path / "promoted",
+                environment=environment,
+            )
+
+
+def test_capture__hook_interpreter_probe_emits_secret__raises_unsafe_error(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        fake_python = Path(environment["PATH"].split(":", maxsplit=1)[0]) / "python3"
+        _write_executable(
+            fake_python,
+            'print(\'{"PASSWORD":"opaque"}\')\n',
+            shebang=str(Path(sys.executable).resolve()),
+        )
+
+        with pytest.raises(UnsafeRunnerCaptureError, match="credential-like output"):
+            _prepare_and_capture(
+                repository,
+                revision,
+                runner,
+                environment,
+                tmp_path / "promoted",
+            )
 
 
 @pytest.mark.parametrize(
@@ -687,6 +830,59 @@ def test_prepare_and_capture__operational_precondition_fails__promotes_bundle(
             runner,
             selected_environment,
             evidence_root,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, reason_fragment)
+
+
+@pytest.mark.parametrize(
+    ("revision_value", "python_path", "mutate_module", "reason_fragment"),
+    [
+        pytest.param(
+            "missing-revision",
+            None,
+            False,
+            "revision: expected a resolvable Git commit",
+            id="unresolved-revision",
+        ),
+        pytest.param(
+            None,
+            "missing-python",
+            False,
+            "operator_python: expected an existing file",
+            id="missing-interpreter",
+        ),
+        pytest.param(
+            None,
+            None,
+            True,
+            "operator module hash does not match",
+            id="module-mismatch",
+        ),
+    ],
+)
+def test_prepare_and_capture__genuine_precondition_failure__promotes_bundle(
+    tmp_path: Path,
+    revision_value: str | None,
+    python_path: str | None,
+    mutate_module: bool,
+    reason_fragment: str,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        if mutate_module:
+            module = Path(environment["PYTHONPATH"]) / "apseudo_lint/__init__.py"
+            module.write_bytes(module.read_bytes() + b"# mismatched module\n")
+        evidence_root = tmp_path / "promoted"
+
+        result = prepare_and_capture_guarded_runner(
+            repository,
+            revision=revision if revision_value is None else revision_value,
+            operator_python=(
+                runner.parent / "python" if python_path is None else tmp_path / python_path
+            ),
+            operator_apseudo_run=runner,
+            evidence_root=evidence_root,
+            environment=environment,
         )
 
     _assert_preflight_bundle(result, evidence_root, reason_fragment)
@@ -845,28 +1041,22 @@ def test_runner_record_excludes_credentials(tmp_path: Path) -> None:
             tmp_path / "input-evidence",
         )
 
-    with _runner_repository(tmp_path / "output") as (
-        repository,
-        revision,
-        runner,
-        environment,
+    with (
+        _runner_repository(tmp_path / "output") as (
+            repository,
+            revision,
+            runner,
+            environment,
+        ),
+        pytest.raises(RunnerCaptureError, match="credential-like output"),
     ):
-        fake_runner_module = Path(environment["PYTHONPATH"]) / "apseudo_lint/runner_cli.py"
-        fake_runner_module.write_text(
-            fake_runner_module.read_text(encoding="utf-8").replace(
-                'print("apseudo-run: script validation passed.")',
-                'print("OPENAI_API_KEY=sk-prohibited123456789")',
-            ),
-            encoding="utf-8",
+        _prepare_and_capture(
+            repository,
+            revision,
+            runner,
+            {**environment, "APSEUDO_TEST_RUNNER_MODE": "raw-secret-output"},
+            tmp_path / "output-evidence",
         )
-        with pytest.raises(RunnerCaptureError, match="credential-like output"):
-            _prepare_and_capture(
-                repository,
-                revision,
-                runner,
-                environment,
-                tmp_path / "output-evidence",
-            )
 
     for evidence_root in (tmp_path / "input-evidence", tmp_path / "output-evidence"):
         if evidence_root.exists():

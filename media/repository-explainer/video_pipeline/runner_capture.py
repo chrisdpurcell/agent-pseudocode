@@ -37,6 +37,7 @@ RUNNER_SCRIPT = "docs/apseudo-docs/examples/runner/review-spec.apseudo"
 SPEC_PATH = "docs/specs/repository-explainer-video.md"
 RUN_ROOT = "dist/video/work/runner-runs"
 MODULE_SOURCE = "src/apseudo_lint/__init__.py"
+ENTRYPOINT_MODULE_SOURCE = "src/apseudo_lint/runner_cli.py"
 REQUIRED_EVIDENCE_NAMES = RUNNER_EVIDENCE_NAMES
 _CREDENTIAL_NAME = re.compile(
     r"(?i)(?:^|_)(?:api_?key|authorization|credential|password|private_?key|"
@@ -72,6 +73,10 @@ class RunnerCaptureError(ValueError):
     """Reject unsafe input or unverifiable runner capture evidence."""
 
 
+class UnsafeRunnerCaptureError(RunnerCaptureError):
+    """Reject credential-bearing input or output without promoting evidence."""
+
+
 @dataclass(frozen=True, slots=True)
 class RunnerRuntime:
     """Locked operator runtime proven against one capture revision."""
@@ -85,7 +90,10 @@ class RunnerRuntime:
     console_entrypoint: str
     module_path: Path
     module_sha256: str
+    entrypoint_module_path: Path
+    entrypoint_module_sha256: str
     toolkit_version: str
+    environment_sha256: str
     sync_argv: tuple[str, ...]
     sync_status: int
     provider_status_argv: tuple[str, ...]
@@ -199,35 +207,26 @@ def prepare_runner_runtime(
     ):
         precondition_reason = "Codex login status did not confirm a configured login"
 
-    identity_code = (
-        "import hashlib,json,pathlib,apseudo_lint;"
-        "p=pathlib.Path(apseudo_lint.__file__).resolve();"
-        "print(json.dumps({'path':str(p),'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),"
-        "'version':apseudo_lint.__version__},sort_keys=True))"
-    )
-    identity = _run(
-        (os.fspath(selected_python), "-c", identity_code),
+    (
+        module_path,
+        module_sha256,
+        entrypoint_module_path,
+        entrypoint_module_sha256,
+        toolkit_version,
+    ) = _operator_module_identity(
+        selected_python,
         cwd=root,
         environment=child_environment,
-        timeout=30,
-        operation="operator module identity",
     )
-    if identity.returncode != 0:
-        raise RunnerCaptureError("operator module identity could not be resolved")
-    try:
-        identity_payload = cast(dict[str, object], json.loads(identity.stdout))
-        module_path = _existing_file(
-            Path(_string(identity_payload.get("path"), "operator module path")),
-            "operator module path",
-        )
-        module_sha256 = _hash_string(identity_payload.get("sha256"), "operator module sha256")
-        toolkit_version = _string(identity_payload.get("version"), "operator toolkit version")
-    except (json.JSONDecodeError, TypeError) as exc:
-        raise RunnerCaptureError("operator module identity returned invalid JSON") from exc
 
     pinned_module = _git_show(root, exact_revision, MODULE_SOURCE)
     if _digest(pinned_module) != module_sha256:
         raise RunnerCaptureError("operator module hash does not match the exact capture revision")
+    pinned_entrypoint_module = _git_show(root, exact_revision, ENTRYPOINT_MODULE_SOURCE)
+    if _digest(pinned_entrypoint_module) != entrypoint_module_sha256:
+        raise RunnerCaptureError(
+            "operator entrypoint module hash does not match the exact capture revision"
+        )
     version_match = _VERSION_LINE.search(pinned_module)
     if version_match is None or version_match.group(1).decode("utf-8") != toolkit_version:
         raise RunnerCaptureError(
@@ -244,13 +243,201 @@ def prepare_runner_runtime(
         console_entrypoint=console_entrypoint,
         module_path=module_path,
         module_sha256=module_sha256,
+        entrypoint_module_path=entrypoint_module_path,
+        entrypoint_module_sha256=entrypoint_module_sha256,
         toolkit_version=toolkit_version,
+        environment_sha256=_environment_digest(child_environment),
         sync_argv=sync_command,
         sync_status=sync.returncode,
         provider_status_argv=provider_command,
         provider_status=provider.returncode,
         precondition_reason=precondition_reason,
     )
+
+
+def prepare_and_capture_guarded_runner(
+    repository_root: Path,
+    *,
+    revision: str,
+    evidence_root: Path,
+    operator_python: Path | None = None,
+    operator_apseudo_run: Path | None = None,
+    environment: Mapping[str, str] | None = None,
+    sync_argv: Sequence[str] = ("uv", "sync", "--locked", "--all-groups"),
+    provider_status_argv: Sequence[str] = ("codex", "login", "status"),
+) -> RunnerCaptureResult:
+    """Prepare and capture, recording safe operational preparation failures."""
+    try:
+        runtime = prepare_runner_runtime(
+            repository_root,
+            revision=revision,
+            operator_python=operator_python,
+            operator_apseudo_run=operator_apseudo_run,
+            environment=environment,
+            sync_argv=sync_argv,
+            provider_status_argv=provider_status_argv,
+        )
+    except UnsafeRunnerCaptureError:
+        raise
+    except RunnerCaptureError as exc:
+        return _capture_preparation_failure(
+            repository_root,
+            revision=revision,
+            evidence_root=evidence_root,
+            operator_python=operator_python,
+            operator_apseudo_run=operator_apseudo_run,
+            sync_argv=sync_argv,
+            provider_status_argv=provider_status_argv,
+            reason=str(exc),
+        )
+    return capture_guarded_runner(
+        repository_root,
+        revision=revision,
+        runtime=runtime,
+        evidence_root=evidence_root,
+        environment=environment,
+    )
+
+
+def _capture_preparation_failure(
+    repository_root: Path,
+    *,
+    revision: str,
+    evidence_root: Path,
+    operator_python: Path | None,
+    operator_apseudo_run: Path | None,
+    sync_argv: Sequence[str],
+    provider_status_argv: Sequence[str],
+    reason: str,
+) -> RunnerCaptureResult:
+    root = _safe_path(repository_root, "repository_root")
+    destination = _safe_path(evidence_root, "evidence_root")
+    destination.mkdir(parents=True, exist_ok=True)
+    if destination.is_relative_to(root / "dist" / "video" / "work"):
+        raise RunnerCaptureError("evidence_root: promoted evidence must survive work-root cleanup")
+    selected_python = (
+        Path(sys.executable).absolute()
+        if operator_python is None
+        else operator_python.expanduser().absolute()
+    )
+    selected_runner = (
+        selected_python.parent / "apseudo-run"
+        if operator_apseudo_run is None
+        else operator_apseudo_run.expanduser().absolute()
+    )
+    command_record = _preparation_failure_command_record(
+        revision=revision,
+        operator_python=selected_python,
+        operator_apseudo_run=selected_runner,
+        sync_argv=tuple(sync_argv),
+        provider_status_argv=tuple(provider_status_argv),
+        reason=reason,
+    )
+    bundle = _terminal_bundle(
+        revision=revision,
+        hook_record=_skipped_hook_record(reason),
+        command_record=command_record,
+        runner_artifacts=_skipped_runner_artifacts(reason),
+        mode="preflight-only",
+        reason=reason,
+    )
+    hashes = _promote_checked_bundle(destination, bundle)
+    clone_path = Path(tempfile.mkdtemp(prefix="apseudo-runner-preparation-"))
+    clone_path.rmdir()
+    return RunnerCaptureResult(
+        mode="preflight-only",
+        reason=reason,
+        revision=revision,
+        clone_path=clone_path,
+        evidence_root=destination,
+        evidence_hashes=hashes,
+    )
+
+
+def _preparation_failure_command_record(
+    *,
+    revision: str,
+    operator_python: Path,
+    operator_apseudo_run: Path,
+    sync_argv: tuple[str, ...],
+    provider_status_argv: tuple[str, ...],
+    reason: str,
+) -> dict[str, object]:
+    post_check = shlex.join((os.fspath(operator_python), "-m", "apseudo_lint.cli", RUNNER_SCRIPT))
+    base_argv = (
+        os.fspath(operator_apseudo_run),
+        "--agent",
+        "codex",
+        "--workspace",
+        ".",
+        "--sandbox",
+        "read-only",
+        "--require-no-diff",
+        "--post-check",
+        post_check,
+        "--run-dir",
+        RUN_ROOT,
+        "--set",
+        f"spec_path={SPEC_PATH}",
+        RUNNER_SCRIPT,
+    )
+    vectors = {
+        "check": _insert_action(base_argv, "--check"),
+        "render-prompt": _insert_action(base_argv, "--render-prompt"),
+        "print-command": _insert_action(base_argv, "--print-command"),
+        "execute": base_argv,
+    }
+    return {
+        "revision": revision,
+        "cwd": ".",
+        "runtime": {
+            "operator_python": os.fspath(operator_python),
+            "operator_python_sha256": None,
+            "operator_apseudo_run": os.fspath(operator_apseudo_run),
+            "console_sha256": None,
+            "console_expected_sha256": None,
+            "console_entrypoint": None,
+            "module_path": None,
+            "module_sha256": None,
+            "entrypoint_module_path": None,
+            "entrypoint_module_sha256": None,
+            "toolkit_version": None,
+            "environment_sha256": None,
+            "sync_argv": list(sync_argv),
+            "sync_status": None,
+            "provider_status_argv": list(provider_status_argv),
+            "provider_status": None,
+            "precondition_reason": reason,
+        },
+        "post_check": post_check,
+        "base_argv": list(base_argv),
+        "vectors": [
+            {
+                "action": action,
+                "argv": list(vector),
+                "status": "skipped",
+                "reason": reason,
+            }
+            for action, vector in vectors.items()
+        ],
+        "prompt_assertions": {
+            "no_hooks_requested: False": False,
+            "hooks_required: False": False,
+        },
+        "rendered_prompt": None,
+        "resolved_provider_vector": None,
+        "display": {
+            "aliases": {
+                "apseudo-run": [os.fspath(operator_apseudo_run)],
+                "apseudo-lint": [
+                    os.fspath(operator_python),
+                    "-m",
+                    "apseudo_lint.cli",
+                ],
+            },
+            "command": None,
+        },
+    }
 
 
 def capture_guarded_runner(
@@ -338,7 +525,12 @@ def capture_guarded_runner(
         reason = hook_reason or "guarded runner capture passed"
 
         if hook_reason is None:
-            integrity_reason = _runtime_integrity_reason(root, exact_revision, runtime)
+            integrity_reason = _runtime_integrity_reason(
+                root,
+                exact_revision,
+                runtime,
+                child_environment,
+            )
             if integrity_reason is not None:
                 reason = integrity_reason
                 runner_artifacts = _skipped_runner_artifacts(integrity_reason)
@@ -349,6 +541,8 @@ def capture_guarded_runner(
                     command_record,
                     vectors,
                     post_check,
+                    runtime,
+                    exact_revision,
                 )
                 reason = runner_reason or "guarded runner capture passed"
                 if runner_reason is None:
@@ -395,8 +589,11 @@ def _runtime_integrity_reason(
     repository: Path,
     exact_revision: str,
     runtime: RunnerRuntime,
+    environment: Mapping[str, str],
 ) -> str | None:
     """Revalidate every executable runtime byte immediately before runner calls."""
+    if _environment_digest(environment) != runtime.environment_sha256:
+        return "operator environment changed after runtime preparation"
     try:
         if _digest(runtime.operator_python.read_bytes()) != runtime.operator_python_sha256:
             return "operator interpreter changed after runtime preparation"
@@ -427,16 +624,97 @@ def _runtime_integrity_reason(
         return "operator console wrapper changed after runtime preparation"
 
     try:
+        (
+            module_path,
+            module_sha256,
+            entrypoint_module_path,
+            entrypoint_module_sha256,
+            toolkit_version,
+        ) = _operator_module_identity(
+            runtime.operator_python,
+            cwd=repository,
+            environment=environment,
+        )
         pinned_module_sha256 = _digest(_git_show(repository, exact_revision, MODULE_SOURCE))
-        observed_module_sha256 = _digest(runtime.module_path.read_bytes())
-    except OSError, RunnerCaptureError:
+        pinned_entrypoint_module_sha256 = _digest(
+            _git_show(repository, exact_revision, ENTRYPOINT_MODULE_SOURCE)
+        )
+    except UnsafeRunnerCaptureError:
+        raise
+    except RunnerCaptureError:
         return "operator module became unavailable after runtime preparation"
-    if (
+    if module_path != runtime.module_path or (
         runtime.module_sha256 != pinned_module_sha256
-        or observed_module_sha256 != runtime.module_sha256
+        or module_sha256 != runtime.module_sha256
+        or toolkit_version != runtime.toolkit_version
     ):
         return "operator module changed after runtime preparation"
+    if entrypoint_module_path != runtime.entrypoint_module_path or (
+        runtime.entrypoint_module_sha256 != pinned_entrypoint_module_sha256
+        or entrypoint_module_sha256 != runtime.entrypoint_module_sha256
+    ):
+        return "operator entrypoint module changed after runtime preparation"
     return None
+
+
+def _operator_module_identity(
+    operator_python: Path,
+    *,
+    cwd: Path,
+    environment: Mapping[str, str],
+) -> tuple[Path, str, Path, str, str]:
+    identity_code = (
+        "import hashlib,json,pathlib,apseudo_lint,apseudo_lint.runner_cli as runner_cli;"
+        "p=pathlib.Path(apseudo_lint.__file__).resolve();"
+        "r=pathlib.Path(runner_cli.__file__).resolve();"
+        "print(json.dumps({'path':str(p),'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),"
+        "'entrypoint_path':str(r),"
+        "'entrypoint_sha256':hashlib.sha256(r.read_bytes()).hexdigest(),"
+        "'version':apseudo_lint.__version__},sort_keys=True))"
+    )
+    identity = _run(
+        (os.fspath(operator_python), "-c", identity_code),
+        cwd=cwd,
+        environment=environment,
+        timeout=30,
+        operation="operator module identity",
+    )
+    if identity.returncode != 0:
+        raise RunnerCaptureError("operator module identity could not be resolved")
+    try:
+        payload = cast(dict[str, object], json.loads(identity.stdout))
+        module_path = _existing_file(
+            Path(_string(payload.get("path"), "operator module path")),
+            "operator module path",
+        )
+        module_sha256 = _hash_string(payload.get("sha256"), "operator module sha256")
+        entrypoint_path = _existing_file(
+            Path(_string(payload.get("entrypoint_path"), "operator entrypoint module path")),
+            "operator entrypoint module path",
+        )
+        entrypoint_sha256 = _hash_string(
+            payload.get("entrypoint_sha256"),
+            "operator entrypoint module sha256",
+        )
+        toolkit_version = _string(payload.get("version"), "operator toolkit version")
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise RunnerCaptureError("operator module identity returned invalid JSON") from exc
+    return (
+        module_path,
+        module_sha256,
+        entrypoint_path,
+        entrypoint_sha256,
+        toolkit_version,
+    )
+
+
+def _environment_digest(environment: Mapping[str, str]) -> str:
+    encoded = json.dumps(
+        sorted(environment.items()),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode()
+    return _digest(encoded)
 
 
 def _skipped_hook_record(reason: str) -> dict[str, object]:
@@ -588,6 +866,8 @@ def _capture_hook(
 
     try:
         interpreter = _hook_interpreter(hook, clone, environment)
+    except UnsafeRunnerCaptureError:
+        raise
     except RunnerCaptureError as exc:
         reason = str(exc)
         base["reason"] = reason
@@ -698,7 +978,10 @@ def _runner_command_record(
             "console_entrypoint": runtime.console_entrypoint,
             "module_path": os.fspath(runtime.module_path),
             "module_sha256": runtime.module_sha256,
+            "entrypoint_module_path": os.fspath(runtime.entrypoint_module_path),
+            "entrypoint_module_sha256": runtime.entrypoint_module_sha256,
             "toolkit_version": runtime.toolkit_version,
+            "environment_sha256": runtime.environment_sha256,
             "sync_argv": list(runtime.sync_argv),
             "sync_status": runtime.sync_status,
             "provider_status_argv": list(runtime.provider_status_argv),
@@ -727,11 +1010,24 @@ def _capture_runner(
     command_record: dict[str, object],
     vectors: Mapping[str, tuple[str, ...]],
     post_check: str,
+    runtime: RunnerRuntime,
+    exact_revision: str,
 ) -> tuple[dict[str, object], str | None]:
     vector_records = cast(list[dict[str, object]], command_record["vectors"])
     results: dict[str, _ProcessResult] = {}
     preflight_reason: str | None = None
     for index, action in enumerate(("check", "render-prompt", "print-command")):
+        integrity_reason = _runtime_integrity_reason(
+            clone,
+            exact_revision,
+            runtime,
+            environment,
+        )
+        if integrity_reason is not None:
+            for skipped in vector_records[index:]:
+                skipped["status"] = "skipped"
+                skipped["reason"] = integrity_reason
+            return _skipped_runner_artifacts(integrity_reason), integrity_reason
         result = _run(
             vectors[action],
             cwd=clone,
@@ -767,6 +1063,17 @@ def _capture_runner(
         vector_records[3]["status"] = "skipped"
         vector_records[3]["reason"] = preflight_reason
         return _skipped_runner_artifacts(preflight_reason), preflight_reason
+
+    integrity_reason = _runtime_integrity_reason(
+        clone,
+        exact_revision,
+        runtime,
+        environment,
+    )
+    if integrity_reason is not None:
+        vector_records[3]["status"] = "skipped"
+        vector_records[3]["reason"] = integrity_reason
+        return _skipped_runner_artifacts(integrity_reason), integrity_reason
 
     execution = _run(
         vectors["execute"],
@@ -996,7 +1303,8 @@ def validation_record_passed(value: object) -> bool:
         except RunnerCaptureError:
             return False
         required = {"path", "line", "column", "code", "severity", "message"}
-        if not required <= set(item) or set(item) - required > {"hint", "snippet"}:
+        optional = {"hint", "snippet"}
+        if not required <= set(item) or not set(item) <= required | optional:
             return False
         if (
             not all(
@@ -1074,14 +1382,14 @@ def reject_credential_evidence(
             record = cast(dict[object, object], current)
             for key, item in record.items():
                 if not isinstance(key, str) or _CREDENTIAL_NAME.search(key):
-                    raise RunnerCaptureError(f"{context} contains credential-like output")
+                    raise UnsafeRunnerCaptureError(f"{context} contains credential-like output")
                 pending.append(item)
         elif isinstance(current, list):
             pending.extend(cast(list[object], current))
         elif isinstance(current, str) and _CREDENTIAL_BYTES.search(current.encode("utf-8")):
-            raise RunnerCaptureError(f"{context} contains credential-like output")
+            raise UnsafeRunnerCaptureError(f"{context} contains credential-like output")
     if raw is not None and (_CREDENTIAL_BYTES.search(raw) or _CREDENTIAL_RAW_KEY.search(raw)):
-        raise RunnerCaptureError(f"{context} contains credential-like output")
+        raise UnsafeRunnerCaptureError(f"{context} contains credential-like output")
 
 
 def _promote_bundle(evidence_root: Path, bundle: Mapping[str, object]) -> dict[str, str]:
@@ -1119,10 +1427,11 @@ def _verify_promoted_bundle(evidence_root: Path, hashes: Mapping[str, str]) -> N
             raise RunnerCaptureError(f"promoted runner evidence {name!r} is unavailable") from exc
         if _digest(content) != expected:
             raise RunnerCaptureError(f"promoted runner evidence {name!r} hash changed")
-        if _CREDENTIAL_BYTES.search(content):
-            raise RunnerCaptureError(
-                f"promoted runner evidence {name!r} contains credential-like output"
-            )
+        reject_credential_evidence(
+            None,
+            raw=content,
+            context=f"promoted runner evidence {name!r}",
+        )
 
 
 def _process_record(result: _ProcessResult) -> dict[str, object]:
@@ -1187,8 +1496,7 @@ def _run(
     except OSError as exc:
         raise RunnerCaptureError(f"{operation}: process could not start") from exc
     encoded = (completed.stdout + completed.stderr).encode("utf-8")
-    if _CREDENTIAL_BYTES.search(encoded):
-        raise RunnerCaptureError(f"{operation}: credential-like output is prohibited")
+    reject_credential_evidence(None, raw=encoded, context=f"{operation} output")
     return _ProcessResult(
         argv=arguments,
         returncode=completed.returncode,
@@ -1203,7 +1511,7 @@ def _child_environment(environment: Mapping[str, str] | None) -> dict[str, str]:
         return selected
     for key, value in environment.items():
         if _CREDENTIAL_NAME.search(key) or _CREDENTIAL_BYTES.search(f"{key}={value}".encode()):
-            raise RunnerCaptureError("credential-like environment input is prohibited")
+            raise UnsafeRunnerCaptureError("credential-like environment input is prohibited")
         selected[key] = value
     return selected
 
