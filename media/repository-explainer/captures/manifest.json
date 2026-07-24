@@ -1,0 +1,135 @@
+{
+	"schema_version": 1,
+	"revision": "6fc73b94e5279928a4e37216592f3272ab2ae03b",
+	"commands": [
+		{
+			"id": "hero-format-check",
+			"argv": [
+				"uv",
+				"run",
+				"apseudo-format",
+				"--check",
+				"docs/apseudo-docs/examples/review-loop.apseudo"
+			],
+			"cwd": ".",
+			"revision": "6fc73b94e5279928a4e37216592f3272ab2ae03b",
+			"captured_at": "2026-07-24T01:53:29Z",
+			"exit_status": 0,
+			"stdout_sha256": "670e2be530132076d1740d26aca5ce8f952e2a708e23d76b409afcbc51c7cf7e",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stdin_source": null,
+			"stdin_sha256": null,
+			"source_path": "docs/apseudo-docs/examples/review-loop.apseudo",
+			"source_sha256": "e37b58953da13f9ab501a6d5198d201b47fd5bd561a330dec28c4dc66cbd9308",
+			"promoted_outputs": [
+				{
+					"path": "media/repository-explainer/captures/evidence/format-check.stdout.txt",
+					"sha256": "670e2be530132076d1740d26aca5ce8f952e2a708e23d76b409afcbc51c7cf7e"
+				}
+			]
+		},
+		{
+			"id": "hero-lint",
+			"argv": [
+				"uv",
+				"run",
+				"apseudo-lint",
+				"docs/apseudo-docs/examples/review-loop.apseudo"
+			],
+			"cwd": ".",
+			"revision": "6fc73b94e5279928a4e37216592f3272ab2ae03b",
+			"captured_at": "2026-07-24T01:53:29Z",
+			"exit_status": 0,
+			"stdout_sha256": "a50c7aa0fec025b86d13eb2de246357f1151a2b7eb5cb528b16e219ea78d4118",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stdin_source": null,
+			"stdin_sha256": null,
+			"source_path": "docs/apseudo-docs/examples/review-loop.apseudo",
+			"source_sha256": "e37b58953da13f9ab501a6d5198d201b47fd5bd561a330dec28c4dc66cbd9308",
+			"promoted_outputs": [
+				{
+					"path": "media/repository-explainer/captures/evidence/lint.stdout.txt",
+					"sha256": "a50c7aa0fec025b86d13eb2de246357f1151a2b7eb5cb528b16e219ea78d4118"
+				}
+			]
+		},
+		{
+			"id": "while-rule-explanation",
+			"argv": ["uv", "run", "apseudo-explain", "APSEUDO-WHILE-001"],
+			"cwd": ".",
+			"revision": "6fc73b94e5279928a4e37216592f3272ab2ae03b",
+			"captured_at": "2026-07-24T01:53:29Z",
+			"exit_status": 0,
+			"stdout_sha256": "ec9b2f63a6f16bdff15d35ca1fd699c0176dfe0cc34cbdd8674f3bb7173f7e27",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stdin_source": null,
+			"stdin_sha256": null,
+			"source_path": null,
+			"source_sha256": null,
+			"promoted_outputs": [
+				{
+					"path": "media/repository-explainer/captures/evidence/explain-while-001.txt",
+					"sha256": "ec9b2f63a6f16bdff15d35ca1fd699c0176dfe0cc34cbdd8674f3bb7173f7e27"
+				}
+			]
+		},
+		{
+			"id": "hero-mermaid",
+			"argv": [
+				"uv",
+				"run",
+				"apseudo-mermaid",
+				"docs/apseudo-docs/examples/review-loop.apseudo",
+				"--no-fence"
+			],
+			"cwd": ".",
+			"revision": "6fc73b94e5279928a4e37216592f3272ab2ae03b",
+			"captured_at": "2026-07-24T01:53:30Z",
+			"exit_status": 0,
+			"stdout_sha256": "dc61c0db70b897e2cd79a8c0dbda3a3211a15d687f5ad312d9673f09fc98e1af",
+			"stderr_sha256": "617be97fd81d1f13024a4eb03cf9573bd21c22d57934202fd667c8a6b84ee383",
+			"stdin_source": null,
+			"stdin_sha256": null,
+			"source_path": "docs/apseudo-docs/examples/review-loop.apseudo",
+			"source_sha256": "e37b58953da13f9ab501a6d5198d201b47fd5bd561a330dec28c4dc66cbd9308",
+			"promoted_outputs": [
+				{
+					"path": "media/repository-explainer/captures/evidence/review-loop.mmd",
+					"sha256": "dc61c0db70b897e2cd79a8c0dbda3a3211a15d687f5ad312d9673f09fc98e1af"
+				}
+			]
+		},
+		{
+			"id": "teaching-defect",
+			"argv": [
+				"uv",
+				"run",
+				"apseudo-lint",
+				"--stdin-filename",
+				"tests/fixtures/invalid/unbounded_while.apseudo"
+			],
+			"cwd": ".",
+			"revision": "6fc73b94e5279928a4e37216592f3272ab2ae03b",
+			"captured_at": "2026-07-24T01:53:30Z",
+			"exit_status": 1,
+			"stdout_sha256": "e9aee194a960877c1fd636e14f4909c8da58000baa5d184bfdb7b55c5d454fd1",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stdin_source": "tests/fixtures/invalid/unbounded_while.apseudo",
+			"stdin_sha256": "cc05cc746e1878f5df3ed2b410c75b347188e548d484531932d8396e12357cf7",
+			"source_path": "tests/fixtures/invalid/unbounded_while.apseudo",
+			"source_sha256": "cc05cc746e1878f5df3ed2b410c75b347188e548d484531932d8396e12357cf7",
+			"promoted_outputs": [
+				{
+					"path": "media/repository-explainer/captures/evidence/teaching-defect.stdout.txt",
+					"sha256": "e9aee194a960877c1fd636e14f4909c8da58000baa5d184bfdb7b55c5d454fd1"
+				}
+			]
+		}
+	],
+	"editor": {
+		"status": "blocked",
+		"blocker": "KDE session is locked; owner-authenticated unlock is required",
+		"observed_at": "2026-07-24T02:01:26Z",
+		"rejected_capture": "Lock-screen pixels were deleted; no editor PNG was promoted"
+	}
+}

@@ -1,0 +1,25 @@
+## APSEUDO-WHILE-001: While loop must have a bounded stop condition
+
+- **Default severity:** error
+- **Source:** Internal convention
+
+while loops must include a cap, timeout, deadline, maximum counter, or explicit bounded annotation.
+
+**Rationale:** Unbounded loops are one of the highest-risk failure modes for autonomous agents.
+
+**Non-compliant:**
+
+```text
+while not approved:
+    revise(document)
+```
+
+**Compliant:**
+
+```text
+while not approved and round <= max_rounds:
+    revise(document)
+    round += 1
+```
+
+**Fix:** Add a bounded condition, update loop state, or annotate a genuine external stop condition.

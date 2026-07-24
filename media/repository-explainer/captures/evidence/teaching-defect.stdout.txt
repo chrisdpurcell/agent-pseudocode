@@ -1,0 +1,7 @@
+tests/fixtures/invalid/unbounded_while.apseudo:2:5: ERROR APSEUDO-WHILE-001: while loop has no obvious bounded stop condition
+  hint: Use a cap/deadline/max counter in the condition or annotate an external stop condition.
+  block: stdin
+tests/fixtures/invalid/unbounded_while.apseudo:2:5: WARNING APSEUDO-WHILE-002: while loop body does not visibly update state used by the condition
+  hint: Update loop-control state, break/return from the loop, or annotate an external stop condition.
+  block: stdin
+apseudo-lint: checked 1 file(s); 2 diagnostic(s); 1 failure(s).
