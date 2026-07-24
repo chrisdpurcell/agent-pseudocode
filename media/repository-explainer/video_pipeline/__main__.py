@@ -1,4 +1,9 @@
-"""Expose the local production package before its stage-oriented CLI is introduced."""
+"""Run the repository-local entry point for the explainer video production pipeline.
+
+This module intentionally remains outside the installed toolkit. Its help surface is stable
+while production stages are added, so automation can discover the local pipeline without
+mistaking it for a public ``apseudo_lint`` command.
+"""
 
 from __future__ import annotations
 

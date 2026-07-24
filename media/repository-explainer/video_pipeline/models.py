@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,11 +52,11 @@ class OutputConfig:
     narrated: Path
     speaker: Path
     render_manifest: Path
-    container: str
-    video_codec: str
-    audio_codec: str
-    pixel_format: str
-    deterministic: bool
+    container: Literal["mp4"]
+    video_codec: Literal["h264"]
+    audio_codec: Literal["aac"]
+    pixel_format: Literal["yuv420p"]
+    deterministic: Literal[True]
 
 
 @dataclass(frozen=True, slots=True)

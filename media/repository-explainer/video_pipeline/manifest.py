@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from collections.abc import Iterable
 from itertools import pairwise
 from pathlib import Path
 from typing import cast
 
+from .errors import ManifestError
 from .models import (
     MediaSettings,
     OutputConfig,
@@ -18,6 +18,12 @@ from .models import (
     Scene,
     TextSizes,
     VisualState,
+)
+from .policy import (
+    resolve_authorized_output_root,
+    resolve_exact_output_target,
+    resolve_tracked_source,
+    trusted_output_root,
 )
 
 APPROVED_SCENES: tuple[tuple[str, int, int], ...] = (
@@ -35,27 +41,42 @@ TOTAL_FRAMES = 4050
 TITLE_SAFE = Rectangle(x=96, y=54, width=1728, height=972)
 
 
-class ManifestError(ValueError):
-    """Raised when a project manifest cannot safely drive a deterministic render."""
+class _DuplicateJsonKeyError(ValueError):
+    """Carry a duplicate key from JSON decoding without exposing parser internals."""
+
+    def __init__(self, key: str) -> None:
+        self.key = key
+        super().__init__(key)
 
 
-def load_project(path: Path, *, repository_root: Path | None = None) -> ProjectManifest:
+def load_project(
+    path: Path, *, repository_root: Path | None = None, output_root: Path | None = None
+) -> ProjectManifest:
     """Load a project manifest and reject every unsupported or unsafe production setting.
 
     Source paths are resolved only below ``repository_root``. Generated paths are resolved
     only below the selected ignored output root, so a malformed manifest cannot redirect a
     capture or render stage into unrelated repository content.
     """
-    manifest_path = path.resolve()
+    manifest_path = _safe_resolve(path, "manifest")
     root = (
-        repository_root.resolve()
+        _safe_resolve(repository_root, "repository_root")
         if repository_root is not None
         else _repository_root(manifest_path)
     )
+    authorized_output_root = trusted_output_root(root, output_root)
     try:
-        decoded: object = cast(object, json.loads(manifest_path.read_text(encoding="utf-8")))
+        text = manifest_path.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
-        raise ManifestError(f"manifest: file not found: {manifest_path}") from exc
+        raise ManifestError("manifest: file not found") from exc
+    except OSError as exc:
+        raise ManifestError("manifest: could not be read") from exc
+    try:
+        decoded: object = cast(
+            object, json.loads(text, object_pairs_hook=_reject_duplicate_object_keys)
+        )
+    except _DuplicateJsonKeyError as exc:
+        raise ManifestError(f"manifest: duplicate JSON key {exc.key!r}") from exc
     except json.JSONDecodeError as exc:
         raise ManifestError(f"manifest: invalid JSON: {exc.msg}") from exc
 
@@ -63,7 +84,11 @@ def load_project(path: Path, *, repository_root: Path | None = None) -> ProjectM
     _exact_fields(payload, {"media", "safe_area", "output", "scenes"}, "manifest")
     media = _parse_media(_object(_required(payload, "media", "manifest"), "media"))
     safe_area = _parse_safe_area(_object(_required(payload, "safe_area", "manifest"), "safe_area"))
-    output = _parse_output(_object(_required(payload, "output", "manifest"), "output"), root)
+    output = _parse_output(
+        _object(_required(payload, "output", "manifest"), "output"),
+        root,
+        authorized_output_root,
+    )
     scenes = _parse_scenes(_array(_required(payload, "scenes", "manifest"), "scenes"), root, media)
     evidence_dominant_frames = _validate_evidence_dominant_frame_share(scenes, media)
     return ProjectManifest(
@@ -80,6 +105,22 @@ def _repository_root(manifest_path: Path) -> Path:
         if (parent / ".git").exists():
             return parent
     raise ManifestError("manifest: repository_root is required outside a Git repository")
+
+
+def _safe_resolve(path: Path, field: str) -> Path:
+    try:
+        return path.resolve()
+    except OSError as exc:
+        raise ManifestError(f"{field}: path resolution failed") from exc
+
+
+def _reject_duplicate_object_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    decoded: dict[str, object] = {}
+    for key, value in pairs:
+        if key in decoded:
+            raise _DuplicateJsonKeyError(key)
+        decoded[key] = value
+    return decoded
 
 
 def _parse_media(payload: dict[str, object]) -> MediaSettings:
@@ -125,7 +166,9 @@ def _parse_safe_area(payload: dict[str, object]) -> SafeArea:
     return SafeArea(rectangle=rectangle, text_sizes=text_sizes)
 
 
-def _parse_output(payload: dict[str, object], repository_root: Path) -> OutputConfig:
+def _parse_output(
+    payload: dict[str, object], repository_root: Path, authorized_output_root: Path
+) -> OutputConfig:
     _exact_fields(
         payload,
         {
@@ -142,20 +185,26 @@ def _parse_output(payload: dict[str, object], repository_root: Path) -> OutputCo
         "output",
     )
     root_value = _string(_required(payload, "root", "output"), "output.root")
-    root = _resolve_relative_path(root_value, repository_root, "output.root")
-    if not _is_ignored_output_root(root, repository_root):
-        raise ManifestError("output.root: must be ignored by the repository")
-    narrated = _resolve_output_path(
+    root = resolve_authorized_output_root(root_value, repository_root, authorized_output_root)
+    narrated = resolve_exact_output_target(
         _string(_required(payload, "narrated", "output"), "output.narrated"),
         root,
+        root / "final" / "agent-pseudocode-explainer-narrated.mp4",
+        repository_root,
         "output.narrated",
     )
-    speaker = _resolve_output_path(
-        _string(_required(payload, "speaker", "output"), "output.speaker"), root, "output.speaker"
+    speaker = resolve_exact_output_target(
+        _string(_required(payload, "speaker", "output"), "output.speaker"),
+        root,
+        root / "final" / "agent-pseudocode-explainer-speaker.mp4",
+        repository_root,
+        "output.speaker",
     )
-    render_manifest = _resolve_output_path(
+    render_manifest = resolve_exact_output_target(
         _string(_required(payload, "render_manifest", "output"), "output.render_manifest"),
         root,
+        root / "candidate" / "render-manifest.json",
+        repository_root,
         "output.render_manifest",
     )
     container = _string(_required(payload, "container", "output"), "output.container")
@@ -228,7 +277,7 @@ def _parse_scene(
     if not source_values:
         raise ManifestError(f"{field}.source_paths: must not be empty")
     source_paths = tuple(
-        _resolve_relative_path(
+        resolve_tracked_source(
             _string(value, f"{field}.source_paths[{path_index}]"),
             repository_root,
             f"{field}.source_paths[{path_index}]",
@@ -375,55 +424,6 @@ def _rectangles_overlap(left: Rectangle, right: Rectangle) -> bool:
         and left.y < right.y + right.height
         and right.y < left.y + left.height
     )
-
-
-def _resolve_relative_path(value: str, root: Path, field: str) -> Path:
-    candidate = Path(value)
-    if (
-        candidate.is_absolute()
-        or not candidate.parts
-        or any(part in {".", ".."} for part in candidate.parts)
-    ):
-        raise ManifestError(f"{field}: must be a repository-relative path without traversal")
-    resolved = (root / candidate).resolve()
-    if not resolved.is_relative_to(root):
-        raise ManifestError(f"{field}: escapes the repository root")
-    return resolved
-
-
-def _resolve_output_path(value: str, output_root: Path, field: str) -> Path:
-    candidate = Path(value)
-    if (
-        candidate.is_absolute()
-        or not candidate.parts
-        or any(part in {".", ".."} for part in candidate.parts)
-    ):
-        raise ManifestError(f"{field}: must be a relative path inside output.root")
-    resolved = (output_root / candidate).resolve()
-    if not resolved.is_relative_to(output_root):
-        raise ManifestError(f"{field}: escapes output.root")
-    return resolved
-
-
-def _is_ignored_output_root(output_root: Path, repository_root: Path) -> bool:
-    relative = f"{output_root.relative_to(repository_root).as_posix()}/"
-    try:
-        completed = subprocess.run(
-            ["git", "check-ignore", "--no-index", "--quiet", "--", relative],
-            cwd=repository_root,
-            check=False,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=10,
-        )
-    except FileNotFoundError as exc:
-        raise ManifestError("output.root: Git ignore engine is unavailable") from exc
-    except subprocess.TimeoutExpired as exc:
-        raise ManifestError("output.root: Git ignore evaluation timed out") from exc
-    if completed.returncode not in {0, 1}:
-        raise ManifestError("output.root: Git ignore evaluation failed")
-    return completed.returncode == 0
 
 
 def _object(value: object, field: str) -> dict[str, object]:
