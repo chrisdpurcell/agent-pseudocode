@@ -23,6 +23,7 @@ PROJECT_PATH = REPOSITORY_ROOT / "media" / "repository-explainer" / "project.jso
 
 CompileCaptions = Callable[[Path, ProjectManifest], bytes]
 ValidateTakeDurations = Callable[[Path, ProjectManifest, Mapping[str, int]], None]
+CaptionErrorType = type[ValueError]
 
 
 def _caption_module() -> ModuleType:
@@ -43,6 +44,10 @@ def _compile_captions() -> CompileCaptions:
 
 def _validate_take_durations() -> ValidateTakeDurations:
     return cast(ValidateTakeDurations, _compiler_entrypoint("validate_take_durations"))
+
+
+def _caption_error() -> CaptionErrorType:
+    return cast(CaptionErrorType, _compiler_entrypoint("CaptionError"))
 
 
 def _project() -> ProjectManifest:
@@ -131,6 +136,90 @@ def test_rejects_overlong_take_for_line_shortening() -> None:
 
     with pytest.raises(ValueError, match="shorten"):
         _validate_take_durations()(NARRATION_PATH, _project(), {"problem": measured_frames})
+
+
+@pytest.mark.parametrize(
+    ("source", "expected_message"),
+    [
+        pytest.param(
+            '{"delivery": {}, "delivery": {}}',
+            "narration: duplicate JSON key 'delivery'",
+            id="top-level-key",
+        ),
+        pytest.param(
+            """{
+              "delivery": {
+                "model": "gpt-4o-mini-tts",
+                "voice": "marin",
+                "voice": "marin",
+                "instructions": "calm",
+                "disclosure": "AI-generated narration."
+              },
+              "segments": []
+            }""",
+            "narration: duplicate JSON key 'voice'",
+            id="nested-key",
+        ),
+    ],
+)
+def test_compile_captions__duplicate_json_key__raises_caption_error(
+    source: str, expected_message: str, tmp_path: Path
+) -> None:
+    """Reject duplicate keys before a later value can silently replace an earlier contract."""
+    narration_path = tmp_path / "narration.json"
+    narration_path.write_text(source, encoding="utf-8")
+
+    with pytest.raises(_caption_error(), match=expected_message):
+        _compile_captions()(narration_path, _project())
+
+
+def test_compile_captions__directory_source__raises_caption_error(tmp_path: Path) -> None:
+    """Normalize filesystem read failures instead of leaking an implementation exception."""
+    with pytest.raises(_caption_error(), match="narration: could not be read"):
+        _compile_captions()(tmp_path, _project())
+
+
+def test_compile_captions__unpaired_surrogate_caption__raises_field_error(tmp_path: Path) -> None:
+    """Reject non-UTF-8 text before SRT encoding can fail outside the validation boundary."""
+    payload = _read_narration()
+    _segments(payload)[0]["caption"] = "bad\ud800"
+
+    with pytest.raises(
+        _caption_error(), match="segments\\[0\\]\\.caption: must be valid UTF-8 text"
+    ):
+        _compile_captions()(_write_narration(tmp_path / "narration.json", payload), _project())
+
+
+def test_compile_captions__missing_delivery_disclosure__raises_field_error(tmp_path: Path) -> None:
+    """Require the explicit disclosure field rather than accepting an implicit policy value."""
+    payload = _read_narration()
+    delivery = cast(dict[str, object], payload["delivery"])
+    del delivery["disclosure"]
+
+    with pytest.raises(_caption_error(), match=r"narration\.delivery"):
+        _compile_captions()(_write_narration(tmp_path / "narration.json", payload), _project())
+
+
+def test_compile_captions__final_caption_without_disclosure__raises_field_error(
+    tmp_path: Path,
+) -> None:
+    """Keep the narrated master disclosure visible in the final caption interval."""
+    payload = _read_narration()
+    _segments(payload)[-1]["caption"] = "Behavior you can read. Work you can run."
+
+    with pytest.raises(_caption_error(), match="segments\\[-1\\]\\.caption"):
+        _compile_captions()(_write_narration(tmp_path / "narration.json", payload), _project())
+
+
+def test_compile_captions__final_mute_safe_copy_without_disclosure__raises_field_error(
+    tmp_path: Path,
+) -> None:
+    """Keep the speaker cut's final mute-safe message equally transparent about narration."""
+    payload = _read_narration()
+    _segments(payload)[-1]["mute_safe_copy"] = "Behavior you can read. Work you can run."
+
+    with pytest.raises(_caption_error(), match="segments\\[-1\\]\\.mute_safe_copy"):
+        _compile_captions()(_write_narration(tmp_path / "narration.json", payload), _project())
 
 
 def test_srt_compilation_is_deterministic() -> None:

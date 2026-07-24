@@ -1,9 +1,9 @@
 """Validate the locked narration source and render its reusable SRT captions.
 
-The JSON source carries narration, caption, and mute-safe copy together so a
-caption edit cannot silently diverge from the approved spoken script. Picture
-scene boundaries are owned by the project manifest; measured audio may fit
-inside a segment but may never move those boundaries.
+The JSON source co-locates narration, caption, and mute-safe copy for review
+and remains the only approved script source. Picture scene boundaries are
+owned by the project manifest; measured audio may fit inside a segment but may
+never move those boundaries.
 """
 
 from __future__ import annotations
@@ -26,6 +26,14 @@ AI_NARRATION_DISCLOSURE = "AI-generated narration."
 
 class CaptionError(ValueError):
     """Raised when narration cannot safely fit the approved visual timeline."""
+
+
+class _DuplicateJsonKeyError(ValueError):
+    """Carry a duplicate JSON key without exposing decoder-specific details."""
+
+    def __init__(self, key: str) -> None:
+        self.key = key
+        super().__init__(key)
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,14 +136,29 @@ def validate_take_durations(
 
 def _load_json(path: Path) -> dict[str, object]:
     try:
-        decoded = cast(object, json.loads(path.read_text(encoding="utf-8")))
+        text = path.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
         raise CaptionError("narration: source file not found") from exc
     except UnicodeDecodeError as exc:
         raise CaptionError("narration: source is not valid UTF-8") from exc
+    except OSError as exc:
+        raise CaptionError("narration: could not be read") from exc
+    try:
+        decoded = cast(object, json.loads(text, object_pairs_hook=_reject_duplicate_object_keys))
+    except _DuplicateJsonKeyError as exc:
+        raise CaptionError(f"narration: duplicate JSON key {exc.key!r}") from exc
     except json.JSONDecodeError as exc:
         raise CaptionError(f"narration: invalid JSON: {exc.msg}") from exc
     return _object(decoded, "narration")
+
+
+def _reject_duplicate_object_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    decoded: dict[str, object] = {}
+    for key, value in pairs:
+        if key in decoded:
+            raise _DuplicateJsonKeyError(key)
+        decoded[key] = value
+    return decoded
 
 
 def _parse_segment(value: object, index: int) -> NarrationSegment:
@@ -277,6 +300,10 @@ def _exact_fields(payload: dict[str, object], expected: set[str], field: str) ->
 def _nonempty_string(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise CaptionError(f"{field}: must be a non-empty string")
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise CaptionError(f"{field}: must be valid UTF-8 text") from exc
     return value
 
 
