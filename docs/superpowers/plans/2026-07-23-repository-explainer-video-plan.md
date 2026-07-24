@@ -6,7 +6,7 @@ status: active
 source: 'docs/specs/repository-explainer-video.md (SPEC-NSBJ)'
 spec_ref: 'docs/specs/repository-explainer-video.md'
 created: 2026-07-23
-updated: 2026-07-23
+updated: 2026-07-24
 owners:
   - 'Chris Purcell'
   - 'Codex, supervised by the owner'
@@ -21,11 +21,11 @@ test_framework: pytest
 
 ## 1. Objective
 
-Build and deliver a reproducible 4050-frame (135-second), 1920×1080, 30 fps repository explainer with truthful Pythonic Agent Pseudocode captures, OpenAI `marin` narration, burned-in narration captions, a same-picture narration-free speaker cut, a procedurally generated tonal bed, and machine-readable verification and delivery evidence.
+Build and deliver a polished 4050-frame (135-second), 1920×1080, 30 fps repository demo with truthful Pythonic Agent Pseudocode captures, OpenAI `marin` narration, burned-in narration captions, a same-picture narration-free speaker cut, a procedural tonal bed, basic media checks, and checksummed local delivery files.
 
 ## 2. Background
 
-`SPEC-NSBJ` revision 0.4 defines a six-scene conference film that makes agent behavior visible, verifiable, and executable. The repository has the product examples and tools but no media-production source, capture ledger, TTS adapter, deterministic renderer, or media verification harness. This plan adds those production surfaces without changing or shipping them as part of the `apseudo_lint` package.
+`SPEC-NSBJ` revision 0.5 defines a six-scene quick demo that makes agent behavior visible, verifiable, and executable. The owner explicitly recalibrated the work away from release-grade media assurance on `2026-07-24`. Tasks T8–T12 are therefore superseded for execution by T13–T15; their prior commits remain historical implementation evidence, not acceptance gates.
 
 The pipeline treats repository output as evidence rather than decorative copy. Visuals may recompose genuine source and command output for conference legibility, but may not change their semantics. OpenBao owns the Speech API credential; generated intermediates and delivery media remain ignored.
 
@@ -39,7 +39,7 @@ The pipeline treats repository output as evidence rather than decorative copy. V
 - Deterministic hybrid scene composition using real editor pixels, repository source, captured output, and SVG annotations.
 - A restricted, retry-bounded OpenAI Speech adapter for `marin`, with an explicit provider-unavailable outcome.
 - FFmpeg assembly of narrated and speaker exports from one 4050-frame timeline, including a procedural tonal bed.
-- FFprobe, per-variant EBU R128, caption, authenticity, asset-rights, secret, and checksum verification.
+- Basic FFprobe, per-variant EBU R128, caption, disclosure, targeted source/log, and checksum verification.
 - The six approved scenes, production sources, reviewed captures, selected narration WAV, final local exports, `delivery.json`, asset provenance, and close-out documentation.
 
 ### 3.2 Out of Scope
@@ -50,6 +50,7 @@ The pipeline treats repository output as evidence rather than decorative copy. V
 - Alternate aspect ratios, translated narration, or human voice recording.
 - A general-purpose video editor or public media-production API.
 - Repairing the repository's unrelated existing coverage-floor backlog.
+- Hermetic reproduction, decoded-stream equivalence, adversarial promotion gates, per-glyph pixel forensics, exhaustive dependency provenance, and rollback rehearsals.
 
 ### 3.3 Assumptions
 
@@ -240,6 +241,9 @@ Each Verify Task pass runs its targeted tests, nearest regression tests, Ruff ch
 | T10 | Lock approved content and real captures | P4 | T5, T9 | FR-001–FR-005, FR-008, FR-010, NFR-003, NFR-004, NFR-006, NFR-008, NFR-010, C-001–C-003, C-006, C-008, IR-001, IR-004, DR-005 | `uv run pytest tests/video/test_content.py` |
 | T11 | Generate narration and both final candidates | P4 | T10 | FR-006–FR-009, NFR-001, NFR-002, NFR-005, NFR-007, NFR-009, C-004, C-007, IR-002, IR-003, DR-002 | `uv run --project ../.. --directory media/repository-explainer python -m video_pipeline all --output ../../dist/video/candidate` |
 | T12 | Accept and deliver the verified film | P4 | T11 | FR-001, FR-002, FR-006–FR-011, NFR-001–NFR-010, C-001, C-002, C-004–C-005, C-007–C-009, IR-005, DR-001–DR-003, DR-005 | `uv run --project ../.. --directory media/repository-explainer python -m video_pipeline verify --output ../../dist/video/final` |
+| T13 | Replace strict assurance with quick-demo verification and CLI | P5 | T7 | FR-009, FR-010, NFR-001, NFR-002, NFR-005, NFR-007, NFR-008, C-005, C-008, IR-003 | `uv run pytest tests/video/test_verify.py tests/video/test_cli.py` |
+| T14 | Capture, narrate, and render the real quick demo | P5 | T13 | FR-001–FR-008, FR-010, FR-011, NFR-001–NFR-004, NFR-006–NFR-010, C-001–C-008, IR-001–IR-004, DR-001–DR-005 | `uv run --project ../.. --directory media/repository-explainer python -m video_pipeline all` |
+| T15 | Package, review, document, and close the local delivery | P5 | T14 | FR-001, FR-002, FR-006–FR-011, NFR-001–NFR-010, C-001, C-002, C-004, C-005, C-007–C-009, IR-005, DR-001–DR-003, DR-005 | `uv run --project ../.. --directory media/repository-explainer python -m video_pipeline verify --output ../../dist/video/final` |
 
 ## 8. Implementation Tasks
 
@@ -507,6 +511,64 @@ Use frozen, slotted dataclasses and explicit JSON decoding. Reject unknown field
   - **T12.6 Recover / Roll Back** — rehearse rollback with fixture outputs before production acceptance: retain the prior Verified files and manifest, alter one reviewed fixture input, create a differently named candidate plus manifest/checksums, and prove the Verified checksums did not change. If credential exposure is suspected, stop production, delete only the identified affected local artifacts, rotate `secret/api-keys/ai/openai-tts` in OpenBao, and rerun from reviewed source. For a rejected render, retain the last Verified files and manifest, restore only the affected reviewed source, and create a new candidate plus manifest; never overwrite the last Verified package.
   - **T12.7 AW-004 Interim** — when narration is blocked, promote only the verified speaker candidate as `agent-pseudocode-explainer-speaker-interim.mp4`; require all speaker-applicable media, mute-safe story, authenticity, asset-rights, security, C-003, clean-checkout speaker reproduction, inventory, and checksum gates; set `delivery.json` to `status: interim`, name AW-004 and the missing narrated Must gates, record explicit owner acceptance, and state that v1 is incomplete. Never use the final speaker filename or mark T12 complete on this branch.
   - **T12.8 Verify Task** — complete the owner acceptance checklist, run the repository-scoped final gate, commit durable close-out with IDs, and report clickable final paths without publishing externally. Delete `.project-pipeline/2026-07-23-repository-explainer-video/` only after its durable secret-free evidence is present in tracked source or the final local bundle.
+
+## Phase P5: Quick-Demo Recalibration
+
+Tasks T8–T12 are skipped in the live checklist because their assurance scope exceeded the owner's quick-demo intent. T13–T15 are the only remaining execution path.
+
+### T13: Replace Strict Assurance with Quick-Demo Verification and CLI
+
+- **goal:** A small local CLI renders or verifies the demo without a provider call when given the selected WAV, and reports only actionable media, disclosure, targeted credential-safety, and checksum results.
+- **phase:** P5
+- **depends_on:** [T7]
+<!-- prettier-ignore -->
+- **requirements:** [FR-009, FR-010, NFR-001, NFR-002, NFR-005, NFR-007, NFR-008, C-005, C-008, IR-003]
+- **priority:** must
+- **files:** `media/repository-explainer/video_pipeline/verify.py` (replace), `media/repository-explainer/video_pipeline/cli.py` (create), `media/repository-explainer/video_pipeline/__main__.py` (modify), `media/repository-explainer/README.md` (create), `tests/video/test_verify.py` (replace), `tests/video/test_cli.py` (create)
+- **acceptance:** verification reads the two MP4s directly with FFprobe, checks 1920×1080, 30 fps, H.264/AAC stereo, 4050 frames, approximately 135 seconds, variant loudness targets, captions/disclosure, targeted source/log credential patterns, and SHA-256 inventory (TC-T13-001); the CLI exposes `check`, `capture`, `narrate`, `render`, `verify`, and `all`, keeps transient work below `dist/video/work`, and accepts the selected WAV for rerendering without another Speech call (TC-T13-002).
+- **sub-tasks:**
+  - **T13.1 RED** — replace adversarial verifier tests with direct media and CLI contract tests; expected failure: the existing verifier and entry point do not expose the quick-demo contract.
+  - **T13.2 Verify RED** — run the focused tests and confirm failures name the missing simple contract.
+  - **T13.3 GREEN** — implement the smallest verifier and orchestration CLI that satisfy the acceptance criteria.
+  - **T13.4 Verify GREEN** — run a short fixture render through `verify` and `all --dry-run`.
+  - **T13.5 REFACTOR** — remove unused strict-assurance implementation and keep orchestration readable.
+  - **T13.6 Verify Task** — run T7, T13, Ruff, scoped BasedPyright, and `git diff --check`; commit with IDs.
+
+### T14: Capture, Narrate, and Render the Real Quick Demo
+
+- **goal:** Produce the real two-minute-fifteen-second narrated and speaker candidates from reviewed repository footage and the approved `marin` voice.
+- **phase:** P5
+- **depends_on:** [T13]
+<!-- prettier-ignore -->
+- **requirements:** [FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-010, FR-011, NFR-001, NFR-002, NFR-003, NFR-004, NFR-006, NFR-007, NFR-008, NFR-009, NFR-010, C-001, C-002, C-003, C-004, C-005, C-006, C-007, C-008, IR-001, IR-002, IR-003, IR-004, DR-001, DR-002, DR-003, DR-004, DR-005]
+- **priority:** must
+- **files:** `media/repository-explainer/captures/` (modify), `media/repository-explainer/production-evidence.json` (modify), `dist/video/candidate/` (generate, ignored)
+- **acceptance:** two real editor frames replace the lock-screen blocker and visually match the hero workflow; the existing truthful command and preflight-only runner evidence remains unchanged (TC-T14-001); one bounded `marin` narration package fits the scene timing and both 4050-frame candidates pass the T13 media checks (TC-T14-002).
+- **sub-tasks:**
+  - **T14.1 RED** — run production readiness and confirm only real editor, narration, and final candidate artifacts are missing.
+  - **T14.2 Verify RED** — inspect the missing-artifact report and fix source defects before any paid call.
+  - **T14.3 GREEN** — capture the two editor frames, run the bounded Speech request, select the WAV, and render both candidates.
+  - **T14.4 Verify GREEN** — run basic verification and inspect representative opening, diagnostic, runner, and end-card frames plus narrated and muted playback.
+  - **T14.5 REFACTOR** — correct only visible or audible defects; do not add new assurance infrastructure.
+  - **T14.6 Verify Task** — save secret-free production evidence and commit reviewed source/capture changes with IDs.
+
+### T15: Package, Review, Document, and Close the Local Delivery
+
+- **goal:** Promote the accepted candidates and reusable inputs to stable local filenames, document reproduction, and close the repository session.
+- **phase:** P5
+- **depends_on:** [T14]
+<!-- prettier-ignore -->
+- **requirements:** [FR-001, FR-002, FR-006, FR-007, FR-008, FR-009, FR-010, FR-011, NFR-001, NFR-002, NFR-003, NFR-004, NFR-005, NFR-006, NFR-007, NFR-008, NFR-009, NFR-010, C-001, C-002, C-004, C-005, C-007, C-008, C-009, IR-005, DR-001, DR-002, DR-003, DR-005]
+- **priority:** must
+- **files:** `dist/video/final/` (generate, ignored), `media/repository-explainer/README.md` (modify), `media/repository-explainer/production-evidence.json` (modify), `docs/handoff/` (modify)
+- **acceptance:** final contains narrated and speaker MP4s, selected WAV, captions, `delivery.json`, render manifest, verification report, and checksums under stable names (TC-T15-001); representative playback/frame review accepts story, readability, truthfulness, narration, and disclosure, and the documented rerender command works with the selected WAV (TC-T15-002).
+- **sub-tasks:**
+  - **T15.1 RED** — verify the final directory before promotion; expected failure: stable delivery files are absent.
+  - **T15.2 Verify RED** — confirm candidates remain green.
+  - **T15.3 GREEN** — promote the reviewed files and write delivery metadata, checksums, reproduction documentation, and handoff facts.
+  - **T15.4 Verify GREEN** — rerun basic media, checksum, targeted source/log, Markdown, pseudocode, and handoff checks.
+  - **T15.5 REFACTOR** — remove obsolete local candidates only after final checksums exist.
+  - **T15.6 Verify Task** — run the proportional final gate, harvest plan notes, close handoff, commit, merge to `main`, and push.
 
 ## 9. Cross-Cutting Requirements
 

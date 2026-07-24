@@ -7,7 +7,7 @@ doc_type: 'spec'
 owner: 'Chris Purcell'
 implementer: 'Codex, supervised by the owner'
 created: '2026-07-23'
-last_reviewed: '2026-07-23'
+last_reviewed: '2026-07-24'
 supersedes: null # SPEC id this replaces, if any
 superseded_by: null # filled in when this spec is retired
 related:
@@ -27,6 +27,7 @@ related:
 
 | Version | Date | Author | Change |
 | --- | --- | --- | --- |
+| 0.5 | `2026-07-24` | Chris Purcell, Codex | Recalibrated the release as a quick repository demo and deferred release-grade media assurance. |
 | 0.4 | `2026-07-23` | Codex, owner-authorized | Clarified provider permission granularity, fixed-frame narration fit, and production-code gate scope during requested Opus convergence. |
 | 0.3 | `2026-07-23` | Codex | Resolved adversarial-review findings for reproducibility, per-variant delivery, provider fallback, provenance, and repository gates. |
 | 0.2 | `2026-07-23` | Chris Purcell | Approved for implementation; confirmed OpenAI `marin` narration. |
@@ -43,6 +44,19 @@ Pythonic Agent Pseudocode turns agent instructions into Python-shaped process de
 This project will produce a conference-ready explainer film that demonstrates the toolkit through real repository artifacts and captured tool behavior. The film's central promise is:
 
 > Agent behavior can be understandable enough to read and concrete enough to run.
+
+### 1.1 Quick-demo release boundary
+
+The owner recalibrated this work on `2026-07-24`: this is a polished quick repository demo, not a release-grade media assurance system. The first local delivery is accepted when it has:
+
+- real repository, editor, and CLI footage with no fabricated success claim;
+- `marin` narration plus a same-picture speaker cut;
+- burned-in narrated captions, mute-safe scene copy, and AI-narration disclosure;
+- basic FFprobe and loudness checks for both MP4s;
+- stable filenames, a delivery inventory, and SHA-256 checksums; and
+- one documented rerender command using the selected narration WAV.
+
+The first local delivery does **not** require hermetic reproduction, bit-for-bit or decoded-stream equivalence, adversarial promotion gates, per-glyph pixel forensics, exhaustive runtime dependency provenance, denial probes against unrelated provider APIs, or remediation of unrelated repository-wide gates. Existing implementation that supports those concerns may remain, but it is not a delivery blocker and must not delay the demo. Where later acceptance language conflicts with this boundary, this section controls the quick-demo release.
 
 The first release is optimized for a technical presentation. It must support a live speaker and also stand alone with calm narration and captions. The durable value is a reproducible media pipeline: future repository changes can replace captures, narration, or individual scenes without rebuilding the film from an opaque editing project.
 
@@ -196,13 +210,13 @@ Every terminal line presented as real traces to a captured command. Every displa
 | NFR-001 | Format | Both variants shall be 1920×1080 at 30 progressive frames per second. | FFprobe reports `1920x1080`, 30 fps, H.264 video, AAC stereo audio, and an MP4 container for each variant. | Must |
 | NFR-002 | Duration | Both variants shall share exactly 4050 video frames and the same 135-second program duration. | FFprobe reports 4050 frames for each variant; container, video, and audio durations equal 135 seconds within one frame; no audio packet or narration segment extends past frame 4050 or outside its FR-006 scene budget. | Must |
 | NFR-003 | Accessibility | Essential meaning shall remain available without audio in each variant. | A muted review of the narrated master using captions and of the speaker cut using scene copy can identify all six scenes and the closing promise. | Must |
-| NFR-004 | Legibility | Essential code, command, caption, and label text shall remain readable from a conference screen. | At 1080p, captions are at least 44 px, primary code is at least 32 px, essential content stays within the central 90% of frame width and height, and WCAG relative-luminance contrast is at least 4.5:1 on final composited frames sampled at every scene/state transition and every caption-bearing state. | Must |
-| NFR-005 | Reproducibility | Identical approved source and selected delivery inputs shall render semantically equivalent streams. | A clean checkout reproduces picture, caption, synthesized-bed, and speaker-cut streams; supplying the checksummed selected narration WAV also reproduces the narrated stream. Nondeterministic container metadata is excluded, and no Speech API call occurs during reproduction. | Must |
+| NFR-004 | Legibility | Essential code, command, caption, and label text shall remain readable from a conference screen. | A representative full-resolution frame review confirms readable type, useful contrast, and title-safe placement in all six scenes. Automated per-glyph pixel analysis is deferred. | Must |
+| NFR-005 | Reproducibility | The reviewed source and selected narration WAV shall support a practical rerender. | One documented command rebuilds both variants without another Speech API call. Hermetic or decoded-stream equivalence is deferred. | Must |
 | NFR-006 | Authenticity | Designed composites shall not change the semantic content of captured source or output. | A side-by-side evidence review finds no altered command, diagnostic, rule code, outcome, or source statement. | Must |
 | NFR-007 | Audio quality | Narration shall be clear while the live-speaker bed remains unobtrusive. | The narrated mix measures −16 LUFS integrated (±1 LU) with true peak no higher than −1 dBTP; the speaker cut measures −28 LUFS integrated (±2 LU) with true peak no higher than −6 dBTP; playback spot checks confirm speech intelligibility and live-speaker headroom. | Must |
-| NFR-008 | Security | Production logs, source, and exports shall contain no credential value. | Secret-pattern and high-entropy scans return no material finding; manual diff review confirms only references remain. | Must |
+| NFR-008 | Security | Production logs and source shall contain no credential value. | The production process passes the key only through its environment; a targeted source/log scan and reviewed Git diff contain references only. Media OCR, transcription, and entropy forensics are deferred. | Must |
 | NFR-009 | Cost | Bounded TTS generation shall remain within C-007. | A non-itemized verification record contains take count, derived usage estimate, the approved cap, and pass/fail only; it contains no invoice, account identifier, payment data, or provider billing export. | Should |
-| NFR-010 | Asset rights | Every non-repository font, graphic, and audio input shall be open, procedurally generated, or accompanied by retained license provenance. | The asset-provenance manifest names source, license or generation method, and checksum; delivery blocks on any unclassified asset. | Must |
+| NFR-010 | Asset rights | The demo shall use repository material, declared Noto fonts, generated SVGs, and procedural audio only. | The delivery record names those input classes and no third-party music or stock imagery is used. Exhaustive runtime dependency provenance is deferred. | Must |
 
 ### 7.3 Interface Requirements
 
