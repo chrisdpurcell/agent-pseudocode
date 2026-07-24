@@ -183,10 +183,18 @@ def promote_evidence_bundle(
                 replace_evidence_path(backup, destination)
                 backup = None
             raise EvidencePromotionError("evidence directory commit failed") from exc
+        try:
+            validate_evidence_directory(destination, hashes)
+        except RunnerCaptureError, OSError:
+            if destination.exists() or destination.is_symlink():
+                _remove_path(destination)
+            if backup is not None and backup.exists():
+                replace_evidence_path(backup, destination)
+                backup = None
+            raise
         if backup is not None:
             _remove_path(backup)
             backup = None
-        _validate_directory(destination, hashes)
         return hashes
     finally:
         if stage.exists():
@@ -219,11 +227,15 @@ def _write_stage(stage: Path, bundle: Mapping[str, object]) -> dict[str, str]:
             raise EvidencePromotionError(f"evidence staging failed for {name!r}") from exc
         hashes[name] = _digest(content)
     _fsync_directory(stage)
-    _validate_directory(stage, hashes)
+    validate_evidence_directory(stage, hashes)
     return hashes
 
 
-def _validate_directory(directory: Path, hashes: Mapping[str, str]) -> None:
+def validate_evidence_directory(
+    directory: Path,
+    hashes: Mapping[str, str],
+) -> None:
+    """Validate the exact regular-file inventory and committed byte hashes."""
     if set(hashes) != set(RUNNER_EVIDENCE_NAMES):
         raise EvidencePromotionError("promoted runner evidence name set changed")
     try:
@@ -261,7 +273,7 @@ def _validate_directory(directory: Path, hashes: Mapping[str, str]) -> None:
 
 def _directory_matches(directory: Path, hashes: Mapping[str, str]) -> bool:
     try:
-        _validate_directory(directory, hashes)
+        validate_evidence_directory(directory, hashes)
     except EvidencePromotionError:
         return False
     return True
@@ -359,7 +371,23 @@ def _parse_agent_command(
         raise RunnerCaptureError("agent command schema path is not bound to argv")
     if _option(argv, "--output-last-message") != last_message_path:
         raise RunnerCaptureError("agent command output path is not bound to argv")
-    if _normalized_provider_argv(argv) != _normalized_provider_argv(context.preview_argv):
+    expected_vector = (
+        "codex",
+        "exec",
+        "--cd",
+        os.fspath(context.workspace),
+        "--json",
+        "--output-last-message",
+        "<output-last-message>",
+        "--output-schema",
+        "<output-schema>",
+        "--sandbox",
+        "read-only",
+        "-",
+    )
+    if _normalized_provider_argv(argv) != expected_vector:
+        raise RunnerCaptureError("agent command provider vector changed")
+    if _normalized_provider_argv(context.preview_argv) != expected_vector:
         raise RunnerCaptureError("provider preview and execution vectors differ")
     return AgentCommand(
         argv=argv,

@@ -21,6 +21,7 @@ import pytest
 
 from video_pipeline import runner_capture as runner_capture_module
 from video_pipeline import runner_evidence
+from video_pipeline.capture import CaptureError
 from video_pipeline.runner_capture import (
     MAX_EVIDENCE_FILE_BYTES,
     MAX_PROCESS_OUTPUT_BYTES,
@@ -40,6 +41,7 @@ from video_pipeline.runner_capture import (
     reject_credential_evidence,
     validation_record_passed,
 )
+from video_pipeline.runner_runtime import environment_digest
 
 REVIEW_SCRIPT = "docs/apseudo-docs/examples/runner/review-spec.apseudo"
 SPEC_PATH = "docs/specs/repository-explainer-video.md"
@@ -75,6 +77,9 @@ import pathlib
 import subprocess
 import sys
 
+if os.environ.get("OPENAI_API_KEY"):
+    sys.stderr.write("hook received provider auth\\n")
+    raise SystemExit(8)
 if os.environ.get("APSEUDO_TEST_HOOK_MODE") == "nonzero":
     sys.stderr.write("configured hook failed\\n")
     raise SystemExit(7)
@@ -127,6 +132,9 @@ prompt = (
 )
 
 if args and args[0] == "--check":
+    if os.environ.get("OPENAI_API_KEY"):
+        sys.stderr.write("check received provider auth\\n")
+        raise SystemExit(8)
     if mode == "raw-secret-output":
         print(json.dumps({"PASSWORD": "opaque"}))
         raise SystemExit(0)
@@ -142,33 +150,43 @@ if args and args[0] == "--check":
     print("apseudo-run: script validation passed.")
     raise SystemExit(0)
 if args and args[0] == "--render-prompt":
+    if os.environ.get("OPENAI_API_KEY"):
+        sys.stderr.write("render received provider auth\\n")
+        raise SystemExit(8)
     print(prompt, end="")
     raise SystemExit(0)
 if args and args[0] == "--print-command":
     preview_root = pathlib.Path.cwd() / ".preview"
     preview_sandbox = "workspace-write" if mode == "provider-preview-mismatch" else "read-only"
-    print(
-        shlex.join(
-            [
-                "codex",
-                "exec",
-                "--cd",
-                str(pathlib.Path.cwd()),
-                "--json",
-                "--output-last-message",
-                str(preview_root / "outcome.json"),
-                "--output-schema",
-                str(preview_root / "schema.json"),
-                "--sandbox",
-                preview_sandbox,
-                "-",
-            ]
-        )
-    )
+    if os.environ.get("OPENAI_API_KEY"):
+        sys.stderr.write("preview received provider auth\\n")
+        raise SystemExit(8)
+    preview_argv = [
+        "codex",
+        "exec",
+        "--cd",
+        str(pathlib.Path.cwd()),
+        "--json",
+        "--output-last-message",
+        str(preview_root / "outcome.json"),
+        "--output-schema",
+        str(preview_root / "schema.json"),
+        "--sandbox",
+        preview_sandbox,
+        "-",
+    ]
+    if mode == "agent-duplicate-sandbox":
+        preview_argv[-1:-1] = ["--sandbox", "danger-full-access"]
+    print(shlex.join(preview_argv))
     print("# stdin: rendered prompt")
     raise SystemExit(0)
 if mode == "execution-nonzero":
     sys.stderr.write("fake provider execution failed\\n")
+    raise SystemExit(40)
+if os.environ.get("APSEUDO_TEST_REQUIRE_AUTH") == "1" and not os.environ.get(
+    "OPENAI_API_KEY"
+):
+    sys.stderr.write("execution did not receive provider auth\\n")
     raise SystemExit(40)
 if mode == "execution-partial-nonzero":
     run_root = pathlib.Path(args[args.index("--run-dir") + 1])
@@ -318,6 +336,8 @@ if mode == "manifest-spec-mismatch":
     payload = json.loads((run_record / "manifest.json").read_text(encoding="utf-8"))
     payload["args"]["spec_path"] = "docs/specs/wrong.md"
     write_json("manifest.json", payload)
+if mode == "manifest-nonobject":
+    write_json("manifest.json", ["not", "an", "object"])
 if mode == "agent-argv-nonstring":
     payload = json.loads((run_record / "agent-command.json").read_text(encoding="utf-8"))
     payload["argv"][1] = 7
@@ -333,6 +353,10 @@ if mode == "agent-prompt-mismatch":
 if mode == "agent-sandbox-mismatch":
     payload = json.loads((run_record / "agent-command.json").read_text(encoding="utf-8"))
     payload["argv"][payload["argv"].index("read-only")] = "workspace-write"
+    write_json("agent-command.json", payload)
+if mode == "agent-duplicate-sandbox":
+    payload = json.loads((run_record / "agent-command.json").read_text(encoding="utf-8"))
+    payload["argv"][-1:-1] = ["--sandbox", "danger-full-access"]
     write_json("agent-command.json", payload)
 if mode == "post-returncode-string":
     payload = json.loads((run_record / "post-checks.json").read_text(encoding="utf-8"))
@@ -377,14 +401,25 @@ def _fake_status_body(
     failure_variable: str,
     *,
     message_variable: str | None = None,
+    require_auth_variable: str | None = None,
 ) -> str:
     rendered_message = (
         repr(message)
         if message_variable is None
         else f"os.environ.get({message_variable!r}, {message!r})"
     )
+    auth_guard = (
+        ""
+        if require_auth_variable is None
+        else (
+            f"if os.environ.get({require_auth_variable!r}) == '1' "
+            "and not os.environ.get('OPENAI_API_KEY'):\n"
+            "    raise SystemExit(9)\n"
+        )
+    )
     return (
         "import os\n"
+        f"{auth_guard}"
         f"print({rendered_message})\n"
         f"raise SystemExit(int(os.environ.get({failure_variable!r}, '0')))\n"
     )
@@ -535,7 +570,10 @@ def _runner_repository(
     fake_bin.mkdir()
     _write_executable(
         fake_bin / "uv",
-        _fake_status_body("locked environment synchronized", "APSEUDO_TEST_SYNC_STATUS"),
+        "import os\n"
+        'print("locked environment synchronized")\n'
+        "raise SystemExit(8 if os.environ.get('OPENAI_API_KEY') else "
+        "int(os.environ.get('APSEUDO_TEST_SYNC_STATUS', '0')))\n",
         shebang=str(Path(sys.executable).resolve()),
     )
     _write_executable(
@@ -544,6 +582,7 @@ def _runner_repository(
             "Logged in using fixture",
             "APSEUDO_TEST_LOGIN_STATUS",
             message_variable="APSEUDO_TEST_LOGIN_MESSAGE",
+            require_auth_variable="APSEUDO_TEST_REQUIRE_AUTH",
         ),
         shebang=str(Path(sys.executable).resolve()),
     )
@@ -1299,12 +1338,17 @@ def test_capture__explicit_auth_is_not_logged_in_evidence(
             operator_python=runner.parent / "python",
             operator_apseudo_run=runner,
             evidence_root=evidence_root,
-            environment=environment,
+            environment={**environment, "APSEUDO_TEST_REQUIRE_AUTH": "1"},
             auth_environment={"OPENAI_API_KEY": "explicit-api-value"},
         )
 
     assert result.mode == "accepted"
     assert all(b"explicit-api-value" not in path.read_bytes() for path in evidence_root.iterdir())
+    commands = _json_object(evidence_root / "runner-commands.json")
+    runtime = cast(dict[str, object], commands["runtime"])
+    assert runtime["environment_sha256"] == environment_digest(
+        build_child_environment({**environment, "APSEUDO_TEST_REQUIRE_AUTH": "1"})
+    )
 
 
 def test_prepare_and_capture__not_logged_in_text__records_preflight(
@@ -1481,10 +1525,12 @@ def test_capture__git_report_failure__records_complete_preflight(
         "manifest-exit-string",
         "manifest-script-mismatch",
         "manifest-spec-mismatch",
+        "manifest-nonobject",
         "agent-argv-nonstring",
         "agent-cwd-mismatch",
         "agent-prompt-mismatch",
         "agent-sandbox-mismatch",
+        "agent-duplicate-sandbox",
         "provider-preview-mismatch",
         "post-returncode-string",
         "outcome-checks-nonstring",
@@ -1534,6 +1580,34 @@ def test_capture__unexecuted_runner_module_mutation__records_preflight(
         )
 
     _assert_preflight_bundle(result, evidence_root, "operator package closure changed")
+
+
+def test_capture__clone_start_failure__records_complete_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    @contextmanager
+    def failed_clone(
+        _repository_root: Path,
+        *,
+        revision: str,
+    ) -> Generator[Path]:
+        del revision
+        raise CaptureError("Git clone could not complete")
+        yield tmp_path / "unreachable"
+
+    monkeypatch.setattr(runner_capture_module, "clean_revision_clone", failed_clone)
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        evidence_root = tmp_path / "promoted"
+        result = _prepare_and_capture(
+            repository,
+            revision,
+            runner,
+            environment,
+            evidence_root,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "Git clone could not complete")
 
 
 def test_promotion__new_or_identical_bundle__is_exact_and_idempotent(
@@ -1608,4 +1682,42 @@ def test_promotion__mid_commit_failure__restores_original_directory(
         )
 
     assert stage_commit_attempted
+    assert {path.name: path.read_bytes() for path in destination.iterdir()} == original_bytes
+
+
+def test_promotion__post_commit_validation_failure__restores_original_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    destination = tmp_path / "evidence"
+    original = _promotion_bundle("original")
+    promote_evidence_bundle(destination, original)
+    original_bytes = {path.name: path.read_bytes() for path in destination.iterdir()}
+    real_validate = runner_evidence.validate_evidence_directory
+    validation_count = 0
+
+    def fail_committed_validation(
+        directory: Path,
+        hashes: Mapping[str, str],
+    ) -> None:
+        nonlocal validation_count
+        validation_count += 1
+        if directory == destination and validation_count >= 3:
+            raise EvidencePromotionError("injected committed validation failure")
+        real_validate(directory, hashes)
+
+    monkeypatch.setattr(
+        runner_evidence,
+        "validate_evidence_directory",
+        fail_committed_validation,
+    )
+
+    with pytest.raises(EvidencePromotionError, match="committed validation"):
+        promote_evidence_bundle(
+            destination,
+            _promotion_bundle("replacement"),
+            allow_recapture=True,
+        )
+
+    assert validation_count == 3
     assert {path.name: path.read_bytes() for path in destination.iterdir()} == original_bytes

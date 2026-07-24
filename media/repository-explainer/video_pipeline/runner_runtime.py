@@ -64,7 +64,8 @@ def prepare_runner_runtime(
 ) -> RunnerRuntime:
     """Synchronize and prove the local operator runtime before cloning."""
     root = _directory(repository_root, "repository_root")
-    child_environment = build_child_environment(
+    child_environment = build_child_environment(environment)
+    provider_environment = build_child_environment(
         environment,
         auth_environment=auth_environment,
     )
@@ -118,7 +119,7 @@ def prepare_runner_runtime(
     provider = run_capture_process(
         provider_command,
         cwd=root,
-        environment=child_environment,
+        environment=provider_environment,
         timeout=30,
         operation="Codex login status",
     )

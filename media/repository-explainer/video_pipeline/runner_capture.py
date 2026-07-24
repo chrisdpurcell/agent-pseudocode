@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
 
-from .capture import RUNNER_EVIDENCE_NAMES, clean_revision_clone
+from .capture import RUNNER_EVIDENCE_NAMES, CaptureError, clean_revision_clone
 from .runner_evidence import (
     RunnerArtifactContext,
     promote_evidence_bundle,
@@ -134,10 +134,7 @@ def prepare_runner_runtime(
     # The implementation lives in runner_runtime; retained code below is
     # removed after focused contract verification.
     root = _directory(repository_root, "repository_root")
-    child_environment = _child_environment(
-        environment,
-        auth_environment=auth_environment,
-    )
+    child_environment = _child_environment(environment)
     exact_revision = _resolve_revision(root, revision)
     _git_object_exists(root, exact_revision)
 
@@ -464,6 +461,41 @@ def capture_guarded_runner(
     auth_environment: Mapping[str, str] | None = None,
     allow_recapture: bool = False,
 ) -> RunnerCaptureResult:
+    """Capture guarded evidence, converting clone startup failures to preflight."""
+    try:
+        return _capture_guarded_runner_impl(
+            repository_root,
+            revision=revision,
+            runtime=runtime,
+            evidence_root=evidence_root,
+            environment=environment,
+            auth_environment=auth_environment,
+            allow_recapture=allow_recapture,
+        )
+    except CaptureError as exc:
+        return _capture_preparation_failure(
+            repository_root,
+            revision=revision,
+            evidence_root=evidence_root,
+            operator_python=runtime.operator_python,
+            operator_apseudo_run=runtime.operator_apseudo_run,
+            sync_argv=runtime.sync_argv,
+            provider_status_argv=runtime.provider_status_argv,
+            reason=f"disposable clone startup failed: {exc}",
+            allow_recapture=allow_recapture,
+        )
+
+
+def _capture_guarded_runner_impl(
+    repository_root: Path,
+    *,
+    revision: str,
+    runtime: RunnerRuntime,
+    evidence_root: Path,
+    environment: Mapping[str, str] | None = None,
+    auth_environment: Mapping[str, str] | None = None,
+    allow_recapture: bool = False,
+) -> RunnerCaptureResult:
     """Capture hook and runner proof, promoting a truthful terminal record.
 
     Operational guard failures select ``preflight-only``. Unsafe input, output,
@@ -471,7 +503,8 @@ def capture_guarded_runner(
     """
     root = _directory(repository_root, "repository_root")
     exact_revision = _resolve_revision(root, revision)
-    child_environment = _child_environment(
+    child_environment = _child_environment(environment)
+    execution_environment = _child_environment(
         environment,
         auth_environment=auth_environment,
     )
@@ -563,6 +596,7 @@ def capture_guarded_runner(
                     runner_artifacts, runner_reason = _capture_runner(
                         clone,
                         child_environment,
+                        execution_environment,
                         command_record,
                         vectors,
                         post_check,
@@ -1131,6 +1165,7 @@ def _runner_command_record(
 def _capture_runner(
     clone: Path,
     environment: Mapping[str, str],
+    execution_environment: Mapping[str, str],
     command_record: dict[str, object],
     vectors: Mapping[str, tuple[str, ...]],
     post_check: str,
@@ -1202,7 +1237,7 @@ def _capture_runner(
     execution = _run(
         vectors["execute"],
         cwd=clone,
-        environment=environment,
+        environment=execution_environment,
         timeout=600,
         operation="runner execution",
     )
@@ -1240,6 +1275,17 @@ def _capture_runner(
         ),
     )
     reason = reason or artifact_contract_reason
+    if artifact_contract_reason is not None:
+        changed_files = _git_changed_files(clone)
+        clean = not changed_files
+        artifacts["changed-files.json"] = {
+            "clean": clean,
+            "files": changed_files,
+            "no_diff": clean,
+        }
+        if not clean:
+            reason = reason or "runner workspace changed despite --require-no-diff"
+        return artifacts, reason
 
     run_manifest = _object_copy(artifacts["run-manifest.json"])
     run_manifest["capture_revision"] = _git(clone, "rev-parse", "HEAD")
