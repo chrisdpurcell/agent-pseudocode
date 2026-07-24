@@ -597,6 +597,7 @@ def test_tc_t7_002__graphs__separate_captions_audio_bed_and_loudness(
     assert "sine=frequency=110:sample_rate=48000" in graph
     assert graph.count("sine=frequency=660:sample_rate=48000") == (len(fixture.project.scenes) - 1)
     assert "loudnorm=I=-16:LRA=7:TP=-1" in graph
+    assert "loudnorm=I=-16:LRA=7:TP=-1:linear=true,volume=1.3dB" in graph
     assert "loudnorm=I=-28:LRA=7:TP=-6" in graph
     assert "atrim=end_sample=67200" in graph
     audio_encoder_indices = [index for index, argument in enumerate(command) if argument == "-c:a"]
@@ -747,6 +748,7 @@ def test_tc_t7_003__cache_selected_wav_and_manifest__are_exact(
         production.fps,
         production.total_frames,
     ) == (1920, 1080, 30, 4050)
+    assert production.caption_size == 12
 
 
 def test_tc_t7_004__orchestration__keeps_every_temporary_under_owned_work_root(

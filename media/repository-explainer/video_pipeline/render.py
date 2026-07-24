@@ -214,7 +214,7 @@ class RenderConfig:
             height=PRODUCTION_HEIGHT,
             fps=PRODUCTION_FPS,
             total_frames=PRODUCTION_FRAMES,
-            caption_size=44,
+            caption_size=12,
             video_bitrate="8M",
         )
 
@@ -947,7 +947,7 @@ def _audio_filter_graph(project: ProjectManifest, config: RenderConfig) -> str:
     filters.append(
         "[speech][bed_for_narrated]"
         "amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,"
-        "loudnorm=I=-16:LRA=7:TP=-1:linear=true,"
+        "loudnorm=I=-16:LRA=7:TP=-1:linear=true,volume=1.3dB,"
         f"aresample={config.audio_sample_rate}:first_pts=0,"
         f"apad=whole_len={total_samples},atrim=end_sample={total_samples},"
         "asetpts=N/SR/TB[narrated_audio]"

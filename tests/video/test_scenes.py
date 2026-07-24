@@ -719,19 +719,12 @@ print(json.dumps({f"{state.scene_id}/{state.state_id}": state.digest for state i
     assert json.loads(runs[0]) == approved
 
 
-def test_compose_scene_states__blocked_editor__reports_locked_editor_only() -> None:
-    from video_pipeline.scenes import (
-        PRODUCTION_EDITOR_BLOCKER,
-        SceneBlockedError,
-        compose_scene_states,
-    )
+def test_compose_scene_states__uses_unlocked_real_editor_capture() -> None:
+    from video_pipeline.scenes import compose_scene_states
 
-    with pytest.raises(
-        SceneBlockedError,
-        match="KDE session is locked; owner-authenticated unlock is required",
-    ) as caught:
-        compose_scene_states(REPOSITORY_ROOT)
-    assert (
-        str(caught.value) == f"{PRODUCTION_EDITOR_BLOCKER}: editor: blocked: "
-        "KDE session is locked; owner-authenticated unlock is required"
-    )
+    states = compose_scene_states(REPOSITORY_ROOT)
+
+    assert {state.state_id for state in states} >= {
+        "editor-lines-1-14",
+        "editor-lines-15-27",
+    }
