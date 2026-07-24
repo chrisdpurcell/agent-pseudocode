@@ -206,31 +206,6 @@ def _state_timeline(
     ]
 
 
-def _rendered_text_width(text: str, font_path: Path, font_size: int) -> int:
-    completed = subprocess.run(
-        [
-            "magick",
-            "-background",
-            "none",
-            "-fill",
-            "white",
-            "-font",
-            str(font_path),
-            "-pointsize",
-            str(font_size),
-            f"label:{text}",
-            "-format",
-            "%w",
-            "info:",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    return int(completed.stdout)
-
-
 def test_tc_t5_001__fixed_inputs__produce_deterministic_provenanced_geometry(
     tmp_path: Path,
 ) -> None:
@@ -397,25 +372,34 @@ def test_tc_t5_002__every_svg_text_run__stays_inside_title_safe_area(
 def test_tc_t5_002__actual_regular_font_bounds_and_resolution__match_every_text_run(
     tmp_path: Path,
 ) -> None:
+    try:
+        from video_pipeline.text_metrics import (
+            TextMetricError,
+            measure_text_bounds,
+            probe_text_metric_capabilities,
+            resolve_regular_font,
+        )
+    except ModuleNotFoundError:
+        pytest.fail("declared FFmpeg/fontconfig text-metric probe is missing")
+
     _, _, _, _, assets, states = _render_test_states(tmp_path)
     sans = assets.require("noto-sans-regular")
     mono = assets.require("noto-sans-mono-regular")
+    capabilities = probe_text_metric_capabilities()
     expected_paths = {
         "Noto Sans": sans.path,
         "Noto Sans Mono": mono.path,
     }
     for family, asset in (("Noto Sans", sans), ("Noto Sans Mono", mono)):
-        resolved = subprocess.run(
-            ["fc-match", "-f", "%{file}", f"{family}:style=Regular"],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        ).stdout
-        assert Path(resolved) == asset.path
+        assert resolve_regular_font(family, capabilities=capabilities) == asset.path
         assert hashlib.sha256(asset.path.read_bytes()).hexdigest() == asset.sha256
     policy_map = ElementTree.fromstring(assets.require("policy-map").path.read_bytes())
     assert all("font-weight" not in element.attrib for element in policy_map.iter())
+
+    with pytest.raises(TextMetricError, match="ffmpeg executable was not found"):
+        probe_text_metric_capabilities(ffmpeg="definitely-missing-ffmpeg-for-test")
+    with pytest.raises(TextMetricError, match="fc-match executable was not found"):
+        probe_text_metric_capabilities(fontconfig="definitely-missing-fontconfig-for-test")
 
     for state in states:
         root = ElementTree.fromstring(state.svg)
@@ -429,16 +413,33 @@ def test_tc_t5_002__actual_regular_font_bounds_and_resolution__match_every_text_
             for run in runs:
                 if not (run.text or "").strip():
                     continue
-                width = _rendered_text_width(
+                bounds = measure_text_bounds(
                     run.text or "",
-                    expected_paths[text_element.attrib["font-family"]],
-                    int(text_element.attrib["font-size"]),
+                    font_path=expected_paths[text_element.attrib["font-family"]],
+                    font_size=int(text_element.attrib["font-size"]),
+                    x=int(run.attrib.get("x", text_element.attrib["x"])),
+                    baseline=int(run.attrib.get("y", text_element.attrib["y"])),
+                    anchor=text_element.attrib.get("text-anchor", "start"),
+                    capabilities=capabilities,
                 )
-                x = int(run.attrib.get("x", text_element.attrib["x"]))
-                anchor = text_element.attrib.get("text-anchor", "start")
-                left = x - width // 2 if anchor == "middle" else x - width if anchor == "end" else x
-                assert left >= 96
-                assert left + width <= 1824
+                assert bounds.left >= 96
+                assert bounds.top >= 54
+                assert bounds.right <= 1824
+                assert bounds.bottom <= CAPTION_RECTANGLE.y
+
+
+def test_tc_t5_002__video_python__has_no_external_image_tool_dependency() -> None:
+    forbidden = "mag" + "ick"
+    paths = (
+        *(REPOSITORY_ROOT / "media" / "repository-explainer" / "video_pipeline").glob("*.py"),
+        *(REPOSITORY_ROOT / "tests" / "video").glob("*.py"),
+    )
+    offenders = [
+        path.relative_to(REPOSITORY_ROOT).as_posix()
+        for path in paths
+        if forbidden in path.read_text(encoding="utf-8").lower()
+    ]
+    assert offenders == []
 
 
 def test_tc_t5_002__wrapped_code_tspans__preserve_exact_semantic_line_ledgers(
@@ -566,6 +567,69 @@ def test_tc_t5_003__state_content_and_asset_ledgers__close_every_reference(
                 and reference.path.endswith(f"#asset={asset_id}")
                 for reference in state.references
             )
+
+
+def test_tc_t5_003__renderer_labels__come_from_one_tracked_content_source(
+    tmp_path: Path,
+) -> None:
+    try:
+        from video_pipeline.scene_content import (
+            POLICY_LABEL,
+            POLICY_MAP_LABELS,
+            PROBLEM_LABEL,
+            RUNNER_ACCEPTED_LABEL,
+            RUNNER_PREFLIGHT_LABEL,
+            TEACHING_LABEL,
+        )
+    except ModuleNotFoundError:
+        pytest.fail("tracked renderer-authored scene content source is missing")
+
+    *_, states = _render_test_states(tmp_path)
+    relative_path = Path("media/repository-explainer/video_pipeline/scene_content.py")
+    content_path = REPOSITORY_ROOT / relative_path
+    content_hash = hashlib.sha256(content_path.read_bytes()).hexdigest()
+    expected_labels = {
+        ("problem", "question"): (PROBLEM_LABEL,),
+        ("caught-defect", "teaching-source"): (TEACHING_LABEL,),
+        ("caught-defect", "teaching-diagnostics"): (TEACHING_LABEL,),
+        ("shared-policy", "system-map"): (POLICY_LABEL, *POLICY_MAP_LABELS),
+        ("guarded-execution", "runner"): (
+            RUNNER_PREFLIGHT_LABEL,
+            RUNNER_ACCEPTED_LABEL,
+        ),
+    }
+    scenes_source = (
+        REPOSITORY_ROOT / "media/repository-explainer/video_pipeline/scenes.py"
+    ).read_text(encoding="utf-8")
+
+    for state in states:
+        labels = expected_labels.get((state.scene_id, state.state_id))
+        references = [
+            reference
+            for reference in state.references
+            if reference.path == relative_path.as_posix()
+        ]
+        if labels is None:
+            assert references == []
+            continue
+        assert len(references) == 1
+        assert references[0].kind == "source"
+        assert references[0].sha256 == content_hash
+        present = tuple(label for label in labels if label in state.content_ledger)
+        assert present
+        if state.scene_id != "guarded-execution":
+            assert present == labels
+        else:
+            assert len(present) == 1
+
+    renderer_labels = (
+        PROBLEM_LABEL,
+        TEACHING_LABEL,
+        POLICY_LABEL,
+        RUNNER_PREFLIGHT_LABEL,
+        RUNNER_ACCEPTED_LABEL,
+    )
+    assert all(label not in scenes_source for label in renderer_labels)
 
 
 def test_tc_t5_003__mutated_verified_assets_and_runner_bytes__fail_closed(

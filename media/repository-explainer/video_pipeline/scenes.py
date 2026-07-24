@@ -39,6 +39,14 @@ from .capture import (
 from .manifest import load_project
 from .models import ProjectManifest, Rectangle, Scene, VisualState
 from .runner_capture import RunnerCaptureError, expand_display_command
+from .scene_content import (
+    POLICY_LABEL,
+    POLICY_MAP_LABELS,
+    PROBLEM_LABEL,
+    RUNNER_ACCEPTED_LABEL,
+    RUNNER_PREFLIGHT_LABEL,
+    TEACHING_LABEL,
+)
 
 type AssetKind = Literal["audio", "font", "graphic"]
 type ReferenceKind = Literal["asset", "capture", "narration", "source", "theme"]
@@ -57,6 +65,7 @@ PROJECT_RELATIVE_PATH = Path("media/repository-explainer/project.json")
 THEME_RELATIVE_PATH = Path("media/repository-explainer/theme.json")
 CAPTURE_MANIFEST_RELATIVE_PATH = Path("media/repository-explainer/captures/manifest.json")
 ASSET_PROVENANCE_RELATIVE_PATH = Path("media/repository-explainer/asset-provenance.json")
+SCENE_CONTENT_RELATIVE_PATH = Path("media/repository-explainer/video_pipeline/scene_content.py")
 _SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _HEX_COLOR = re.compile(r"#[0-9A-Fa-f]{6}")
@@ -393,6 +402,11 @@ def render_scene_states(
         root / NARRATION_RELATIVE_PATH,
         "narration",
     )
+    scene_content_reference = _path_reference(
+        root,
+        root / SCENE_CONTENT_RELATIVE_PATH,
+        "source",
+    )
 
     rendered: list[RenderedSceneState] = []
     for scene in project.scenes:
@@ -410,6 +424,7 @@ def render_scene_states(
             source_references=source_cache[scene.id],
             theme_reference=theme_reference,
             narration_reference=narration_reference,
+            scene_content_reference=scene_content_reference,
         )
         rendered.extend(_render_state(context, state) for state in scene.visual_states)
     return tuple(rendered)
@@ -452,6 +467,7 @@ class _SceneContext:
     source_references: tuple[_SourceInput, ...]
     theme_reference: ContentReference
     narration_reference: ContentReference
+    scene_content_reference: ContentReference
 
 
 @dataclass(frozen=True, slots=True)
@@ -461,6 +477,7 @@ class _RenderedVisual:
     content_ledger: tuple[str, ...]
     asset_ids: tuple[str, ...]
     extra_references: tuple[ContentReference, ...] = ()
+    uses_scene_content: bool = False
 
 
 def _render_state(
@@ -500,6 +517,8 @@ def _render_state(
     else:
         raise SceneError(f"scene/state {scene_id!r}/{state.id!r}: no approved renderer")
     references.extend(visual.extra_references)
+    if visual.uses_scene_content:
+        references.append(context.scene_content_reference)
     references.extend(
         _asset_reference(context.assets.require(asset_id)) for asset_id in visual.asset_ids
     )
@@ -579,7 +598,7 @@ def _render_mute_safe(
 
 
 def _problem_svg(context: _SceneContext, state: VisualState) -> _RenderedVisual:
-    label = "Dense instructions. Hidden decisions."
+    label = PROBLEM_LABEL
     display_text = context.segment.caption
     content_ledger = (label, display_text)
     root = _svg_root(context, state.id, evidence_rectangles=())
@@ -598,6 +617,7 @@ def _problem_svg(context: _SceneContext, state: VisualState) -> _RenderedVisual:
         display_text=display_text,
         content_ledger=content_ledger,
         asset_ids=(context.theme.font_sans_asset_id,),
+        uses_scene_content=True,
     )
 
 
@@ -704,7 +724,7 @@ def _teaching_svg(
 ) -> _RenderedVisual:
     evidence_rectangles = state.evidence_rectangles
     rectangle = _one_evidence_rectangle(evidence_rectangles, "caught-defect")
-    label = "Teaching example — deliberately invalid"
+    label = TEACHING_LABEL
     if state.id == "teaching-source":
         display_text = context.teaching.command
         exact_lines = [
@@ -754,6 +774,7 @@ def _teaching_svg(
             context.theme.font_mono_asset_id,
         ),
         extra_references=references,
+        uses_scene_content=True,
     )
 
 
@@ -771,9 +792,9 @@ def _policy_svg(
         )
     asset = context.assets.require("policy-map")
     asset_bytes = _verified_asset_bytes(asset)
-    label = "One shared policy"
+    label = POLICY_LABEL
     display_text = "\n".join(rule_lines)
-    map_labels = ("Policy core", "Editor", "MCP", "Runner", "Hooks", "Pre-commit", "CI")
+    map_labels = POLICY_MAP_LABELS
     content_ledger = (label, display_text, *rule_lines, *map_labels)
     root = _svg_root(context, state.id, evidence_rectangles=evidence_rectangles)
     _background(root, context.theme.colors["ink"])
@@ -820,6 +841,7 @@ def _policy_svg(
             context.theme.font_sans_asset_id,
             context.theme.font_mono_asset_id,
         ),
+        uses_scene_content=True,
     )
 
 
@@ -833,9 +855,7 @@ def _runner_svg(
     _background(root, context.theme.colors["ink"])
     _terminal_panel(root, rectangle, context.theme)
     mode_label = (
-        "Verified preflight-only"
-        if context.runner.mode == "preflight-only"
-        else "Accepted guarded execution"
+        RUNNER_PREFLIGHT_LABEL if context.runner.mode == "preflight-only" else RUNNER_ACCEPTED_LABEL
     )
     display_text = context.runner.display_command
     exact_lines = ["$ " + context.runner.display_command, "", context.runner.reason]
@@ -872,6 +892,7 @@ def _runner_svg(
             context.theme.font_mono_asset_id,
         ),
         extra_references=context.runner.references,
+        uses_scene_content=True,
     )
 
 
