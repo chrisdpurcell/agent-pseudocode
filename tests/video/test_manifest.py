@@ -59,6 +59,7 @@ def test_loads_approved_4050_frame_six_scene_manifest(
     ]
     assert (manifest.media.width, manifest.media.height, manifest.media.fps) == (1920, 1080, 30)
     assert manifest.media.total_frames == 4050
+    assert manifest.evidence_dominant_frames == 3000
 
 
 def test_module_help_describes_the_local_pipeline() -> None:
@@ -184,6 +185,155 @@ def _rectangles_overlap(payload: dict[str, object]) -> None:
         {"x": 100, "y": 100, "width": 800, "height": 600},
         {"x": 800, "y": 100, "width": 800, "height": 600},
     ]
+
+
+def _full_frame_rectangle() -> dict[str, int]:
+    return {"x": 0, "y": 0, "width": 1920, "height": 1080}
+
+
+def _replace_visual_states(
+    payload: dict[str, object], scene_index: int, states: list[dict[str, object]]
+) -> None:
+    _scene(payload, scene_index)["visual_states"] = states
+
+
+def _below_evidence_share(payload: dict[str, object]) -> None:
+    _state(payload, 1)["evidence_rectangles"] = []
+
+
+def _exactly_sixty_percent_evidence_share(payload: dict[str, object]) -> None:
+    _replace_visual_states(
+        payload,
+        1,
+        [
+            {
+                "id": "brief-evidence",
+                "start_frame": 450,
+                "end_frame": 480,
+                "evidence_rectangles": [_full_frame_rectangle()],
+            },
+            {
+                "id": "workflow-copy",
+                "start_frame": 480,
+                "end_frame": 1050,
+                "evidence_rectangles": [],
+            },
+        ],
+    )
+
+
+def _exactly_eighty_percent_evidence_share(payload: dict[str, object]) -> None:
+    _replace_visual_states(
+        payload,
+        0,
+        [
+            {
+                "id": "opening-evidence",
+                "start_frame": 0,
+                "end_frame": 240,
+                "evidence_rectangles": [_full_frame_rectangle()],
+            },
+            {
+                "id": "question-copy",
+                "start_frame": 240,
+                "end_frame": 450,
+                "evidence_rectangles": [],
+            },
+        ],
+    )
+
+
+def _above_evidence_share(payload: dict[str, object]) -> None:
+    _state(payload, 0)["evidence_rectangles"] = [_full_frame_rectangle()]
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected_frames", "should_raise"),
+    [
+        pytest.param(_below_evidence_share, 2400, True, id="below-sixty-percent"),
+        pytest.param(
+            _exactly_sixty_percent_evidence_share, 2430, False, id="exactly-sixty-percent"
+        ),
+        pytest.param(
+            _exactly_eighty_percent_evidence_share, 3240, False, id="exactly-eighty-percent"
+        ),
+        pytest.param(_above_evidence_share, 3450, True, id="above-eighty-percent"),
+    ],
+)
+def test_enforces_evidence_dominant_frame_share_boundaries(
+    repository_root: Path,
+    approved_manifest_data: dict[str, object],
+    write_manifest: Callable[[Path, Mapping[str, object]], Path],
+    mutate: Mutation,
+    expected_frames: int,
+    should_raise: bool,
+) -> None:
+    payload = copy.deepcopy(approved_manifest_data)
+    mutate(payload)
+    manifest_path = write_manifest(repository_root, payload)
+
+    if should_raise:
+        with pytest.raises(ManifestError, match=re.escape("evidence-dominant frames")):
+            _load_manifest(manifest_path, repository_root)
+    else:
+        manifest = _load_manifest(manifest_path, repository_root)
+        assert manifest.evidence_dominant_frames == expected_frames
+
+
+def test_accepts_contiguous_states_and_touching_evidence_rectangles(
+    repository_root: Path,
+    approved_manifest_data: dict[str, object],
+    write_manifest: Callable[[Path, Mapping[str, object]], Path],
+) -> None:
+    payload = copy.deepcopy(approved_manifest_data)
+    _replace_visual_states(
+        payload,
+        1,
+        [
+            {
+                "id": "left-half",
+                "start_frame": 450,
+                "end_frame": 750,
+                "evidence_rectangles": [{"x": 0, "y": 0, "width": 960, "height": 1080}],
+            },
+            {
+                "id": "right-half",
+                "start_frame": 750,
+                "end_frame": 1050,
+                "evidence_rectangles": [
+                    {"x": 0, "y": 0, "width": 960, "height": 1080},
+                    {"x": 960, "y": 0, "width": 960, "height": 1080},
+                ],
+            },
+        ],
+    )
+
+    manifest = _load_manifest(write_manifest(repository_root, payload), repository_root)
+
+    assert len(manifest.scenes[1].visual_states) == 2
+    assert manifest.evidence_dominant_frames == 3000
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        pytest.param("narrated", "final/narrated.txt", id="narrated-text"),
+        pytest.param("speaker", "final/speaker", id="speaker-without-suffix"),
+        pytest.param("render_manifest", "candidate/render-manifest.mp4", id="manifest-mp4"),
+    ],
+)
+def test_rejects_invalid_output_filename_suffixes(
+    repository_root: Path,
+    approved_manifest_data: dict[str, object],
+    write_manifest: Callable[[Path, Mapping[str, object]], Path],
+    field: str,
+    replacement: str,
+) -> None:
+    payload = copy.deepcopy(approved_manifest_data)
+    _mapping(payload["output"])[field] = replacement
+
+    with pytest.raises(ManifestError, match=re.escape(f"output.{field}")):
+        _load_manifest(write_manifest(repository_root, payload), repository_root)
 
 
 @pytest.mark.parametrize(

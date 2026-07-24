@@ -87,3 +87,4 @@ class ProjectManifest:
     safe_area: SafeArea
     output: OutputConfig
     scenes: tuple[Scene, ...]
+    evidence_dominant_frames: int

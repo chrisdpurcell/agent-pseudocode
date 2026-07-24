@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
+from itertools import pairwise
 from pathlib import Path
 from typing import cast
 
@@ -63,7 +64,14 @@ def load_project(path: Path, *, repository_root: Path | None = None) -> ProjectM
     safe_area = _parse_safe_area(_object(_required(payload, "safe_area", "manifest"), "safe_area"))
     output = _parse_output(_object(_required(payload, "output", "manifest"), "output"), root)
     scenes = _parse_scenes(_array(_required(payload, "scenes", "manifest"), "scenes"), root, media)
-    return ProjectManifest(media=media, safe_area=safe_area, output=output, scenes=scenes)
+    evidence_dominant_frames = _validate_evidence_dominant_frame_share(scenes, media)
+    return ProjectManifest(
+        media=media,
+        safe_area=safe_area,
+        output=output,
+        scenes=scenes,
+        evidence_dominant_frames=evidence_dominant_frames,
+    )
 
 
 def _repository_root(manifest_path: Path) -> Path:
@@ -164,6 +172,12 @@ def _parse_output(payload: dict[str, object], repository_root: Path) -> OutputCo
         raise ManifestError("output.pixel_format: expected yuv420p")
     if not deterministic:
         raise ManifestError("output.deterministic: must be true")
+    if narrated.suffix != ".mp4":
+        raise ManifestError("output.narrated: must end in .mp4")
+    if speaker.suffix != ".mp4":
+        raise ManifestError("output.speaker: must end in .mp4")
+    if render_manifest.suffix != ".json":
+        raise ManifestError("output.render_manifest: must end in .json")
     if len({narrated, speaker, render_manifest}) != 3:
         raise ManifestError("output: generated paths must be distinct")
     return OutputConfig(
@@ -315,6 +329,42 @@ def _validate_non_overlapping_rectangles(rectangles: tuple[Rectangle, ...], fiel
         for other_index in range(index):
             if _rectangles_overlap(rectangle, rectangles[other_index]):
                 raise ManifestError(f"{field}[{index}]: overlaps {field}[{other_index}]")
+
+
+def _validate_evidence_dominant_frame_share(scenes: tuple[Scene, ...], media: MediaSettings) -> int:
+    frame_area = media.width * media.height
+    dominant_frames = sum(
+        state.end_frame - state.start_frame
+        for scene in scenes
+        for state in scene.visual_states
+        if _rectangle_union_area(state.evidence_rectangles) * 2 >= frame_area
+    )
+    if dominant_frames * 100 < media.total_frames * 60:
+        raise ManifestError("scenes: evidence-dominant frames must occupy 60%-80% of the timeline")
+    if dominant_frames * 100 > media.total_frames * 80:
+        raise ManifestError("scenes: evidence-dominant frames must occupy 60%-80% of the timeline")
+    return dominant_frames
+
+
+def _rectangle_union_area(rectangles: tuple[Rectangle, ...]) -> int:
+    """Return the exact union area instead of trusting manifest-authored evidence ratios."""
+    x_edges = sorted(
+        {edge for rectangle in rectangles for edge in (rectangle.x, rectangle.x + rectangle.width)}
+    )
+    area = 0
+    for left, right in pairwise(x_edges):
+        intervals = sorted(
+            (rectangle.y, rectangle.y + rectangle.height)
+            for rectangle in rectangles
+            if rectangle.x < right and rectangle.x + rectangle.width > left
+        )
+        covered_until = 0
+        for bottom, top in intervals:
+            if top <= covered_until:
+                continue
+            area += (right - left) * (top - max(bottom, covered_until))
+            covered_until = top
+    return area
 
 
 def _rectangles_overlap(left: Rectangle, right: Rectangle) -> bool:

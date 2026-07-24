@@ -97,7 +97,7 @@ def approved_manifest_data() -> dict[str, object]:
                         "id": "system-map",
                         "start_frame": 1800,
                         "end_frame": 2550,
-                        "evidence_rectangles": [],
+                        "evidence_rectangles": [{"x": 120, "y": 90, "width": 1680, "height": 840}],
                     }
                 ],
             },
