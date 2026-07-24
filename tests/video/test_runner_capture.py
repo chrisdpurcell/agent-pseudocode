@@ -9,8 +9,10 @@ import re
 import shlex
 import subprocess
 import sys
+import textwrap
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 
@@ -22,7 +24,10 @@ from video_pipeline.runner_capture import (
     RunnerCaptureResult,
     capture_guarded_runner,
     expand_display_command,
+    expected_console_wrapper_bytes,
     prepare_runner_runtime,
+    reject_credential_evidence,
+    validation_record_passed,
 )
 
 REVIEW_SCRIPT = "docs/apseudo-docs/examples/runner/review-spec.apseudo"
@@ -91,15 +96,13 @@ else:
 
 
 def _fake_runner_body() -> str:
-    return """\
+    body = """\
 import json
 import os
 import pathlib
 import shlex
 import subprocess
 import sys
-
-from apseudo_lint.runner_cli import main as _apseudo_runner_main
 
 args = sys.argv[1:]
 mode = os.environ.get("APSEUDO_TEST_RUNNER_MODE", "accepted")
@@ -133,7 +136,13 @@ if mode == "execution-partial-nonzero":
         encoding="utf-8",
     )
     (run_record / "validation-before.json").write_text(
-        json.dumps({"diagnostics": [], "failed": False}) + "\\n",
+        json.dumps(
+            {
+                "summary": {"diagnostics": 0, "errors": 0, "warnings": 0},
+                "diagnostics": [],
+            }
+        )
+        + "\\n",
         encoding="utf-8",
     )
     sys.stderr.write("fake provider failed after creating a run record\\n")
@@ -188,7 +197,13 @@ write_json(
         "stdin": "rendered prompt",
     },
 )
-write_json("validation-before.json", {"diagnostics": [], "failed": False})
+write_json(
+    "validation-before.json",
+    {
+        "summary": {"diagnostics": 0, "errors": 0, "warnings": 0},
+        "diagnostics": [],
+    },
+)
 write_json(
     "post-checks.json",
     [
@@ -224,10 +239,24 @@ print(
 )
 raise SystemExit(exit_code)
 """
+    return f"def main():\n{textwrap.indent(body, '    ')}"
 
 
-def _fake_status_body(message: str) -> str:
-    return f"print({message!r})\n"
+def _fake_linter_body() -> str:
+    return """\
+import sys
+
+print("apseudo-lint: checked 1 file(s); no diagnostics.")
+raise SystemExit(0)
+"""
+
+
+def _fake_status_body(message: str, failure_variable: str) -> str:
+    return (
+        "import os\n"
+        f"print({message!r})\n"
+        f"raise SystemExit(int(os.environ.get({failure_variable!r}, '0')))\n"
+    )
 
 
 @contextmanager
@@ -317,25 +346,42 @@ def _runner_repository(
     module_target = repository / "src/apseudo_lint/__init__.py"
     module_target.parent.mkdir(parents=True)
     module_target.write_bytes(Path(imported_module).read_bytes())
+
+    fake_runtime = tmp_path / "fake-runtime"
+    runtime_package = fake_runtime / "apseudo_lint"
+    runtime_package.mkdir(parents=True)
+    (runtime_package / "__init__.py").write_bytes(module_target.read_bytes())
+    (runtime_package / "runner_cli.py").write_text(
+        _fake_runner_body(),
+        encoding="utf-8",
+    )
+    (runtime_package / "cli.py").write_text(
+        _fake_linter_body(),
+        encoding="utf-8",
+    )
+
     operator_python = repository / "operator/bin/python"
     operator_python.parent.mkdir(parents=True)
     operator_python.symlink_to(Path(sys.executable).resolve())
-    runner = _write_executable(
-        repository / "operator/bin/apseudo-run",
-        _fake_runner_body(),
-        shebang=str(operator_python.absolute()),
+    runner = repository / "operator/bin/apseudo-run"
+    runner.write_bytes(
+        expected_console_wrapper_bytes(
+            operator_python.absolute(),
+            "apseudo_lint.runner_cli:main",
+        )
     )
+    runner.chmod(0o755)
 
     fake_bin = tmp_path / "fake-bin"
     fake_bin.mkdir()
     _write_executable(
         fake_bin / "uv",
-        _fake_status_body("locked environment synchronized"),
+        _fake_status_body("locked environment synchronized", "APSEUDO_TEST_SYNC_STATUS"),
         shebang=str(Path(sys.executable).resolve()),
     )
     _write_executable(
         fake_bin / "codex",
-        _fake_status_body("Logged in using fixture"),
+        _fake_status_body("Logged in using fixture", "APSEUDO_TEST_LOGIN_STATUS"),
         shebang=str(Path(sys.executable).resolve()),
     )
 
@@ -344,13 +390,27 @@ def _runner_repository(
     revision = _git(repository, "rev-parse", "HEAD")
     environment = {
         "PATH": f"{fake_bin}:{os.environ['PATH']}",
-        "PYTHONPATH": str(Path(imported_module).parents[1]),
+        "PYTHONPATH": str(fake_runtime),
     }
     yield repository, revision, runner, environment
 
 
 def _json_object(path: Path) -> dict[str, object]:
     return cast(dict[str, object], json.loads(path.read_text(encoding="utf-8")))
+
+
+def _validation_payload(
+    diagnostics: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    selected = [] if diagnostics is None else diagnostics
+    return {
+        "summary": {
+            "diagnostics": len(selected),
+            "errors": sum(item["severity"] == "error" for item in selected),
+            "warnings": sum(item["severity"] == "warning" for item in selected),
+        },
+        "diagnostics": selected,
+    }
 
 
 def _prepare_and_capture(
@@ -374,6 +434,262 @@ def _prepare_and_capture(
         evidence_root=evidence_root,
         environment=environment,
     )
+
+
+def _assert_preflight_bundle(
+    result: RunnerCaptureResult,
+    evidence_root: Path,
+    reason_fragment: str,
+) -> None:
+    assert result.mode == "preflight-only"
+    assert reason_fragment in result.reason
+    assert not result.clone_path.exists()
+    assert set(result.evidence_hashes) == set(REQUIRED_EVIDENCE_NAMES)
+    outcome = _json_object(evidence_root / "outcome.json")
+    assert outcome["accepted"] is False
+    assert outcome["mode"] == "preflight-only"
+    assert reason_fragment in cast(str, outcome["reason"])
+
+
+@pytest.mark.parametrize(
+    ("value", "raw"),
+    [
+        pytest.param(
+            {"outer": [{"PASSWORD": "opaque"}]},
+            None,
+            id="nested-secret-key",
+        ),
+        pytest.param(
+            {"outer": [["sk-prohibited123456789"]]},
+            None,
+            id="secret-shaped-list-value",
+        ),
+        pytest.param(
+            {"safe": "opaque"},
+            b"PASSWORD=opaque",
+            id="raw-fallback",
+        ),
+        pytest.param(
+            None,
+            b'{"OPENAI_API_KEY":"opaque"',
+            id="malformed-json-raw-fallback",
+        ),
+    ],
+)
+def test_reject_credential_evidence__nested_or_raw_secret_shape__raises(
+    value: object,
+    raw: bytes | None,
+) -> None:
+    with pytest.raises(RunnerCaptureError, match="credential-like output"):
+        reject_credential_evidence(value, raw=raw, context="fixture")
+
+
+def test_reject_credential_evidence__opaque_safe_fields__passes() -> None:
+    reject_credential_evidence(
+        {"status": "opaque", "items": [{"name": "fixture"}], "tokenized": True},
+        raw=b'{"status":"opaque","tokenized":true}',
+        context="fixture",
+    )
+
+
+def test_validation_passed__exact_zero_error_schema__returns_true() -> None:
+    assert validation_record_passed(_validation_payload())
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param({"failed": False}, id="generic-failed-false"),
+        pytest.param(
+            {
+                "summary": {"diagnostics": 1, "errors": 0, "warnings": 0},
+                "diagnostics": [],
+            },
+            id="summary-count-contradiction",
+        ),
+        pytest.param(
+            _validation_payload(
+                [
+                    {
+                        "path": "fixture.apseudo",
+                        "line": 1,
+                        "column": 1,
+                        "code": "APSEUDO-FIXTURE",
+                        "severity": "error",
+                        "message": "fixture diagnostic",
+                    }
+                ]
+            )
+            | {
+                "summary": {
+                    "diagnostics": 1,
+                    "errors": 0,
+                    "warnings": 0,
+                }
+            },
+            id="error-count-contradiction",
+        ),
+    ],
+)
+def test_validation_passed__nonproduction_or_contradictory_schema__returns_false(
+    payload: object,
+) -> None:
+    assert not validation_record_passed(payload)
+
+
+def test_prepare_runtime__console_has_extra_bytes__rejects_nonexact_wrapper(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        runner.write_bytes(runner.read_bytes() + b"# unexpected wrapper bytes\n")
+
+        with pytest.raises(RunnerCaptureError, match="console wrapper does not match"):
+            prepare_runner_runtime(
+                repository,
+                revision=revision,
+                operator_python=runner.parent / "python",
+                operator_apseudo_run=runner,
+                environment=environment,
+            )
+
+
+def test_capture__console_changes_after_preparation__records_preflight_only(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        runtime = prepare_runner_runtime(
+            repository,
+            revision=revision,
+            operator_python=runner.parent / "python",
+            operator_apseudo_run=runner,
+            environment=environment,
+        )
+        runner.write_bytes(runner.read_bytes() + b"# stale wrapper\n")
+        evidence_root = tmp_path / "promoted"
+
+        result = capture_guarded_runner(
+            repository,
+            revision=revision,
+            runtime=runtime,
+            evidence_root=evidence_root,
+            environment=environment,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "operator console wrapper changed")
+
+
+def test_capture__module_changes_after_preparation__records_preflight_only(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        runtime = prepare_runner_runtime(
+            repository,
+            revision=revision,
+            operator_python=runner.parent / "python",
+            operator_apseudo_run=runner,
+            environment=environment,
+        )
+        runtime.module_path.write_bytes(runtime.module_path.read_bytes() + b"# stale module\n")
+        evidence_root = tmp_path / "promoted"
+
+        result = capture_guarded_runner(
+            repository,
+            revision=revision,
+            runtime=runtime,
+            evidence_root=evidence_root,
+            environment=environment,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "operator module changed")
+
+
+@pytest.mark.parametrize(
+    ("runtime_change", "reason_fragment"),
+    [
+        pytest.param(
+            {"revision": "0" * 40},
+            "runtime revision does not match",
+            id="revision-mismatch",
+        ),
+        pytest.param(
+            {"sync_status": 1},
+            "locked environment sync exited 1",
+            id="sync-failed",
+        ),
+        pytest.param(
+            {"provider_status": 1},
+            "Codex login status exited 1",
+            id="login-failed",
+        ),
+        pytest.param(
+            {"operator_python_sha256": "0" * 64},
+            "operator interpreter changed",
+            id="interpreter-mismatch",
+        ),
+    ],
+)
+def test_capture__runtime_precondition_fails__promotes_complete_preflight_bundle(
+    tmp_path: Path,
+    runtime_change: dict[str, object],
+    reason_fragment: str,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        runtime = prepare_runner_runtime(
+            repository,
+            revision=revision,
+            operator_python=runner.parent / "python",
+            operator_apseudo_run=runner,
+            environment=environment,
+        )
+        evidence_root = tmp_path / "promoted"
+
+        result = capture_guarded_runner(
+            repository,
+            revision=revision,
+            runtime=replace(runtime, **runtime_change),
+            evidence_root=evidence_root,
+            environment=environment,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, reason_fragment)
+
+
+@pytest.mark.parametrize(
+    ("variable", "status", "reason_fragment"),
+    [
+        pytest.param(
+            "APSEUDO_TEST_SYNC_STATUS",
+            "8",
+            "locked environment sync exited 8",
+            id="sync-command",
+        ),
+        pytest.param(
+            "APSEUDO_TEST_LOGIN_STATUS",
+            "7",
+            "Codex login status exited 7",
+            id="login-command",
+        ),
+    ],
+)
+def test_prepare_and_capture__operational_precondition_fails__promotes_bundle(
+    tmp_path: Path,
+    variable: str,
+    status: str,
+    reason_fragment: str,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        selected_environment = {**environment, variable: status}
+        evidence_root = tmp_path / "promoted"
+
+        result = _prepare_and_capture(
+            repository,
+            revision,
+            runner,
+            selected_environment,
+            evidence_root,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, reason_fragment)
 
 
 def test_accepts_only_exact_clean_guarded_codex_run(tmp_path: Path) -> None:
@@ -535,17 +851,14 @@ def test_runner_record_excludes_credentials(tmp_path: Path) -> None:
         runner,
         environment,
     ):
-        runner.write_text(
-            runner.read_text(encoding="utf-8").replace(
+        fake_runner_module = Path(environment["PYTHONPATH"]) / "apseudo_lint/runner_cli.py"
+        fake_runner_module.write_text(
+            fake_runner_module.read_text(encoding="utf-8").replace(
                 'print("apseudo-run: script validation passed.")',
                 'print("OPENAI_API_KEY=sk-prohibited123456789")',
             ),
             encoding="utf-8",
         )
-        runner.chmod(0o755)
-        _git(repository, "add", "operator/bin/apseudo-run")
-        _git(repository, "commit", "--quiet", "-m", "leaky runner")
-        revision = _git(repository, "rev-parse", "HEAD")
         with pytest.raises(RunnerCaptureError, match="credential-like output"):
             _prepare_and_capture(
                 repository,

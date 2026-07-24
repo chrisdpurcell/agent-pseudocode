@@ -46,6 +46,23 @@ _CREDENTIAL_BYTES = re.compile(
     rb"(?i)(?:authorization|api[_-]?key|access[_-]?token|secret[_-]?key|password)"
     rb"\s*[:=]\s*\S+|sk-[A-Za-z0-9_-]{8,}|-----BEGIN [A-Z ]*PRIVATE KEY-----"
 )
+_CREDENTIAL_RAW_KEY = re.compile(
+    rb"""(?ix)
+    (?:
+        ["']
+        (?:[a-z0-9]+[_-])*
+        (?:api[_-]?key|authorization|credential|password|private[_-]?key|secret|token)
+        (?:[_-][a-z0-9]+)*
+        ["']
+        |
+        (?:^|[\s,{])
+        (?:[a-z0-9]+[_-])*
+        (?:api[_-]?key|authorization|credential|password|private[_-]?key|secret|token)
+        (?:[_-][a-z0-9]+)*
+    )
+    \s*[:=]
+    """
+)
 _FULL_REVISION = re.compile(r"[0-9a-f]{40}")
 _VERSION_LINE = re.compile(rb'^__version__\s*=\s*"([^"]+)"\s*$', re.MULTILINE)
 _VERSION_NUMBER = re.compile(r"Python\s+(\d+)\.(\d+)(?:\.(\d+))?")
@@ -61,8 +78,10 @@ class RunnerRuntime:
 
     revision: str
     operator_python: Path
+    operator_python_sha256: str
     operator_apseudo_run: Path
     console_sha256: str
+    console_expected_sha256: str
     console_entrypoint: str
     module_path: Path
     module_sha256: str
@@ -71,6 +90,7 @@ class RunnerRuntime:
     sync_status: int
     provider_status_argv: tuple[str, ...]
     provider_status: int
+    precondition_reason: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,10 +155,15 @@ def prepare_runner_runtime(
         )
     if not os.access(selected_runner, os.X_OK):
         raise RunnerCaptureError("operator_apseudo_run: console script is not executable")
-    _verify_console_shebang(selected_runner, selected_python)
+    console_interpreter = _verify_console_shebang(selected_runner, selected_python)
     console_entrypoint = _verify_console_entrypoint(
         selected_runner,
         _git_show(root, exact_revision, "pyproject.toml"),
+        console_interpreter,
+    )
+    expected_console = expected_console_wrapper_bytes(
+        console_interpreter,
+        console_entrypoint,
     )
 
     sync_command = _argument_vector(sync_argv, "sync_argv")
@@ -149,8 +174,11 @@ def prepare_runner_runtime(
         timeout=300,
         operation="locked environment sync",
     )
-    if sync.returncode != 0:
-        raise RunnerCaptureError(f"locked environment sync exited {sync.returncode}; expected 0")
+    precondition_reason = (
+        f"locked environment sync exited {sync.returncode}; expected 0"
+        if sync.returncode != 0
+        else None
+    )
 
     provider_command = _argument_vector(provider_status_argv, "provider_status_argv")
     provider = _run(
@@ -160,12 +188,16 @@ def prepare_runner_runtime(
         timeout=30,
         operation="Codex login status",
     )
-    if provider.returncode != 0:
-        raise RunnerCaptureError(
+    if provider.returncode != 0 and precondition_reason is None:
+        precondition_reason = (
             f"Codex login status exited {provider.returncode}; configured login is required"
         )
-    if "logged in" not in f"{provider.stdout}\n{provider.stderr}".casefold():
-        raise RunnerCaptureError("Codex login status did not confirm a configured login")
+    if (
+        provider.returncode == 0
+        and "logged in" not in f"{provider.stdout}\n{provider.stderr}".casefold()
+        and precondition_reason is None
+    ):
+        precondition_reason = "Codex login status did not confirm a configured login"
 
     identity_code = (
         "import hashlib,json,pathlib,apseudo_lint;"
@@ -205,8 +237,10 @@ def prepare_runner_runtime(
     return RunnerRuntime(
         revision=exact_revision,
         operator_python=selected_python,
+        operator_python_sha256=_digest(selected_python.read_bytes()),
         operator_apseudo_run=selected_runner,
         console_sha256=_digest(selected_runner.read_bytes()),
+        console_expected_sha256=_digest(expected_console),
         console_entrypoint=console_entrypoint,
         module_path=module_path,
         module_sha256=module_sha256,
@@ -215,6 +249,7 @@ def prepare_runner_runtime(
         sync_status=sync.returncode,
         provider_status_argv=provider_command,
         provider_status=provider.returncode,
+        precondition_reason=precondition_reason,
     )
 
 
@@ -233,10 +268,6 @@ def capture_guarded_runner(
     """
     root = _directory(repository_root, "repository_root")
     exact_revision = _resolve_revision(root, revision)
-    if runtime.revision != exact_revision:
-        raise RunnerCaptureError("runtime revision does not match the requested capture revision")
-    if runtime.sync_status != 0 or runtime.provider_status != 0:
-        raise RunnerCaptureError("runtime was not prepared by successful sync and login checks")
     child_environment = _child_environment(environment)
     destination = _safe_path(evidence_root, "evidence_root")
     destination.mkdir(parents=True, exist_ok=True)
@@ -273,51 +304,68 @@ def capture_guarded_runner(
         "print-command": _insert_action(base_argv, "--print-command"),
         "execute": base_argv,
     }
+    command_record = _runner_command_record(runtime, base_argv, post_check, vectors)
+
+    precondition_reason = _runtime_precondition_reason(runtime, exact_revision)
+    if precondition_reason is not None:
+        clone_path = Path(tempfile.mkdtemp(prefix="apseudo-runner-precondition-"))
+        clone_path.rmdir()
+        runner_artifacts = _skipped_runner_artifacts(precondition_reason)
+        bundle = _terminal_bundle(
+            revision=exact_revision,
+            hook_record=_skipped_hook_record(precondition_reason),
+            command_record=command_record,
+            runner_artifacts=runner_artifacts,
+            mode="preflight-only",
+            reason=precondition_reason,
+        )
+        evidence_hashes = _promote_checked_bundle(destination, bundle)
+        return RunnerCaptureResult(
+            mode="preflight-only",
+            reason=precondition_reason,
+            revision=exact_revision,
+            clone_path=clone_path,
+            evidence_root=destination,
+            evidence_hashes=evidence_hashes,
+        )
 
     clone_path: Path
-    bundle: dict[str, object]
     with clean_revision_clone(root, revision=exact_revision) as clone:
         clone_path = clone
         hook_record, hook_reason = _capture_hook(clone, child_environment)
-        command_record = _runner_command_record(runtime, base_argv, post_check, vectors)
         runner_artifacts = _skipped_runner_artifacts("runner skipped because hook preflight failed")
         mode: CaptureMode = "preflight-only"
         reason = hook_reason or "guarded runner capture passed"
 
         if hook_reason is None:
-            runner_artifacts, runner_reason = _capture_runner(
-                clone,
-                child_environment,
-                command_record,
-                vectors,
-                post_check,
-            )
-            reason = runner_reason or "guarded runner capture passed"
-            if runner_reason is None:
-                mode = "accepted"
+            integrity_reason = _runtime_integrity_reason(root, exact_revision, runtime)
+            if integrity_reason is not None:
+                reason = integrity_reason
+                runner_artifacts = _skipped_runner_artifacts(integrity_reason)
+            else:
+                runner_artifacts, runner_reason = _capture_runner(
+                    clone,
+                    child_environment,
+                    command_record,
+                    vectors,
+                    post_check,
+                )
+                reason = runner_reason or "guarded runner capture passed"
+                if runner_reason is None:
+                    mode = "accepted"
 
-        outcome_value = _object_copy(runner_artifacts["outcome.json"])
-        outcome_value.update(
-            {
-                "accepted": mode == "accepted",
-                "mode": mode,
-                "reason": reason,
-                "revision": exact_revision,
-            }
+        bundle = _terminal_bundle(
+            revision=exact_revision,
+            hook_record=hook_record,
+            command_record=command_record,
+            runner_artifacts=runner_artifacts,
+            mode=mode,
+            reason=reason,
         )
-        runner_artifacts["outcome.json"] = outcome_value
-        bundle = {
-            "hook-preflight.json": hook_record,
-            "runner-commands.json": command_record,
-            **runner_artifacts,
-        }
-        _require_exact_bundle(bundle)
-        _scan_bundle(bundle)
-        evidence_hashes = _promote_bundle(destination, bundle)
+        evidence_hashes = _promote_checked_bundle(destination, bundle)
 
     if clone_path.exists():
         raise RunnerCaptureError("disposable clone still exists after capture")
-    _verify_promoted_bundle(destination, evidence_hashes)
     return RunnerCaptureResult(
         mode=mode,
         reason=reason,
@@ -326,6 +374,121 @@ def capture_guarded_runner(
         evidence_root=destination,
         evidence_hashes=evidence_hashes,
     )
+
+
+def _runtime_precondition_reason(
+    runtime: RunnerRuntime,
+    exact_revision: str,
+) -> str | None:
+    if runtime.revision != exact_revision:
+        return "runtime revision does not match the requested capture revision"
+    if runtime.precondition_reason is not None:
+        return runtime.precondition_reason
+    if runtime.sync_status != 0:
+        return f"locked environment sync exited {runtime.sync_status}; expected 0"
+    if runtime.provider_status != 0:
+        return f"Codex login status exited {runtime.provider_status}; configured login is required"
+    return None
+
+
+def _runtime_integrity_reason(
+    repository: Path,
+    exact_revision: str,
+    runtime: RunnerRuntime,
+) -> str | None:
+    """Revalidate every executable runtime byte immediately before runner calls."""
+    try:
+        if _digest(runtime.operator_python.read_bytes()) != runtime.operator_python_sha256:
+            return "operator interpreter changed after runtime preparation"
+    except OSError:
+        return "operator interpreter became unavailable after runtime preparation"
+
+    try:
+        console_interpreter = _verify_console_shebang(
+            runtime.operator_apseudo_run,
+            runtime.operator_python,
+        )
+        pinned_entrypoint = _pinned_console_entrypoint(
+            _git_show(repository, exact_revision, "pyproject.toml")
+        )
+        expected_console = expected_console_wrapper_bytes(
+            console_interpreter,
+            pinned_entrypoint,
+        )
+        observed_console = runtime.operator_apseudo_run.read_bytes()
+    except OSError, RunnerCaptureError:
+        return "operator console wrapper became unverifiable after runtime preparation"
+    if (
+        runtime.console_entrypoint != pinned_entrypoint
+        or _digest(expected_console) != runtime.console_expected_sha256
+        or observed_console != expected_console
+        or _digest(observed_console) != runtime.console_sha256
+    ):
+        return "operator console wrapper changed after runtime preparation"
+
+    try:
+        pinned_module_sha256 = _digest(_git_show(repository, exact_revision, MODULE_SOURCE))
+        observed_module_sha256 = _digest(runtime.module_path.read_bytes())
+    except OSError, RunnerCaptureError:
+        return "operator module became unavailable after runtime preparation"
+    if (
+        runtime.module_sha256 != pinned_module_sha256
+        or observed_module_sha256 != runtime.module_sha256
+    ):
+        return "operator module changed after runtime preparation"
+    return None
+
+
+def _skipped_hook_record(reason: str) -> dict[str, object]:
+    return {
+        "config_path": ".codex/config.toml",
+        "config_command": None,
+        "configured_hook_path": HOOK_PATH.as_posix(),
+        "configured_hook_mode": None,
+        "cwd": ".",
+        "input": HOOK_INPUT,
+        "shell_argv": ["/bin/bash", "-lc", HOOK_COMMAND],
+        "state_sha256": None,
+        "status": "skipped",
+        "reason": f"hook skipped because runtime precondition failed: {reason}",
+    }
+
+
+def _terminal_bundle(
+    *,
+    revision: str,
+    hook_record: dict[str, object],
+    command_record: dict[str, object],
+    runner_artifacts: dict[str, object],
+    mode: CaptureMode,
+    reason: str,
+) -> dict[str, object]:
+    outcome_value = _object_copy(runner_artifacts["outcome.json"])
+    outcome_value.update(
+        {
+            "accepted": mode == "accepted",
+            "mode": mode,
+            "reason": reason,
+            "revision": revision,
+        }
+    )
+    runner_artifacts["outcome.json"] = outcome_value
+    return {
+        "hook-preflight.json": hook_record,
+        "runner-commands.json": command_record,
+        **runner_artifacts,
+    }
+
+
+def _promote_checked_bundle(
+    evidence_root: Path,
+    bundle: Mapping[str, object],
+) -> dict[str, str]:
+    _require_exact_bundle(bundle)
+    _scan_bundle(bundle)
+    evidence_hashes = _promote_bundle(evidence_root, bundle)
+    _verify_promoted_bundle(evidence_root, evidence_hashes)
+    return evidence_hashes
 
 
 def expand_display_command(display_command: str, aliases: Mapping[str, object]) -> tuple[str, ...]:
@@ -350,6 +513,32 @@ def expand_display_command(display_command: str, aliases: Mapping[str, object]) 
         raise RunnerCaptureError("display post-check must begin with the apseudo-lint alias")
     argv[post_index] = shlex.join([*linter_exact, *post_argv[1:]])
     return tuple(argv)
+
+
+def expected_console_wrapper_bytes(interpreter: Path, entrypoint: str) -> bytes:
+    """Render the exact uv console wrapper for one pinned Python entry point."""
+    try:
+        module_name, function_name = entrypoint.split(":", maxsplit=1)
+    except ValueError as exc:
+        raise RunnerCaptureError("operator console entry point is invalid") from exc
+    if (
+        not interpreter.is_absolute()
+        or not all(part.isidentifier() for part in module_name.split("."))
+        or not function_name.isidentifier()
+    ):
+        raise RunnerCaptureError("operator console entry point is invalid")
+    return (
+        f"#!{interpreter}\n"
+        "# -*- coding: utf-8 -*-\n"
+        "import sys\n"
+        f"from {module_name} import {function_name}\n"
+        'if __name__ == "__main__":\n'
+        '    if sys.argv[0].endswith("-script.pyw"):\n'
+        "        sys.argv[0] = sys.argv[0][:-11]\n"
+        '    elif sys.argv[0].endswith(".exe"):\n'
+        "        sys.argv[0] = sys.argv[0][:-4]\n"
+        f"    sys.exit({function_name}())\n"
+    ).encode()
 
 
 def _capture_hook(
@@ -502,8 +691,10 @@ def _runner_command_record(
         "cwd": ".",
         "runtime": {
             "operator_python": os.fspath(runtime.operator_python),
+            "operator_python_sha256": runtime.operator_python_sha256,
             "operator_apseudo_run": os.fspath(runtime.operator_apseudo_run),
             "console_sha256": runtime.console_sha256,
+            "console_expected_sha256": runtime.console_expected_sha256,
             "console_entrypoint": runtime.console_entrypoint,
             "module_path": os.fspath(runtime.module_path),
             "module_sha256": runtime.module_sha256,
@@ -512,6 +703,7 @@ def _runner_command_record(
             "sync_status": runtime.sync_status,
             "provider_status_argv": list(runtime.provider_status_argv),
             "provider_status": runtime.provider_status,
+            "precondition_reason": runtime.precondition_reason,
         },
         "post_check": post_check,
         "base_argv": list(base_argv),
@@ -629,7 +821,7 @@ def _capture_runner(
             reason = "runner post-check failed"
 
     validation = artifacts["validation-before.json"]
-    if not _validation_passed(validation):
+    if not validation_record_passed(validation):
         reason = reason or "runner validation-before record failed"
     outcome = artifacts["outcome.json"]
     try:
@@ -781,18 +973,54 @@ def _first_current_focus_bullet(state_path: Path) -> str:
     raise RunnerCaptureError("docs/handoff/state.md has no current-focus bullet")
 
 
-def _validation_passed(value: object) -> bool:
+def validation_record_passed(value: object) -> bool:
+    """Return whether a record exactly matches a zero-error runner validation."""
     try:
         record = _object_copy(value)
-    except RunnerCaptureError:
-        return False
-    if record.get("failed") is False:
-        return True
-    try:
+        if set(record) != {"summary", "diagnostics"}:
+            return False
         summary = _object_copy(record.get("summary"))
+        if set(summary) != {"diagnostics", "errors", "warnings"}:
+            return False
+        diagnostics = _array(record.get("diagnostics"), "validation diagnostics")
     except RunnerCaptureError:
         return False
-    return summary.get("errors") == 0
+    counts = {
+        "diagnostics": len(diagnostics),
+        "errors": 0,
+        "warnings": 0,
+    }
+    for diagnostic in diagnostics:
+        try:
+            item = _object_copy(diagnostic)
+        except RunnerCaptureError:
+            return False
+        required = {"path", "line", "column", "code", "severity", "message"}
+        if not required <= set(item) or set(item) - required > {"hint", "snippet"}:
+            return False
+        if (
+            not all(
+                isinstance(item[field], str) and bool(item[field])
+                for field in ("path", "code", "severity", "message")
+            )
+            or not _is_nonnegative_integer(item["line"])
+            or not _is_nonnegative_integer(item["column"])
+            or any(
+                field in item and (not isinstance(item[field], str) or not bool(item[field]))
+                for field in ("hint", "snippet")
+            )
+        ):
+            return False
+        severity = item["severity"]
+        if severity not in {"error", "warning", "info"}:
+            return False
+        if severity in {"error", "warning"}:
+            counts[cast(str, severity) + "s"] += 1
+    return (
+        all(_is_nonnegative_integer(summary.get(field)) for field in counts)
+        and all(summary[field] == count for field, count in counts.items())
+        and counts["errors"] == 0
+    )
 
 
 def _git_changed_files(repository: Path) -> list[str]:
@@ -817,14 +1045,43 @@ def _scan_record_directory(run_record: Path) -> None:
                 content = path.read_bytes()
             except OSError as exc:
                 raise RunnerCaptureError("runner record file could not be read") from exc
-            if _CREDENTIAL_BYTES.search(content):
-                raise RunnerCaptureError("runner record contains credential-like output")
+            try:
+                value = cast(object, json.loads(content))
+            except UnicodeDecodeError, json.JSONDecodeError:
+                value = None
+            reject_credential_evidence(value, raw=content, context="runner record")
 
 
 def _scan_bundle(bundle: Mapping[str, object]) -> None:
-    encoded = _canonical_json(bundle)
-    if _CREDENTIAL_BYTES.search(encoded):
-        raise RunnerCaptureError("runner evidence contains credential-like output")
+    reject_credential_evidence(
+        bundle,
+        raw=_canonical_json(bundle),
+        context="runner evidence",
+    )
+
+
+def reject_credential_evidence(
+    value: object,
+    *,
+    raw: bytes | None,
+    context: str,
+) -> None:
+    """Reject secret-shaped JSON names, values, or undecodable raw evidence."""
+    pending = [value]
+    while pending:
+        current = pending.pop()
+        if isinstance(current, dict):
+            record = cast(dict[object, object], current)
+            for key, item in record.items():
+                if not isinstance(key, str) or _CREDENTIAL_NAME.search(key):
+                    raise RunnerCaptureError(f"{context} contains credential-like output")
+                pending.append(item)
+        elif isinstance(current, list):
+            pending.extend(cast(list[object], current))
+        elif isinstance(current, str) and _CREDENTIAL_BYTES.search(current.encode("utf-8")):
+            raise RunnerCaptureError(f"{context} contains credential-like output")
+    if raw is not None and (_CREDENTIAL_BYTES.search(raw) or _CREDENTIAL_RAW_KEY.search(raw)):
+        raise RunnerCaptureError(f"{context} contains credential-like output")
 
 
 def _promote_bundle(evidence_root: Path, bundle: Mapping[str, object]) -> dict[str, str]:
@@ -951,7 +1208,7 @@ def _child_environment(environment: Mapping[str, str] | None) -> dict[str, str]:
     return selected
 
 
-def _verify_console_shebang(console: Path, operator_python: Path) -> None:
+def _verify_console_shebang(console: Path, operator_python: Path) -> Path:
     try:
         first_line = console.read_text(encoding="utf-8").splitlines()[0]
     except (OSError, UnicodeDecodeError, IndexError) as exc:
@@ -963,30 +1220,35 @@ def _verify_console_shebang(console: Path, operator_python: Path) -> None:
         raise RunnerCaptureError(
             "operator console script shebang does not resolve to the selected interpreter"
         )
+    return shebang_path
 
 
-def _verify_console_entrypoint(console: Path, pinned_pyproject: bytes) -> str:
+def _verify_console_entrypoint(
+    console: Path,
+    pinned_pyproject: bytes,
+    console_interpreter: Path,
+) -> str:
+    entrypoint = _pinned_console_entrypoint(pinned_pyproject)
+    try:
+        console_bytes = console.read_bytes()
+    except OSError as exc:
+        raise RunnerCaptureError("operator console entry point could not be verified") from exc
+    expected = expected_console_wrapper_bytes(console_interpreter, entrypoint)
+    if console_bytes != expected:
+        raise RunnerCaptureError(
+            "operator console wrapper does not match the exact capture revision"
+        )
+    return entrypoint
+
+
+def _pinned_console_entrypoint(pinned_pyproject: bytes) -> str:
     try:
         payload = _object_copy(cast(object, tomllib.loads(pinned_pyproject.decode("utf-8"))))
         project = _object_copy(payload.get("project"))
         scripts = _object_copy(project.get("scripts"))
-        entrypoint = _string(scripts.get("apseudo-run"), "project.scripts.apseudo-run")
+        return _string(scripts.get("apseudo-run"), "project.scripts.apseudo-run")
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise RunnerCaptureError("capture revision pyproject.toml is invalid") from exc
-    try:
-        module_name, function_name = entrypoint.split(":", maxsplit=1)
-        console_source = console.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError, ValueError) as exc:
-        raise RunnerCaptureError("operator console entry point could not be verified") from exc
-    import_pattern = re.compile(
-        rf"(?m)^from {re.escape(module_name)} import {re.escape(function_name)}"
-        rf"(?: as [A-Za-z_][A-Za-z0-9_]*)?\s*$"
-    )
-    if import_pattern.search(console_source) is None:
-        raise RunnerCaptureError(
-            "operator console entry point does not match the exact capture revision"
-        )
-    return entrypoint
 
 
 def _git_object_exists(repository: Path, revision: str) -> None:
@@ -1121,6 +1383,10 @@ def _hash_string(value: object, field: str) -> str:
     if re.fullmatch(r"[0-9a-f]{64}", selected) is None:
         raise RunnerCaptureError(f"{field}: expected a SHA-256 digest")
     return selected
+
+
+def _is_nonnegative_integer(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
 def _digest(content: bytes) -> str:
