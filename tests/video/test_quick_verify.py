@@ -155,6 +155,7 @@ def test_parse_probe__valid_payload__returns_direct_media_facts() -> None:
                 {
                     "codec_type": "audio",
                     "codec_name": "aac",
+                    "profile": "LC",
                     "channels": 2,
                     "channel_layout": "stereo",
                 },
@@ -166,7 +167,7 @@ def test_parse_probe__valid_payload__returns_direct_media_facts() -> None:
     assert facts.video_codec == "h264"
     assert (facts.width, facts.height, facts.fps, facts.frames) == (1920, 1080, 30.0, 4050)
     assert facts.progressive is True
-    assert (facts.audio_codec, facts.audio_channels) == ("aac", 2)
+    assert (facts.audio_codec, facts.audio_profile, facts.audio_channels) == ("aac", "LC", 2)
 
 
 def test_parse_loudness__ebu_summary__returns_integrated_lufs_and_true_peak() -> None:
@@ -190,49 +191,70 @@ def test_parse_loudness__ebu_summary__returns_integrated_lufs_and_true_peak() ->
     ("facts", "failure"),
     [
         pytest.param(
-            MediaFacts("matroska", 135.0, "h264", 1920, 1080, True, 30.0, 4050, "aac", 2, "stereo"),
+            MediaFacts(
+                "matroska", 135.0, "h264", 1920, 1080, True, 30.0, 4050, "aac", "LC", 2, "stereo"
+            ),
             "container",
             id="container",
         ),
         pytest.param(
-            MediaFacts("mp4", 135.0, "hevc", 1920, 1080, True, 30.0, 4050, "aac", 2, "stereo"),
+            MediaFacts(
+                "mp4", 135.0, "hevc", 1920, 1080, True, 30.0, 4050, "aac", "LC", 2, "stereo"
+            ),
             "video codec",
             id="video-codec",
         ),
         pytest.param(
-            MediaFacts("mp4", 135.0, "h264", 1280, 720, True, 30.0, 4050, "aac", 2, "stereo"),
+            MediaFacts("mp4", 135.0, "h264", 1280, 720, True, 30.0, 4050, "aac", "LC", 2, "stereo"),
             "dimensions",
             id="dimensions",
         ),
         pytest.param(
-            MediaFacts("mp4", 135.0, "h264", 1920, 1080, False, 30.0, 4050, "aac", 2, "stereo"),
+            MediaFacts(
+                "mp4", 135.0, "h264", 1920, 1080, False, 30.0, 4050, "aac", "LC", 2, "stereo"
+            ),
             "progressive scan",
             id="progressive",
         ),
         pytest.param(
-            MediaFacts("mp4", 135.0, "h264", 1920, 1080, True, 29.97, 4050, "aac", 2, "stereo"),
+            MediaFacts(
+                "mp4", 135.0, "h264", 1920, 1080, True, 29.97, 4050, "aac", "LC", 2, "stereo"
+            ),
             "frame rate",
             id="frame-rate",
         ),
         pytest.param(
-            MediaFacts("mp4", 135.0, "h264", 1920, 1080, True, 30.0, 4049, "aac", 2, "stereo"),
+            MediaFacts(
+                "mp4", 135.0, "h264", 1920, 1080, True, 30.0, 4049, "aac", "LC", 2, "stereo"
+            ),
             "frame count",
             id="frame-count",
         ),
         pytest.param(
-            MediaFacts("mp4", 135.04, "h264", 1920, 1080, True, 30.0, 4050, "aac", 2, "stereo"),
+            MediaFacts(
+                "mp4", 135.04, "h264", 1920, 1080, True, 30.0, 4050, "aac", "LC", 2, "stereo"
+            ),
             "duration",
             id="duration",
         ),
         pytest.param(
-            MediaFacts("mp4", 135.0, "h264", 1920, 1080, True, 30.0, 4050, "opus", 2, "stereo"),
+            MediaFacts(
+                "mp4", 135.0, "h264", 1920, 1080, True, 30.0, 4050, "opus", "unknown", 2, "stereo"
+            ),
             "audio codec",
             id="audio-codec",
         ),
         pytest.param(
-            MediaFacts("mp4", 135.0, "h264", 1920, 1080, True, 30.0, 4050, "aac", 1, "mono"),
+            MediaFacts("mp4", 135.0, "h264", 1920, 1080, True, 30.0, 4050, "aac", "LC", 1, "mono"),
             "stereo audio",
             id="stereo",
+        ),
+        pytest.param(
+            MediaFacts(
+                "mp4", 135.0, "h264", 1920, 1080, True, 30.0, 4050, "aac", "LD", 2, "stereo"
+            ),
+            "audio profile",
+            id="audio-profile",
         ),
     ],
 )

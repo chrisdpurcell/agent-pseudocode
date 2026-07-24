@@ -286,7 +286,8 @@ def _probe(path: Path) -> dict[str, object]:
     return cast(dict[str, object], json.loads(completed.stdout))
 
 
-def _decoded_pcm(path: Path) -> array.array[int]:
+def _decoded_pcm(path: Path, *, end_sample: int | None = None) -> array.array[int]:
+    bounded_decode = [] if end_sample is None else ["-af", f"atrim=end_sample={end_sample}"]
     completed = subprocess.run(
         [
             "ffmpeg",
@@ -296,6 +297,7 @@ def _decoded_pcm(path: Path) -> array.array[int]:
             str(path),
             "-map",
             "0:a:0",
+            *bounded_decode,
             "-c:a",
             "pcm_s16le",
             "-f",
@@ -522,14 +524,14 @@ def test_tc_t7_001__short_real_fixture__renders_matching_picture_variants(
             2,
             "48000",
         )
-        assert audio["profile"] == "LD"
+        assert audio["profile"] == "LC"
         assert float(cast(str, video["duration"])) == pytest.approx(1.4, abs=1 / 30)
         assert float(
             cast(str, cast(dict[str, object], probe["format"])["duration"])
         ) == pytest.approx(1.4, abs=1 / 30)
 
-    narrated_pcm = _decoded_pcm(fixture.project.output.narrated)
-    speaker_pcm = _decoded_pcm(fixture.project.output.speaker)
+    narrated_pcm = _decoded_pcm(fixture.project.output.narrated, end_sample=67_200)
+    speaker_pcm = _decoded_pcm(fixture.project.output.speaker, end_sample=67_200)
     assert len(narrated_pcm) == len(speaker_pcm) == 67_200 * 2
     assert not narrated_pcm[67_200 * 2 :]
     assert not speaker_pcm[67_200 * 2 :]
@@ -603,14 +605,13 @@ def test_tc_t7_002__graphs__separate_captions_audio_bed_and_loudness(
     audio_encoder_indices = [index for index, argument in enumerate(command) if argument == "-c:a"]
     assert len(audio_encoder_indices) == 2
     for index in audio_encoder_indices:
-        assert command[index : index + 6] == (
+        assert command[index : index + 4] == (
             "-c:a",
             "libfdk_aac",
             "-profile:a",
-            "aac_ld",
-            "-frame_length",
-            "480",
+            "aac_low",
         )
+    assert "-frame_length" not in command
     speaker_output_index = command.index(str(fixture.project.output.speaker))
     assert command[speaker_output_index - 1] == "+faststart"
 
@@ -717,8 +718,8 @@ def test_tc_t7_003__cache_selected_wav_and_manifest__are_exact(
     assert manifest["toolchain"]["encoder"]["name"] == "libopenh264"
     assert manifest["toolchain"]["encoder"]["verified"] is True
     assert manifest["toolchain"]["audio_encoder"]["name"] == "libfdk_aac"
-    assert manifest["toolchain"]["audio_encoder"]["profile"] == "aac_ld"
-    assert manifest["toolchain"]["audio_encoder"]["frame_length"] == 480
+    assert manifest["toolchain"]["audio_encoder"]["profile"] == "aac_low"
+    assert manifest["toolchain"]["audio_encoder"]["frame_length"] == 1024
     assert manifest["toolchain"]["audio_encoder"]["verified"] is True
     assert [font["family"] for font in manifest["toolchain"]["fonts"]] == [
         "Noto Sans",
@@ -729,15 +730,19 @@ def test_tc_t7_003__cache_selected_wav_and_manifest__are_exact(
         assert len(output["decoded_video_sha256"]) == 64
         assert len(output["decoded_pcm_sha256"]) == 64
         assert output["decoded_audio_samples_per_channel"] == 67_200
+        audio_stream = next(
+            stream for stream in output["probe"]["streams"] if stream["codec_type"] == "audio"
+        )
+        assert audio_stream["profile"] == "LC"
         assert output["probe"]["program_audio_boundary"] == {
             "final_discard_padding_samples": 0,
-            "final_packet_duration": 480,
-            "final_packet_pts": 66_720,
+            "final_packet_duration": 640,
+            "final_packet_pts": 66_560,
             "final_packet_skip_samples": 0,
             "first_program_sample": 0,
             "last_program_sample_exclusive": 67_200,
             "packet_after_program_boundary": False,
-            "priming_skip_samples": 480,
+            "priming_skip_samples": 2048,
         }
     assert len(manifest["shared_picture"]["decoded_video_sha256"]) == 64
 

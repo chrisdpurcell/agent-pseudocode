@@ -8,7 +8,7 @@
 - Durable Markdown frontmatter follows accepted ADR-0003; `docs/specs/` holds project-spec-conformant specifications.
 - `SPEC-QZXW` specifies the validation toolchain and is the traceability source for coverage and defect work.
 - `docs/usage.md` is the authored CLI reference for `apseudo` and its per-command entry points.
-- The 135-second repository explainer is locally verified under ignored `dist/video/final/` with narrated and speaker MP4s, selected `marin` WAV, captions, manifests, report, and checksums; publication remains separate.
+- The 135-second repository explainer is locally verified under ignored `dist/video/final/` with AAC-LC narrated and speaker MP4s, selected `marin` WAV, captions, manifests, report, and checksums; publication remains separate.
 - Markdown lint and Prettier gates are green; the archived pre-migration transcript is a declared, reasoned exclusion.
 - The `check.yml` gate is red on coverage alone: 62% against the 85% floor. All other gates pass.
 - Three pre-existing product bugs remain open in `docs/handoff/bugs/`; bugs 003, 005, and 006 are fixed.

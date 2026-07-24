@@ -160,6 +160,7 @@ class MediaFacts:
     fps: float
     frames: int
     audio_codec: str
+    audio_profile: str
     audio_channels: int
     audio_layout: str
 
@@ -222,6 +223,7 @@ def parse_probe(payload: Mapping[str, object]) -> MediaFacts:
         fps=fps,
         frames=_integer_string(video.get("nb_read_frames"), "video.nb_read_frames"),
         audio_codec=_string(audio.get("codec_name"), "audio.codec_name"),
+        audio_profile=_string(audio.get("profile"), "audio.profile"),
         audio_channels=_integer(audio.get("channels"), "audio.channels"),
         audio_layout=_string(audio.get("channel_layout"), "audio.channel_layout"),
     )
@@ -409,6 +411,8 @@ def check_media(
         failures.append("duration")
     if facts.audio_codec != "aac":
         failures.append("audio codec")
+    if facts.audio_profile != "LC":
+        failures.append("audio profile")
     if facts.audio_channels != 2 or facts.audio_layout != "stereo":
         failures.append("stereo audio")
     return VerificationCheck(

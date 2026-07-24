@@ -57,7 +57,7 @@ uv run --project ../.. --directory media/repository-explainer python -m video_pi
 
 The separate `narrate` stage retains the dormant permission-smoke and three-take hardening controls for a future owner-approved narration series. It is not part of the quick rerender path.
 
-`verify` runs the quick-demo checks and writes `dist/video/final/verification-report.json`. It directly checks both MP4s with FFprobe, measures EBU R128 loudness, validates the narrated-only caption inventory and AI-narration disclosure, scans targeted text for credential patterns, and records SHA-256 hashes.
+`verify` runs the quick-demo checks and writes `dist/video/final/verification-report.json`. It directly checks both MP4s with FFprobe, including the standard AAC-LC audio profile, measures EBU R128 loudness, validates the narrated-only caption inventory and AI-narration disclosure, scans targeted text for credential patterns, and records SHA-256 hashes.
 
 The complete local delivery is `dist/video/final/`. It contains the narrated and speaker MP4s, selected narration WAV, captions, delivery and render manifests, verification report, and `checksums.sha256`. Verify the package from that directory with `sha256sum -c checksums.sha256`.
 

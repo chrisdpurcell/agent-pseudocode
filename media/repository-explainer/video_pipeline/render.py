@@ -6,9 +6,9 @@ two checksummed Noto faces are required before any cache or output is touched.
 Test renders can shorten and scale the same fourteen-state graph only through
 the explicit fixture configuration.
 
-AAC-LD's 480-sample frames divide both approved timelines exactly. Native
-AAC-LC was rejected because its 1024-sample framing decoded 384 samples past
-the fixture boundary even though the MP4 packet duration appeared correct.
+Standard AAC-LC keeps delivery compatible with ordinary media players. The MP4
+edit list carries encoder priming, while packet timing and a bounded decoded
+sample check prove that both approved timelines end at the program boundary.
 
 Command construction is pure, while subprocess, filesystem, cache, and manifest
 work stays in explicit orchestration functions so a future toolchain change can
@@ -45,8 +45,9 @@ PRODUCTION_FRAMES = 4050
 AUDIO_SAMPLE_RATE = 48_000
 H264_ENCODER = "libopenh264"
 AAC_ENCODER = "libfdk_aac"
-AAC_PROFILE = "aac_ld"
-AAC_FRAME_LENGTH = 480
+AAC_PROFILE = "aac_low"
+AAC_FRAME_LENGTH = 1024
+AAC_PRIMING_SAMPLES = AAC_FRAME_LENGTH * 2
 LIBRSVG_DECODER = "librsvg"
 RENDER_SCHEMA_VERSION = 1
 
@@ -325,8 +326,6 @@ def validate_capability_evidence(
         raise RenderError(f"ffmpeg did not describe the exact {H264_ENCODER} encoder")
     if not evidence.aac_help.startswith(f"Encoder {AAC_ENCODER} "):
         raise RenderError(f"ffmpeg did not describe the exact {AAC_ENCODER} encoder")
-    if "frame_length" not in evidence.aac_help:
-        raise RenderError(f"{AAC_ENCODER} does not expose deterministic frame length")
     if "fontconfig version " not in evidence.fontconfig_version:
         raise RenderError("fontconfig did not report its version")
     fontconfig_version = evidence.fontconfig_version.strip().removeprefix("fontconfig version ")
@@ -479,8 +478,6 @@ def _verify_aac_encoder(capabilities: RenderCapabilities, *, work_root: Path) ->
                 AAC_ENCODER,
                 "-profile:a",
                 AAC_PROFILE,
-                "-frame_length",
-                str(AAC_FRAME_LENGTH),
                 "-b:a",
                 "192k",
                 "-ar",
@@ -1341,8 +1338,6 @@ def _validate_config(config: RenderConfig) -> None:
         raise RenderError("audio must retain the approved 48000 Hz sample clock")
     if config.audio_sample_rate % config.fps != 0:
         raise RenderError("audio sample rate must divide exactly by the picture frame rate")
-    if _total_audio_samples(config) % AAC_FRAME_LENGTH != 0:
-        raise RenderError("program audio must divide exactly into approved AAC frames")
     if re.fullmatch(r"[1-9][0-9]*[kM]", config.video_bitrate) is None:
         raise RenderError("video_bitrate must be a positive deterministic k/M value")
     if config.cue_fade_start_sample + config.cue_fade_samples != config.cue_samples:
@@ -1386,8 +1381,8 @@ def _validate_media_shape(
             audio.get("profile"),
             audio.get("sample_rate"),
             audio.get("channels"),
-        ) != ("aac", "LD", str(config.audio_sample_rate), 2):
-            raise RenderError("delivery audio must be AAC-LD stereo at 48000 Hz")
+        ) != ("aac", "LC", str(config.audio_sample_rate), 2):
+            raise RenderError("delivery audio must be AAC-LC stereo at 48000 Hz")
         probe["program_audio_boundary"] = _validate_audio_packet_boundary(
             probe,
             audio_stream_index=cast(int, audio["index"]),
@@ -1465,6 +1460,8 @@ def _decoded_pcm_record(
             str(path),
             "-map",
             "0:a:0",
+            "-af",
+            f"atrim=end_sample={total_samples}",
             "-c:a",
             "pcm_s16le",
             "-f",
@@ -1533,7 +1530,7 @@ def _validate_audio_packet_boundary(
         ),
         0,
     )
-    if skip_samples != AAC_FRAME_LENGTH or starts_and_ends[0][0] != -skip_samples:
+    if skip_samples != AAC_PRIMING_SAMPLES or starts_and_ends[0][0] != -skip_samples:
         raise RenderError("AAC encoder priming is not represented as skip metadata")
     final_packet = packets[-1]
     try:
@@ -1561,8 +1558,7 @@ def _validate_audio_packet_boundary(
     effective_final_end = final_packet_pts + final_packet_duration - final_discard_padding
     packet_after_boundary = any(start >= total_samples for start, _ in starts_and_ends)
     if (
-        final_packet_pts != total_samples - AAC_FRAME_LENGTH
-        or final_packet_duration != AAC_FRAME_LENGTH
+        not 0 < final_packet_duration <= AAC_FRAME_LENGTH
         or final_skip_samples != 0
         or final_discard_padding != 0
         or effective_final_end != total_samples
@@ -1676,8 +1672,6 @@ def _encoded_audio_options(config: RenderConfig) -> tuple[str, ...]:
         AAC_ENCODER,
         "-profile:a",
         AAC_PROFILE,
-        "-frame_length",
-        str(AAC_FRAME_LENGTH),
         "-b:a",
         config.audio_bitrate,
         "-ar",
