@@ -235,7 +235,7 @@ def _probe(path: Path) -> dict[str, object]:
             (
                 "format=format_name,duration:"
                 "stream=index,codec_type,codec_name,width,height,r_frame_rate,"
-                "duration,nb_read_frames,channels,sample_rate"
+                "duration,nb_read_frames,channels,sample_rate,profile"
             ),
             "-of",
             "json",
@@ -259,8 +259,6 @@ def _decoded_pcm(path: Path) -> array.array[int]:
             str(path),
             "-map",
             "0:a:0",
-            "-af",
-            "atrim=end_sample=67200,asetpts=N/SR/TB",
             "-c:a",
             "pcm_s16le",
             "-f",
@@ -308,6 +306,44 @@ def test_tc_t7_000__reference_toolchain__passes_real_preflight() -> None:
     _require_render_api()
 
 
+def test_tc_t7_000a__capability_probe__rejects_every_used_graph_filter() -> None:
+    from video_pipeline.render import RenderError, validate_required_filters
+
+    listing = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-filters"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    ).stdout
+    graph_filters = (
+        "adelay",
+        "afade",
+        "aformat",
+        "amix",
+        "apad",
+        "aresample",
+        "asetpts",
+        "asplit",
+        "atrim",
+        "concat",
+        "format",
+        "loudnorm",
+        "scale",
+        "setpts",
+        "sine",
+        "subtitles",
+        "volume",
+    )
+    validate_required_filters(listing)
+    for filter_name in graph_filters:
+        listing_without_filter = "\n".join(
+            line for line in listing.splitlines() if f" {filter_name} " not in line
+        )
+        with pytest.raises(RenderError, match=filter_name):
+            validate_required_filters(listing_without_filter)
+
+
 def test_tc_t7_001__short_real_fixture__renders_matching_picture_variants(
     rendered_fixture: _RenderedFixture,
 ) -> None:
@@ -326,6 +362,7 @@ def test_tc_t7_001__short_real_fixture__renders_matching_picture_variants(
             2,
             "48000",
         )
+        assert audio["profile"] == "LD"
         assert float(cast(str, video["duration"])) == pytest.approx(1.4, abs=1 / 30)
         assert float(
             cast(str, cast(dict[str, object], probe["format"])["duration"])
@@ -334,12 +371,48 @@ def test_tc_t7_001__short_real_fixture__renders_matching_picture_variants(
     narrated_pcm = _decoded_pcm(fixture.project.output.narrated)
     speaker_pcm = _decoded_pcm(fixture.project.output.speaker)
     assert len(narrated_pcm) == len(speaker_pcm) == 67_200 * 2
+    assert not narrated_pcm[67_200 * 2 :]
+    assert not speaker_pcm[67_200 * 2 :]
     assert _tone_amplitude(narrated_pcm, 880, 48_000) > (
         8 * _tone_amplitude(speaker_pcm, 880, 48_000)
     )
     assert result.decoded_picture_sha256["speaker"] == result.base_picture_sha256
     assert result.decoded_picture_sha256["narrated"] != result.base_picture_sha256
     assert result.decoded_pcm_sha256["narrated"] != result.decoded_pcm_sha256["speaker"]
+
+
+def test_tc_t7_001a__native_aac_regression__untrimmed_decode_exposes_tail(
+    tmp_path: Path,
+) -> None:
+    native_aac = tmp_path / "TEST-ONLY-native-aac-regression.mp4"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=880:sample_rate=48000:duration=1.4",
+            "-af",
+            "aformat=channel_layouts=stereo",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            str(native_aac),
+        ],
+        check=True,
+        timeout=30,
+    )
+    decoded = _decoded_pcm(native_aac)
+    assert len(decoded) // 2 == 67_584
+    assert any(decoded[67_200 * 2 :])
 
 
 def test_tc_t7_002__graphs__separate_captions_audio_bed_and_loudness(
@@ -366,6 +439,17 @@ def test_tc_t7_002__graphs__separate_captions_audio_bed_and_loudness(
     assert "loudnorm=I=-16:LRA=7:TP=-1" in graph
     assert "loudnorm=I=-28:LRA=7:TP=-6" in graph
     assert "atrim=end_sample=67200" in graph
+    audio_encoder_indices = [index for index, argument in enumerate(command) if argument == "-c:a"]
+    assert len(audio_encoder_indices) == 2
+    for index in audio_encoder_indices:
+        assert command[index : index + 6] == (
+            "-c:a",
+            "libfdk_aac",
+            "-profile:a",
+            "aac_ld",
+            "-frame_length",
+            "480",
+        )
     speaker_output_index = command.index(str(fixture.project.output.speaker))
     assert command[speaker_output_index - 1] == "+faststart"
 
@@ -446,6 +530,7 @@ def test_tc_t7_003__cache_selected_wav_and_manifest__are_exact(
     assert manifest["project_timing"]["total_frames"] == 42
     assert manifest["inputs"]["selected_narration_wav"]["sha256"] == (fixture.selected_wav_sha256)
     assert set(manifest["toolchain"]) == {
+        "audio_encoder",
         "encoder",
         "ffmpeg",
         "ffprobe",
@@ -459,6 +544,10 @@ def test_tc_t7_003__cache_selected_wav_and_manifest__are_exact(
     assert manifest["toolchain"]["librsvg"]["version"] == "2.62.3"
     assert manifest["toolchain"]["encoder"]["name"] == "libopenh264"
     assert manifest["toolchain"]["encoder"]["verified"] is True
+    assert manifest["toolchain"]["audio_encoder"]["name"] == "libfdk_aac"
+    assert manifest["toolchain"]["audio_encoder"]["profile"] == "aac_ld"
+    assert manifest["toolchain"]["audio_encoder"]["frame_length"] == 480
+    assert manifest["toolchain"]["audio_encoder"]["verified"] is True
     assert [font["family"] for font in manifest["toolchain"]["fonts"]] == [
         "Noto Sans",
         "Noto Sans Mono",
@@ -469,10 +558,14 @@ def test_tc_t7_003__cache_selected_wav_and_manifest__are_exact(
         assert len(output["decoded_pcm_sha256"]) == 64
         assert output["decoded_audio_samples_per_channel"] == 67_200
         assert output["probe"]["program_audio_boundary"] == {
+            "final_discard_padding_samples": 0,
+            "final_packet_duration": 480,
+            "final_packet_pts": 66_720,
+            "final_packet_skip_samples": 0,
             "first_program_sample": 0,
             "last_program_sample_exclusive": 67_200,
             "packet_after_program_boundary": False,
-            "priming_skip_samples": 1024,
+            "priming_skip_samples": 480,
         }
     assert len(manifest["shared_picture"]["decoded_video_sha256"]) == 64
 
