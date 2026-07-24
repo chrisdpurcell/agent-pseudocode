@@ -3,25 +3,17 @@
 		"environment_variable": "OPENAI_API_KEY",
 		"openbao_path": "secret/api-keys/ai/openai-tts"
 	},
-	"permission_bundle": {
+	"dashboard_bundle": {
 		"checked_date": "2026-07-23",
-		"containment": "Bundled model capabilities are not represented as independently denied; production code permits only POST /v1/audio/speech.",
+		"containment": "Production code permits only POST /v1/audio/speech.",
+		"dashboard_only_denials": ["Management", "Administration"],
+		"independently_denied_bundled_model_capabilities": false,
+		"project_key_probe_targets": ["Files", "Fine-tuning", "Assistants"],
 		"scope": "Restricted",
-		"separately_denied": [
-			"management",
-			"files",
-			"fine-tuning",
-			"assistants",
-			"administration"
-		],
 		"source": "OpenAI project API key dashboard",
 		"speech_permitting_bundle": "provider-bundled model capabilities: Request"
 	},
-	"permission_smoke": {
-		"mode": "permission-smoke",
-		"requests": [],
-		"status": "not-run"
-	},
+	"project_key_denial_probes": { "requests": [], "status": "not-run" },
 	"provider_contract": {
 		"checked_date": "2026-07-23",
 		"documentation": "https://developers.openai.com/api/reference/resources/audio/subresources/speech/methods/create",
@@ -34,6 +26,7 @@
 		"voice": "marin"
 	},
 	"schema_version": 1,
+	"speech_smoke": { "mode": "permission-smoke", "request": null, "status": "not-run" },
 	"spend_evidence": {
 		"approved_cap_usd": "1.00",
 		"recording": "non-itemized projected and generated bounds only"

@@ -43,19 +43,11 @@ MIN_BOUNDARY_GAP_SECONDS = Decimal("0.05")
 LOCK_WAIT_SECONDS = 5.0
 TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 502, 503, 504})
 PERMISSION_DENIAL_STATUSES = frozenset({401, 403})
-DENIED_PERMISSION_CLASSES = (
-    "management",
-    "files",
-    "fine-tuning",
-    "assistants",
-    "administration",
-)
+PROJECT_KEY_DENIAL_CLASSES = ("Files", "Fine-tuning", "Assistants")
 PERMISSION_PROBE_CONTRACT = (
-    ("files", "GET", "/v1/files"),
-    ("fine-tuning", "GET", "/v1/fine_tuning/jobs"),
-    ("assistants", "GET", "/v1/assistants"),
-    ("management", "GET", "/v1/organization/projects"),
-    ("administration", "GET", "/v1/organization/admin_api_keys"),
+    ("Files", "GET", "/v1/files"),
+    ("Fine-tuning", "GET", "/v1/fine_tuning/jobs"),
+    ("Assistants", "GET", "/v1/assistants"),
 )
 PRODUCTION_EVIDENCE_SCHEMA_VERSION = 1
 TAKE_MANIFEST_SCHEMA_VERSION = 1
@@ -135,7 +127,7 @@ DEFAULT_SPEECH_POLICY = SpeechPolicy()
 
 @dataclass(frozen=True, slots=True)
 class PermissionProbe:
-    """One non-Speech resource class expected to be denied by the restricted key."""
+    """One project-key resource mapped to its exact dashboard permission name."""
 
     request_class: str
     method: str
@@ -258,21 +250,32 @@ def generate_narration(
     narration_path: Path,
     project: ProjectManifest,
     output_dir: Path,
-    manifest_path: Path,
     api_key: str,
     transport: SpeechTransport,
+    manifest_path: Path | None = None,
     policy: SpeechPolicy = DEFAULT_SPEECH_POLICY,
     sleep: Callable[[float], None] = time.sleep,
 ) -> NarrationResult:
     """Serialize one unchanged-series reservation and its bounded provider call."""
-    with _exclusive_file_lock(manifest_path):
+    package = load_narration(narration_path, project)
+    script = build_locked_script(package)
+    series_hash = _series_hash(script, package)
+    canonical_manifest = _canonical_take_manifest(project, series_hash)
+    if manifest_path is not None and manifest_path != canonical_manifest:
+        raise SpeechTerminalError(
+            "caller-supplied manifest_path must equal the canonical narration state path"
+        )
+    with _exclusive_file_lock(canonical_manifest):
         return _generate_narration_locked(
             narration_path=narration_path,
             project=project,
             output_dir=output_dir,
-            manifest_path=manifest_path,
+            manifest_path=canonical_manifest,
             api_key=api_key,
             transport=transport,
+            package=package,
+            script=script,
+            series_hash=series_hash,
             policy=policy,
             sleep=sleep,
         )
@@ -286,6 +289,9 @@ def _generate_narration_locked(
     manifest_path: Path,
     api_key: str,
     transport: SpeechTransport,
+    package: NarrationPackage,
+    script: str,
+    series_hash: str,
     policy: SpeechPolicy = DEFAULT_SPEECH_POLICY,
     sleep: Callable[[float], None] = time.sleep,
 ) -> NarrationResult:
@@ -295,12 +301,9 @@ def _generate_narration_locked(
     permission, policy, malformed WAV, fixed-budget, and spend failures return
     immediately. Every attempted provider request consumes the unchanged-series cap.
     """
-    package = load_narration(narration_path, project)
-    script = build_locked_script(package)
     _validate_api_key(api_key)
     projected_bound = _projected_series_bound(policy)
     _enforce_spend_bound(projected_bound, policy)
-    series_hash = _series_hash(script, package)
     ledger = _load_take_ledger(manifest_path)
     take_count = _series_take_count(ledger, series_hash)
     request = _speech_request(script, package, api_key)
@@ -447,7 +450,11 @@ def run_permission_smoke(
     _validate_checked_date(checked_date)
     _validate_api_key(api_key)
     _validate_permission_probe_set(probes)
-    with _exclusive_file_lock(evidence_path):
+    package = load_narration(narration_path, project)
+    script = build_locked_script(package)
+    series_hash = _series_hash(script, package)
+    smoke_state_path = _canonical_smoke_state(project, series_hash)
+    with _exclusive_file_lock(smoke_state_path):
         return _run_permission_smoke_locked(
             narration_path=narration_path,
             project=project,
@@ -458,6 +465,10 @@ def run_permission_smoke(
             probes=probes,
             mode=mode,
             timeout_seconds=timeout_seconds,
+            package=package,
+            script=script,
+            series_hash=series_hash,
+            smoke_state_path=smoke_state_path,
         )
 
 
@@ -472,44 +483,117 @@ def _run_permission_smoke_locked(
     probes: Sequence[PermissionProbe],
     mode: Literal["permission-smoke"],
     timeout_seconds: float = 60.0,
+    package: NarrationPackage,
+    script: str,
+    series_hash: str,
+    smoke_state_path: Path,
 ) -> dict[str, object]:
     """Run the one-time Speech success and denied-resource permission check.
 
-    Evidence retains only request class, date, HTTP status, and pass/fail. Response
-    bodies and authorization headers stay outside the durable record.
+    The canonical state files retain only request class, date, status, and
+    pass/fail. Response bodies and authorization headers stay outside the
+    durable record.
     """
-    existing = _load_production_evidence(evidence_path)
-    prior_smoke = cast(dict[str, object], existing["permission_smoke"])
-    if prior_smoke.get("status") != "not-run":
+    smoke_state = _load_smoke_state(smoke_state_path)
+    if smoke_state.get("status") != "not-run":
         raise SpeechTerminalError("permission smoke was already attempted and is one-time")
+    _atomic_write_json(
+        smoke_state_path,
+        {
+            "schema_version": 1,
+            "series_hash": series_hash,
+            "status": "running",
+            "checked_date": checked_date,
+        },
+    )
 
-    package = load_narration(narration_path, project)
-    script = build_locked_script(package)
+    existing = _load_production_evidence(evidence_path)
     baseline = _base_production_evidence(checked_date)
     evidence = dict(existing)
     for key, value in baseline.items():
-        if key != "permission_smoke":
-            evidence[key] = value
-    records: list[dict[str, object]] = []
-    _persist_smoke_evidence(evidence_path, evidence, records, status="running")
-    try:
-        speech_response = _send_smoke_request(
-            transport,
-            _speech_request(script, package, api_key),
-            timeout_seconds=timeout_seconds,
+        evidence[key] = value
+    denial_records: list[dict[str, object]] = []
+    speech_record = _smoke_record("Speech", checked_date, "reserved", False)
+    _persist_smoke_evidence(
+        evidence_path,
+        evidence,
+        denial_records,
+        speech_record=speech_record,
+        status="running",
+    )
+
+    manifest_path = _canonical_take_manifest(project, series_hash)
+    with _exclusive_file_lock(manifest_path):
+        ledger = _load_take_ledger(manifest_path)
+        take_count = _series_take_count(ledger, series_hash)
+        if take_count >= MAX_TAKES:
+            _finish_smoke_state(smoke_state_path, "fail")
+            raise TakeLimitError("unchanged narration series reached the global three-take cap")
+        take_count += 1
+        _update_ledger(
+            ledger,
+            series_hash=series_hash,
+            take_count=take_count,
+            package=package,
+            policy=DEFAULT_SPEECH_POLICY,
+            status="permission-smoke-requested",
+            failure_class=None,
+            outcome=None,
         )
-    except ProviderUnavailableError:
-        records.append(_smoke_record("speech", checked_date, "transport-unavailable", False))
-        _persist_smoke_evidence(evidence_path, evidence, records, status="fail")
-        raise
-    speech_passed = speech_response.status == 200
-    if speech_passed:
+        _atomic_write_json(manifest_path, ledger)
         try:
-            _decode_wav(speech_response.body)
-        except SpeechTerminalError:
-            speech_passed = False
-    records.append(_smoke_record("speech", checked_date, speech_response.status, speech_passed))
-    _persist_smoke_evidence(evidence_path, evidence, records, status="running")
+            speech_response = _send_smoke_request(
+                transport,
+                _speech_request(script, package, api_key),
+                timeout_seconds=timeout_seconds,
+            )
+        except ProviderUnavailableError:
+            speech_record = _smoke_record("Speech", checked_date, "transport-unavailable", False)
+            _record_failure(
+                ledger,
+                manifest_path,
+                series_hash=series_hash,
+                take_count=take_count,
+                package=package,
+                policy=DEFAULT_SPEECH_POLICY,
+                failure_class="provider-unavailable",
+                transient=False,
+            )
+            _persist_smoke_evidence(
+                evidence_path,
+                evidence,
+                denial_records,
+                speech_record=speech_record,
+                status="fail",
+            )
+            _finish_smoke_state(smoke_state_path, "fail")
+            raise
+
+        speech_passed = speech_response.status == 200
+        if speech_passed:
+            try:
+                _decode_wav(speech_response.body)
+            except SpeechTerminalError:
+                speech_passed = False
+        speech_record = _smoke_record("Speech", checked_date, speech_response.status, speech_passed)
+        _update_ledger(
+            ledger,
+            series_hash=series_hash,
+            take_count=take_count,
+            package=package,
+            policy=DEFAULT_SPEECH_POLICY,
+            status="permission-smoke-complete" if speech_passed else "rejected",
+            failure_class=None if speech_passed else "permission-smoke-speech",
+            outcome="permission-smoke" if speech_passed else "rejected",
+        )
+        _atomic_write_json(manifest_path, ledger)
+    _persist_smoke_evidence(
+        evidence_path,
+        evidence,
+        denial_records,
+        speech_record=speech_record,
+        status="running",
+    )
 
     for probe in probes:
         try:
@@ -518,37 +602,58 @@ def _run_permission_smoke_locked(
                 HttpRequest(
                     method=probe.method,
                     path=probe.path,
-                    headers=_authorization_headers(api_key),
+                    headers=_permission_probe_headers(probe, api_key),
                     body=b"",
                 ),
                 timeout_seconds=timeout_seconds,
             )
         except ProviderUnavailableError:
-            records.append(
-                _smoke_record(
+            denial_records.append(
+                _denial_probe_record(
                     probe.request_class,
                     checked_date,
                     "transport-unavailable",
                     False,
                 )
             )
-            _persist_smoke_evidence(evidence_path, evidence, records, status="fail")
+            _persist_smoke_evidence(
+                evidence_path,
+                evidence,
+                denial_records,
+                speech_record=speech_record,
+                status="fail",
+            )
+            _finish_smoke_state(smoke_state_path, "fail")
             raise
-        records.append(
-            _smoke_record(
+        denial_records.append(
+            _denial_probe_record(
                 probe.request_class,
                 checked_date,
                 response.status,
                 response.status in PERMISSION_DENIAL_STATUSES,
             )
         )
-        _persist_smoke_evidence(evidence_path, evidence, records, status="running")
+        _persist_smoke_evidence(
+            evidence_path,
+            evidence,
+            denial_records,
+            speech_record=speech_record,
+            status="running",
+        )
 
-    passed = speech_passed and all(cast(bool, record["pass"]) for record in records[1:])
-    _persist_smoke_evidence(evidence_path, evidence, records, status="pass" if passed else "fail")
+    passed = speech_passed and all(cast(bool, record["pass"]) for record in denial_records)
+    status = "pass" if passed else "fail"
+    _persist_smoke_evidence(
+        evidence_path,
+        evidence,
+        denial_records,
+        speech_record=speech_record,
+        status=status,
+    )
+    _finish_smoke_state(smoke_state_path, status)
     if not passed:
         raise SpeechTerminalError("permission smoke failed; production Speech remains blocked")
-    return cast(dict[str, object], evidence["permission_smoke"])
+    return cast(dict[str, object], evidence["project_key_denial_probes"])
 
 
 def _speech_request(script: str, package: NarrationPackage, api_key: str) -> HttpRequest:
@@ -600,6 +705,16 @@ def _series_hash(script: str, package: NarrationPackage) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(canonical).hexdigest()
+
+
+def _canonical_take_manifest(project: ProjectManifest, series_hash: str) -> Path:
+    """Return the repository-owned ledger path for one immutable request series."""
+    return project.output.root / "work" / "narration-series" / f"{series_hash}.json"
+
+
+def _canonical_smoke_state(project: ProjectManifest, series_hash: str) -> Path:
+    """Return the repository-owned one-shot permission-smoke state path."""
+    return project.output.root / "work" / "permission-smoke" / f"{series_hash}.json"
 
 
 def _projected_series_bound(policy: SpeechPolicy) -> Decimal:
@@ -957,6 +1072,18 @@ def _validate_permission_probe_set(probes: Sequence[PermissionProbe]) -> None:
         )
 
 
+def _permission_probe_headers(probe: PermissionProbe, api_key: str) -> Mapping[str, str]:
+    headers = _authorization_headers(api_key)
+    if probe.request_class == "Assistants":
+        headers.update(
+            {
+                "Content-Type": "application/json",
+                "OpenAI-Beta": "assistants=v2",
+            }
+        )
+    return headers
+
+
 def _smoke_record(
     request_class: str, checked_date: str, status: int | str, passed: bool
 ) -> dict[str, object]:
@@ -968,19 +1095,59 @@ def _smoke_record(
     }
 
 
+def _denial_probe_record(
+    dashboard_permission: str,
+    checked_date: str,
+    status: int | str,
+    passed: bool,
+) -> dict[str, object]:
+    return {
+        "dashboard_permission": dashboard_permission,
+        "date": checked_date,
+        "status": status,
+        "pass": passed,
+    }
+
+
 def _persist_smoke_evidence(
     evidence_path: Path,
     evidence: dict[str, object],
     records: list[dict[str, object]],
     *,
+    speech_record: dict[str, object],
     status: str,
 ) -> None:
-    evidence["permission_smoke"] = {
+    evidence["speech_smoke"] = {
         "mode": "permission-smoke",
+        "status": status,
+        "request": speech_record,
+    }
+    evidence["project_key_denial_probes"] = {
         "status": status,
         "requests": records,
     }
     _atomic_write_json(evidence_path, evidence)
+
+
+def _load_smoke_state(path: Path) -> dict[str, object]:
+    if not path.exists():
+        return {"schema_version": 1, "status": "not-run"}
+    try:
+        decoded = cast(object, json.loads(path.read_text(encoding="utf-8")))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SpeechTerminalError("permission smoke state could not be read as valid JSON") from exc
+    if not isinstance(decoded, dict):
+        raise SpeechTerminalError("permission smoke state is invalid")
+    state = cast(dict[str, object], decoded)
+    if state.get("schema_version") != 1:
+        raise SpeechTerminalError("permission smoke state is invalid")
+    return state
+
+
+def _finish_smoke_state(path: Path, status: str) -> None:
+    state = _load_smoke_state(path)
+    state["status"] = status
+    _atomic_write_json(path, state)
 
 
 def _validate_checked_date(checked_date: str) -> None:
@@ -1000,8 +1167,9 @@ def _load_production_evidence(path: Path) -> dict[str, object]:
     if not isinstance(decoded, dict):
         raise SpeechTerminalError("production evidence must be a JSON object")
     evidence = cast(dict[str, object], decoded)
-    if not isinstance(evidence.get("permission_smoke"), dict):
-        raise SpeechTerminalError("production evidence permission_smoke must be an object")
+    denial_probes = evidence.get("project_key_denial_probes")
+    if denial_probes is not None and not isinstance(denial_probes, dict):
+        raise SpeechTerminalError("production evidence project_key_denial_probes must be an object")
     return evidence
 
 
@@ -1022,23 +1190,26 @@ def _base_production_evidence(checked_date: str) -> dict[str, object]:
             "response_format": RESPONSE_FORMAT,
             "maximum_input_characters": MAX_INPUT_CHARACTERS,
         },
-        "permission_bundle": {
+        "dashboard_bundle": {
             "checked_date": checked_date,
             "source": "OpenAI project API key dashboard",
             "scope": "Restricted",
             "speech_permitting_bundle": "provider-bundled model capabilities: Request",
-            "separately_denied": list(DENIED_PERMISSION_CLASSES),
-            "containment": (
-                "Bundled model capabilities are not represented as independently denied; "
-                "production code permits only POST /v1/audio/speech."
-            ),
+            "independently_denied_bundled_model_capabilities": False,
+            "project_key_probe_targets": list(PROJECT_KEY_DENIAL_CLASSES),
+            "dashboard_only_denials": ["Management", "Administration"],
+            "containment": "Production code permits only POST /v1/audio/speech.",
         },
         "credential_reference": {
             "environment_variable": "OPENAI_API_KEY",
             "openbao_path": "secret/api-keys/ai/openai-tts",
         },
-        "permission_smoke": {
+        "speech_smoke": {
             "mode": "permission-smoke",
+            "status": "not-run",
+            "request": None,
+        },
+        "project_key_denial_probes": {
             "status": "not-run",
             "requests": [],
         },
