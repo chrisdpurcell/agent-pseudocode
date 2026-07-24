@@ -1206,6 +1206,14 @@ def _toolchain_manifest(
     }
 
 
+def toolchain_manifest(
+    capabilities: RenderCapabilities,
+    config: RenderConfig,
+) -> dict[str, object]:
+    """Expose the exact renderer-owned toolchain contract to promotion verification."""
+    return _toolchain_manifest(capabilities, config)
+
+
 def _synthesis_manifest(project: ProjectManifest, config: RenderConfig) -> dict[str, object]:
     return {
         "method": "FFmpeg sine sources mixed in the render filter graph",
@@ -1940,6 +1948,22 @@ def _hash_command_output(
         process.stdout.close()
         process.stderr.close()
     return digest.hexdigest(), byte_count
+
+
+def hash_command_output(
+    argv: Sequence[str],
+    label: str,
+    *,
+    timeout_seconds: float,
+    max_output_bytes: int,
+) -> tuple[str, int]:
+    """Hash bounded process output with the renderer's process-group guarantees."""
+    return _hash_command_output(
+        argv,
+        label,
+        timeout_seconds=timeout_seconds,
+        max_output_bytes=max_output_bytes,
+    )
 
 
 def _terminate_process_group(process: subprocess.Popen[bytes]) -> None:

@@ -6,6 +6,8 @@ import copy
 import hashlib
 import json
 import subprocess
+import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 
@@ -13,6 +15,8 @@ import pytest
 
 from video_pipeline.models import MediaSettings, Rectangle, VisualState
 from video_pipeline.scenes import ContentReference, RenderedSceneState
+
+REPOSITORY_ROOT = Path(__file__).parents[2]
 
 
 def _probe_payload(*, frames: int = 4050, duration: str = "135.000000") -> dict[str, object]:
@@ -26,6 +30,7 @@ def _probe_payload(*, frames: int = 4050, duration: str = "135.000000") -> dict[
                 "width": 1920,
                 "height": 1080,
                 "pix_fmt": "yuv420p",
+                "field_order": "progressive",
                 "r_frame_rate": "30/1",
                 "duration": duration,
                 "nb_read_frames": str(frames),
@@ -35,6 +40,7 @@ def _probe_payload(*, frames: int = 4050, duration: str = "135.000000") -> dict[
                 "codec_type": "audio",
                 "codec_name": "aac",
                 "profile": "LD",
+                "time_base": "1/48000",
                 "sample_rate": "48000",
                 "channels": 2,
                 "duration": duration,
@@ -46,6 +52,19 @@ def _probe_payload(*, frames: int = 4050, duration: str = "135.000000") -> dict[
             "last_program_sample_exclusive": 6_480_000,
             "packet_after_program_boundary": False,
         },
+        "packets": [
+            {
+                "stream_index": 1,
+                "pts": -480,
+                "duration": 480,
+                "side_data_list": [{"side_data_type": "Skip Samples", "skip_samples": 480}],
+            },
+            {
+                "stream_index": 1,
+                "pts": round(float(duration) * 48_000) - 480,
+                "duration": 480,
+            },
+        ],
     }
 
 
@@ -180,6 +199,58 @@ def test_tc_t8_001__probe_parser__rejects_inexact_frame_and_audio_boundaries() -
     assert duration.evidence["expected_audio_samples"] == 6_480_000
 
 
+def test_tc_t8_001__production_media_contract__cannot_be_softened_by_caller_settings() -> None:
+    from video_pipeline.verify import LoudnessMeasurement, verify_media_variant
+
+    probe = _probe_payload(frames=100, duration="5.000000")
+    video = cast(dict[str, object], cast(list[object], probe["streams"])[0])
+    video.update({"width": 100, "height": 100, "r_frame_rate": "20/1"})
+    cast(dict[str, object], probe["program_audio_boundary"])["last_program_sample_exclusive"] = (
+        240_000
+    )
+
+    rows = verify_media_variant(
+        "narrated",
+        probe,
+        LoudnessMeasurement(-16.0, -1.2),
+        media=MediaSettings(width=100, height=100, fps=20, total_frames=100),
+    )
+
+    format_row = next(row for row in rows if row.id == "MEDIA-narrated-format")
+    duration_row = next(row for row in rows if row.id == "MEDIA-narrated-duration")
+    expected_format = cast(dict[str, object], format_row.evidence["expected"])
+    assert format_row.status == "fail"
+    assert expected_format["width"] == 1920
+    assert duration_row.status == "fail"
+    assert duration_row.evidence["expected_frames"] == 4050
+    assert duration_row.evidence["expected_seconds"] == 135.0
+
+
+def test_tc_t8_001__packet_and_progressive_contract__rejects_forged_boundary() -> None:
+    from video_pipeline.verify import LoudnessMeasurement, verify_media_variant
+
+    probe = _probe_payload()
+    video = cast(dict[str, object], cast(list[object], probe["streams"])[0])
+    video["field_order"] = "tt"
+    final_packet = cast(dict[str, object], cast(list[object], probe["packets"])[-1])
+    final_packet["duration"] = 960
+    # A forged summary cannot override the actual packet that crosses 135 seconds.
+    cast(dict[str, object], probe["program_audio_boundary"])["packet_after_program_boundary"] = (
+        False
+    )
+
+    rows = verify_media_variant(
+        "narrated",
+        probe,
+        LoudnessMeasurement(-16.0, -1.2),
+    )
+
+    assert next(row for row in rows if row.id == "MEDIA-narrated-format").status == "fail"
+    duration = next(row for row in rows if row.id == "MEDIA-narrated-duration")
+    assert duration.status == "fail"
+    assert duration.evidence["packet_after_program_boundary"] is True
+
+
 def test_tc_t8_002__must_gate_aggregation__blocks_every_corrupted_fixture() -> None:
     from video_pipeline.verify import GateResult, aggregate_report
 
@@ -267,6 +338,132 @@ def test_tc_t8_002__content_gates__report_structured_failures(tmp_path: Path) ->
     assert "sk-fixture-secret" not in json.dumps(failures)
 
 
+def test_tc_t8_002__authenticity__rejects_forged_svg_with_unchanged_reference(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import verify_content_contracts
+
+    (tmp_path / "source.txt").write_bytes(b"source")
+    forged = replace(
+        _state("mute_safe_copy", 0, 60),
+        svg=b"<svg><text>Forged claim</text></svg>",
+        display_text="Forged claim",
+        content_ledger=("Forged claim",),
+    )
+    rows = verify_content_contracts(
+        repository_root=tmp_path,
+        states=(forged,),
+        classified_asset_ids=frozenset({"font"}),
+        delivery={"ai_narration_disclosure": "AI-generated narration."},
+        external_music_inputs=(),
+        speaker_speech_detected=False,
+        frame_reviews=(),
+        required_frame_samples=(),
+        secret_artifacts={"source.txt": b"source"},
+    )
+
+    authenticity = next(row for row in rows if row.id == "AUTH-evidence")
+    assert authenticity.status == "fail"
+    semantic = cast(list[dict[str, object]], authenticity.evidence["semantic_findings"])
+    assert {finding["reason"] for finding in semantic} == {
+        "missing-renderer-content-ledger",
+        "renderer-evidence-geometry-mismatch",
+    }
+
+
+def test_tc_t8_002__revision_authenticity__uses_bounded_process_group_runner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from video_pipeline.verify import verify_content_contracts
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "config",
+            "user.email",
+            "168346341+chrisdpurcell@users.noreply.github.com",
+        ],
+        cwd=tmp_path,
+        check=True,
+    )
+    subprocess.run(["git", "config", "user.name", "Fixture"], cwd=tmp_path, check=True)
+    source = tmp_path / "source.txt"
+    source.write_bytes(b"source")
+    subprocess.run(["git", "add", "source.txt"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "fixture"], cwd=tmp_path, check=True)
+    revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    state = replace(
+        _state("mute_safe_copy", 0, 60),
+        references=(
+            ContentReference(
+                kind="source",
+                path="source.txt",
+                sha256=hashlib.sha256(b"source").hexdigest(),
+                revision=revision,
+            ),
+        ),
+    )
+
+    def reject_unbounded_run(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("revision lookup must not call subprocess.run")
+
+    monkeypatch.setattr(subprocess, "run", reject_unbounded_run)
+    rows = verify_content_contracts(
+        repository_root=tmp_path,
+        states=(state,),
+        classified_asset_ids=frozenset({"font"}),
+        delivery={"ai_narration_disclosure": "AI-generated narration."},
+        external_music_inputs=(),
+        speaker_speech_detected=False,
+        frame_reviews=(),
+        required_frame_samples=(),
+        secret_artifacts={},
+    )
+
+    authenticity = next(row for row in rows if row.id == "AUTH-evidence")
+    assert authenticity.evidence["findings"] == []
+
+
+def test_tc_t8_002__required_artifact_secret_scan__is_closed_and_detects_entropy(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import (
+        REQUIRED_DELIVERY_INVENTORY,
+        verify_required_artifact_secrets,
+    )
+
+    deliverables: dict[str, Path] = {}
+    for role, name in REQUIRED_DELIVERY_INVENTORY.items():
+        path = tmp_path / name
+        path.write_text("ordinary fixture evidence\n", encoding="utf-8")
+        deliverables[role] = path
+    opaque_value = "Kx9pQ2vN7sR4mT8wY5cF1hJ6dL0uB3gZ"
+    deliverables["delivery_json"].write_text(
+        json.dumps({"note": opaque_value}),
+        encoding="utf-8",
+    )
+
+    row = verify_required_artifact_secrets(deliverables, ())
+    missing_row = verify_required_artifact_secrets({}, ())
+
+    assert row.status == "fail"
+    assert row.evidence["artifacts_scanned"] == sorted(REQUIRED_DELIVERY_INVENTORY)
+    assert row.evidence["findings"] == [
+        {"artifact": "delivery_json", "classification": "high-entropy-token"}
+    ]
+    assert opaque_value not in json.dumps(row.evidence)
+    assert missing_row.status == "fail"
+    assert missing_row.evidence["missing_roles"] == sorted(REQUIRED_DELIVERY_INVENTORY)
+
+
 def test_tc_t8_003__exact_reproduction__matches_semantics_but_ignores_container_hash() -> None:
     from video_pipeline.verify import semantic_manifest_sha256, verify_reproduction
 
@@ -283,6 +480,7 @@ def test_tc_t8_003__exact_reproduction__matches_semantics_but_ignores_container_
         actual_toolchain=actual_toolchain,
         clean_checkout=True,
         speech_api_calls=0,
+        mode="diagnostic",
     )
 
     assert row.status == "pass"
@@ -302,6 +500,7 @@ def test_tc_t8_003__toolchain_or_decoded_hash_mismatch__blocks_without_threshold
         actual_toolchain=mismatched_toolchain,
         clean_checkout=True,
         speech_api_calls=0,
+        mode="diagnostic",
     )
     reproduced = copy.deepcopy(approved)
     cast(dict[str, object], cast(dict[str, object], reproduced["outputs"])["speaker"])[
@@ -313,6 +512,7 @@ def test_tc_t8_003__toolchain_or_decoded_hash_mismatch__blocks_without_threshold
         actual_toolchain=cast(dict[str, object], approved["toolchain"]),
         clean_checkout=True,
         speech_api_calls=0,
+        mode="diagnostic",
     )
 
     assert toolchain_row.status == "fail"
@@ -320,6 +520,59 @@ def test_tc_t8_003__toolchain_or_decoded_hash_mismatch__blocks_without_threshold
     assert decoded_row.status == "fail"
     assert decoded_row.evidence["comparison"] == "exact-hash"
     assert "threshold" not in json.dumps(decoded_row.evidence)
+
+
+def test_tc_t8_003__production_reproduction__rejects_caller_self_attestation() -> None:
+    from video_pipeline.verify import verify_reproduction
+
+    approved = _semantic_manifest()
+    row = verify_reproduction(
+        approved,
+        copy.deepcopy(approved),
+        actual_toolchain=cast(dict[str, object], approved["toolchain"]),
+        clean_checkout=True,
+        speech_api_calls=0,
+    )
+
+    assert row.status == "fail"
+    assert row.evidence["reason"] == "actual-probe-and-offline-run-required"
+
+
+def test_tc_t8_003__offline_reproduction_command__is_fixed_network_denied_and_keyless(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import build_offline_reproduction_command
+
+    checkout = tmp_path / "dist" / "video" / "work" / "checkout"
+    checkout.mkdir(parents=True)
+    selected = tmp_path / "agent-pseudocode-explainer-narration-selected.wav"
+    selected.write_bytes(b"selected")
+    command = build_offline_reproduction_command(
+        checkout=checkout,
+        selected_wav=selected,
+        selected_wav_sha256=hashlib.sha256(b"selected").hexdigest(),
+        python=Path(sys.executable),
+        bwrap=Path("/usr/bin/bwrap"),
+    )
+
+    assert command[:4] == (
+        "/usr/bin/bwrap",
+        "--unshare-net",
+        "--die-with-parent",
+        "--new-session",
+    )
+    assert "--clearenv" in command
+    assert "PYTHONPATH" in command
+    assert "VIDEO_PIPELINE_OFFLINE_REPRODUCTION" in command
+    assert "OPENAI_API_KEY" not in command
+    assert command[-6:] == (
+        "-m",
+        "video_pipeline.verify",
+        "--offline-render",
+        str(selected.resolve()),
+        "--selected-wav-sha256",
+        hashlib.sha256(b"selected").hexdigest(),
+    )
 
 
 def test_tc_t8_002__strict_manifest_and_asset_ledger__reject_tampering(tmp_path: Path) -> None:
@@ -367,6 +620,55 @@ def test_tc_t8_002__strict_manifest_and_asset_ledger__reject_tampering(tmp_path:
     }
 
 
+def test_tc_t8_002__closed_world_provenance__requires_selected_wav_and_procedural_audio(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import verify_closed_world_provenance
+
+    selected = tmp_path / "agent-pseudocode-explainer-narration-selected.wav"
+    selected.write_bytes(b"selected narration")
+    state = _state("mute_safe_copy", 0, 60)
+    manifest = _render_manifest_for_states(
+        (state,),
+        MediaSettings(width=100, height=100, fps=20, total_frames=60),
+    )
+    selected_record = cast(
+        dict[str, object],
+        cast(dict[str, object], manifest["inputs"])["selected_narration_wav"],
+    )
+    selected_record["sha256"] = hashlib.sha256(selected.read_bytes()).hexdigest()
+    assets = {
+        "schema_version": 1,
+        "assets": [
+            {
+                "id": "font",
+                "kind": "font",
+                "repository_path": "font.bin",
+                "system_path": None,
+                "source": "Fixture",
+                "license_id": "OFL-1.1",
+                "generation_method": None,
+                "sha256": hashlib.sha256(b"font").hexdigest(),
+            }
+        ],
+    }
+    (tmp_path / "font.bin").write_bytes(b"font")
+
+    row = verify_closed_world_provenance(
+        manifest,
+        states=(state,),
+        asset_provenance=assets,
+        repository_root=tmp_path,
+        selected_wav=selected,
+    )
+
+    assert row.status == "fail"
+    assert row.evidence["missing_classifications"] == [
+        "procedural_tonal_bed_and_cues",
+        "selected_narration_wav",
+    ]
+
+
 @pytest.mark.parametrize(
     ("dominant_frames", "expected_status"),
     [
@@ -404,6 +706,34 @@ def test_tc_t8_004__renderer_geometry_frame_share__uses_inclusive_boundaries(
     assert row.status == expected_status
     assert row.evidence["dominant_frames"] == dominant_frames
     assert row.evidence["percentage"] == dominant_frames
+
+
+def test_tc_t8_004__frame_share__rejects_gaps_overlaps_and_out_of_frame_rectangles() -> None:
+    from video_pipeline.verify import verify_evidence_frame_share
+
+    states = (
+        VisualState(
+            id="dominant",
+            start_frame=0,
+            end_frame=60,
+            evidence_rectangles=(Rectangle(-1, 0, 101, 100),),
+        ),
+        VisualState(
+            id="gap-after-60",
+            start_frame=61,
+            end_frame=100,
+            evidence_rectangles=(),
+        ),
+    )
+
+    row = verify_evidence_frame_share(states, width=100, height=100, total_frames=100)
+
+    assert row.status == "fail"
+    findings = cast(list[dict[str, object]], row.evidence["timeline_geometry_findings"])
+    assert {finding["reason"] for finding in findings} == {
+        "gap-or-overlap",
+        "rectangle-outside-frame",
+    }
 
 
 def test_tc_t8_001__real_short_fixture__is_probed_by_the_verifier(tmp_path: Path) -> None:
@@ -450,13 +780,118 @@ def test_tc_t8_001__real_short_fixture__is_probed_by_the_verifier(tmp_path: Path
         probe,
         # This test exercises the real media probe; loudness parsing is covered independently.
         loudness=LoudnessMeasurement(-28.0, -6.0),
+        mode="diagnostic",
         media=MediaSettings(width=160, height=90, fps=30, total_frames=30),
     )
 
     assert all(row.status == "pass" for row in rows[:3])
 
 
-def test_tc_t8_002__single_verifier__writes_promotable_report_and_checksums(
+def test_tc_t8_001__candidate_analyzers__use_bounded_process_group_runner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from video_pipeline.verify import measure_loudness, probe_media_file
+
+    output = tmp_path / "fixture.mp4"
+    _write_short_mp4(output)
+
+    def reject_unbounded_run(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("candidate analyzers must not call subprocess.run")
+
+    monkeypatch.setattr(subprocess, "run", reject_unbounded_run)
+
+    probe = probe_media_file(output)
+    loudness = measure_loudness(output)
+
+    boundary = cast(dict[str, object], probe["program_audio_boundary"])
+    assert boundary["first_program_sample"] == 0
+    assert boundary["last_program_sample_exclusive"] == 48_000
+    assert boundary["priming_skip_samples"] == 480
+    assert boundary["packet_after_program_boundary"] is False
+    assert loudness.integrated_lufs < 0
+
+
+def test_tc_t8_002__candidate_analyzers__derive_hashes_samples_and_speech_contract(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import verify_candidate_media
+
+    narrated = tmp_path / "agent-pseudocode-explainer-narrated.mp4"
+    speaker = tmp_path / "agent-pseudocode-explainer-speaker.mp4"
+    _write_short_mp4(narrated)
+    speaker.write_bytes(narrated.read_bytes())
+    captions = tmp_path / "agent-pseudocode-explainer-captions.srt"
+    captions.write_text(
+        "1\n00:00:00,166 --> 00:00:00,666\nFixture caption\n",
+        encoding="utf-8",
+    )
+    state = _state("mute_safe_copy", 0, 30)
+    manifest = _render_manifest_for_states(
+        (state,),
+        MediaSettings(width=160, height=90, fps=30, total_frames=30),
+    )
+    outputs = cast(dict[str, dict[str, object]], manifest["outputs"])
+    for output in outputs.values():
+        output["decoded_video_sha256"] = "0" * 64
+        output["decoded_pcm_sha256"] = "1" * 64
+    inputs = cast(dict[str, dict[str, object]], manifest["inputs"])
+    inputs["captions_srt"]["sha256"] = "2" * 64
+
+    rows = verify_candidate_media(
+        {
+            "narrated_mp4": narrated,
+            "speaker_mp4": speaker,
+            "captions_srt": captions,
+        },
+        manifest=manifest,
+        states=(state,),
+        mode="diagnostic",
+        diagnostic_media=MediaSettings(width=160, height=90, fps=30, total_frames=30),
+    )
+    by_id = {row.id: row for row in rows}
+
+    assert by_id["CANDIDATE-semantic-hashes"].status == "fail"
+    actual = cast(dict[str, object], by_id["CANDIDATE-semantic-hashes"].evidence["actual"])
+    assert actual["caption_sha256"] == hashlib.sha256(captions.read_bytes()).hexdigest()
+    assert by_id["FRAME-final-samples"].status == "pass"
+    assert by_id["FRAME-final-samples"].evidence["sampled_frames"] == [5, 19, 29]
+    assert by_id["CAPTION-speaker"].evidence["derivation"] == "decoded-speaker-picture"
+    assert by_id["AUDIO-speaker-speech"].evidence["derivation"] == "decoded-speaker-pcm"
+
+
+def test_tc_t8_002__candidate_analyzers__fail_closed_on_corrupt_media(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import verify_candidate_media
+
+    narrated = tmp_path / "agent-pseudocode-explainer-narrated.mp4"
+    speaker = tmp_path / "agent-pseudocode-explainer-speaker.mp4"
+    captions = tmp_path / "agent-pseudocode-explainer-captions.srt"
+    narrated.write_bytes(b"not an MP4")
+    speaker.write_bytes(b"not an MP4")
+    captions.write_text("", encoding="utf-8")
+
+    rows = verify_candidate_media(
+        {
+            "narrated_mp4": narrated,
+            "speaker_mp4": speaker,
+            "captions_srt": captions,
+        },
+        manifest={},
+        states=(),
+        mode="diagnostic",
+        diagnostic_media=MediaSettings(width=160, height=90, fps=30, total_frames=30),
+    )
+
+    assert len(rows) == 1
+    assert rows[0].id == "CANDIDATE-analysis"
+    assert rows[0].status == "fail"
+    assert rows[0].evidence["error_class"] == "VerificationError"
+    assert "not an MP4" not in json.dumps(rows[0].evidence)
+
+
+def test_tc_t8_002__diagnostic_fixture__cannot_be_promoted_as_production(
     tmp_path: Path,
 ) -> None:
     from video_pipeline.verify import (
@@ -517,41 +952,102 @@ def test_tc_t8_002__single_verifier__writes_promotable_report_and_checksums(
         FrameReview("narrated", 99, "promise", "end-card", 44, True, 7.0, True),
         FrameReview("speaker", 99, "promise", "end-card", 32, True, 7.0, False),
     )
-    report = verify_delivery(
-        VerificationInputs(
-            repository_root=tmp_path,
-            media=media,
-            states=states,
-            render_manifest=manifest,
-            reproduced_manifest=copy.deepcopy(manifest),
-            actual_toolchain=cast(dict[str, object], manifest["toolchain"]),
-            probes={"narrated": probe, "speaker": copy.deepcopy(probe)},
-            loudness={
-                "narrated": LoudnessMeasurement(-16.0, -1.2),
-                "speaker": LoudnessMeasurement(-28.0, -6.2),
-            },
-            asset_provenance=assets,
-            delivery={"ai_narration_disclosure": "AI-generated narration."},
-            frame_reviews=reviews,
-            required_frame_samples=(
-                ("narrated", 99, "promise", "end-card"),
-                ("speaker", 99, "promise", "end-card"),
-            ),
-            speaker_speech_detected=False,
-            clean_checkout=True,
-            speech_api_calls=0,
-            secret_artifacts={"delivery.json": "AI-generated narration."},
-            deliverables={"source.txt": source},
-        )
+    inputs = VerificationInputs(
+        mode="diagnostic",
+        repository_root=tmp_path,
+        media=media,
+        states=states,
+        render_manifest=manifest,
+        reproduced_manifest=copy.deepcopy(manifest),
+        actual_toolchain=cast(dict[str, object], manifest["toolchain"]),
+        probes={"narrated": probe, "speaker": copy.deepcopy(probe)},
+        loudness={
+            "narrated": LoudnessMeasurement(-16.0, -1.2),
+            "speaker": LoudnessMeasurement(-28.0, -6.2),
+        },
+        asset_provenance=assets,
+        delivery={"ai_narration_disclosure": "AI-generated narration."},
+        frame_reviews=reviews,
+        required_frame_samples=(
+            ("narrated", 99, "promise", "end-card"),
+            ("speaker", 99, "promise", "end-card"),
+        ),
+        speaker_speech_detected=False,
+        clean_checkout=True,
+        speech_api_calls=0,
+        secret_artifacts={"delivery.json": "AI-generated narration."},
+        deliverables={"source.txt": source},
     )
+    report = verify_delivery(inputs)
     report_path = tmp_path / "verification-report.json"
-    write_verification_report(report_path, report)
+    checksum_path = tmp_path / "checksums.sha256"
+    write_verification_report(report_path, checksum_path, report)
     written = json.loads(report_path.read_text(encoding="utf-8"))
+    report_digest = hashlib.sha256(report_path.read_bytes()).hexdigest()
 
-    assert report.promotable is True
-    assert written["promotable"] is True
+    assert report.promotable is False
+    assert written["promotable"] is False
+    assert "MODE-production" in written["failed_gate_ids"]
     assert written["checksums"]["source.txt"] == hashlib.sha256(b"source").hexdigest()
     assert all(row["evidence"] for row in written["gates"])
+    assert checksum_path.read_text(encoding="utf-8") == (
+        f"{report_digest}  verification-report.json\n"
+    )
+
+    production_report = verify_delivery(replace(inputs, mode="production"))
+    assert production_report.failed_gate_ids == ("API-production-entry",)
+
+
+def test_tc_t8_002__production_inventory__rejects_missing_or_substituted_names(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import verify_delivery_inventory
+
+    one_file = tmp_path / "source.txt"
+    one_file.write_bytes(b"source")
+    substituted = {
+        "narrated_mp4": tmp_path / "wrong-name.mp4",
+        "speaker_mp4": tmp_path / "agent-pseudocode-explainer-speaker.mp4",
+    }
+    substituted["narrated_mp4"].write_bytes(b"video")
+    substituted["speaker_mp4"].write_bytes(b"video")
+
+    missing_row = verify_delivery_inventory({"source.txt": one_file})
+    substituted_row = verify_delivery_inventory(substituted)
+
+    assert missing_row.status == "fail"
+    assert missing_row.evidence["missing_roles"]
+    assert missing_row.evidence["unexpected_roles"] == ["source.txt"]
+    assert substituted_row.status == "fail"
+    assert substituted_row.evidence["name_mismatches"] == [
+        {
+            "role": "narrated_mp4",
+            "expected": "agent-pseudocode-explainer-narrated.mp4",
+            "actual": "wrong-name.mp4",
+        }
+    ]
+
+
+def test_tc_t8_002__production_entry__fails_closed_when_real_states_are_blocked(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline.verify import REQUIRED_DELIVERY_INVENTORY, verify_production_delivery
+
+    deliverables: dict[str, Path] = {}
+    for role, name in REQUIRED_DELIVERY_INVENTORY.items():
+        path = tmp_path / name
+        path.write_bytes(b"fixture")
+        deliverables[role] = path
+    report = verify_production_delivery(
+        repository_root=REPOSITORY_ROOT,
+        deliverables=deliverables,
+    )
+
+    assert report.promotable is False
+    assert report.failed_gate_ids == ("SOURCE-production-states",)
+    source_gate = report.gates[0]
+    assert source_gate.evidence["production_source_required"] is True
+    assert source_gate.evidence["fixture_fallback_used"] is False
 
 
 def _semantic_manifest() -> dict[str, object]:
@@ -594,6 +1090,43 @@ def _semantic_manifest() -> dict[str, object]:
         "shared_picture": {"decoded_video_sha256": "b" * 64, "sha256": "1" * 64},
         "outputs": {"narrated": narrated, "speaker": speaker},
     }
+
+
+def _write_short_mp4(path: Path) -> None:
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=black:s=160x90:r=30:d=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=48000:duration=1",
+            "-frames:v",
+            "30",
+            "-c:v",
+            "libopenh264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "libfdk_aac",
+            "-profile:a",
+            "aac_ld",
+            "-frame_length",
+            "480",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            str(path),
+        ],
+        check=True,
+        timeout=30,
+    )
 
 
 def _render_manifest_for_states(
