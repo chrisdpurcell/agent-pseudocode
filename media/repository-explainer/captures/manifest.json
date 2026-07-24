@@ -131,5 +131,44 @@
 		"blocker": "KDE session is locked; owner-authenticated unlock is required",
 		"observed_at": "2026-07-24T02:01:26Z",
 		"rejected_capture": "Lock-screen pixels were deleted; no editor PNG was promoted"
+	},
+	"runner": {
+		"mode": "preflight-only",
+		"reason": "runner execution exited 40; expected 0: Codex invalid_json_schema: response schema requires additionalProperties to be false",
+		"revision": "6fc73b94e5279928a4e37216592f3272ab2ae03b",
+		"evidence": [
+			{
+				"path": "media/repository-explainer/captures/evidence/runner/hook-preflight.json",
+				"sha256": "3403f0b8040aec4f770dc5d3f7943dfaaff5386eff447bc733127f94e8372158"
+			},
+			{
+				"path": "media/repository-explainer/captures/evidence/runner/runner-commands.json",
+				"sha256": "129e8f9a1e51195daf6a6199da06a85216113c1d9628b24b94a1c8cf77825f54"
+			},
+			{
+				"path": "media/repository-explainer/captures/evidence/runner/run-manifest.json",
+				"sha256": "ae62cf413c11a3d0fe67e04d5134a4eab87bf63890d9c9855b0ba5f9b6e289d6"
+			},
+			{
+				"path": "media/repository-explainer/captures/evidence/runner/agent-command.json",
+				"sha256": "920118073fc10614d285dbb29184dba84cd16f7671fddfe6ef3ceacef75e07b1"
+			},
+			{
+				"path": "media/repository-explainer/captures/evidence/runner/validation-before.json",
+				"sha256": "7e8df31e108e9b7f8f4d7d4848d9bc30f8a56bd7136061c89412a429918710ba"
+			},
+			{
+				"path": "media/repository-explainer/captures/evidence/runner/post-checks.json",
+				"sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+			},
+			{
+				"path": "media/repository-explainer/captures/evidence/runner/changed-files.json",
+				"sha256": "441d992526662c2001bd479952aa42e588936977ea55f7737ca82f03ff678e03"
+			},
+			{
+				"path": "media/repository-explainer/captures/evidence/runner/outcome.json",
+				"sha256": "9cce27e12955d9fb0fba8f33caae8f222b2a7bd30d80c9b8e26854a0170bd4db"
+			}
+		]
 	}
 }

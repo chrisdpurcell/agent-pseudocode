@@ -1,0 +1,17 @@
+{
+	"agent": "codex",
+	"args": { "spec_path": "docs/specs/repository-explainer-video.md" },
+	"capture_revision": "6fc73b94e5279928a4e37216592f3272ab2ae03b",
+	"ended_at": "2026-07-24T03:37:21.119276+00:00",
+	"exit_code": 40,
+	"git_head": "6fc73b94e5279928a4e37216592f3272ab2ae03b",
+	"mode": "review",
+	"passthrough": [],
+	"prompt_sha256": "bee9a2c2178ced9f4c19da515c80d53c41f32b7821917a01592ea26d118cfbbc",
+	"run_id": "20260724T033718Z-review_spec-codex-b7f78c29",
+	"script_name": "review_spec",
+	"script_path": "/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/dist/video/work/capture-clone-f0bfkvyr/docs/apseudo-docs/examples/runner/review-spec.apseudo",
+	"started_at": "2026-07-24T03:37:18.373429+00:00",
+	"toolkit_version": "0.6.1",
+	"workspace": "/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/dist/video/work/capture-clone-f0bfkvyr"
+}

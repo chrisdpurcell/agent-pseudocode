@@ -37,6 +37,17 @@ HERO_SOURCE_PATH = "docs/apseudo-docs/examples/review-loop.apseudo"
 CAPTURE_ROOT = Path("media/repository-explainer/captures")
 EVIDENCE_ROOT = CAPTURE_ROOT / "evidence"
 EDITOR_EVIDENCE_ROOT = EVIDENCE_ROOT / "editor"
+RUNNER_EVIDENCE_ROOT = EVIDENCE_ROOT / "runner"
+RUNNER_EVIDENCE_NAMES = (
+    "hook-preflight.json",
+    "runner-commands.json",
+    "run-manifest.json",
+    "agent-command.json",
+    "validation-before.json",
+    "post-checks.json",
+    "changed-files.json",
+    "outcome.json",
+)
 SOURCE_CROP = (0, 120, 1728, 786)
 DESTINATION_RECTANGLE = (96, 54, 1728, 786)
 CAPTION_RECTANGLE = (96, 864, 1728, 162)
@@ -211,6 +222,24 @@ class EditorEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class RunnerEvidenceFile:
+    """One promoted runner record that survives disposable-clone deletion."""
+
+    path: Path
+    sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class RunnerEvidenceLedger:
+    """Typed hash ledger for an accepted or truthful preflight-only runner capture."""
+
+    mode: Literal["accepted", "preflight-only"]
+    reason: str
+    revision: str
+    evidence: tuple[RunnerEvidenceFile, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class EvidenceManifest:
     """Verified command and real-editor evidence for one pinned commit."""
 
@@ -218,6 +247,7 @@ class EvidenceManifest:
     commands: tuple[CommandEvidence, ...]
     editor: EditorEvidence | None
     editor_blocker: str | None
+    runner: RunnerEvidenceLedger | None
 
 
 def capture_command(
@@ -454,7 +484,10 @@ def verify_evidence_manifest(
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise CaptureError("manifest: invalid JSON") from exc
     payload = _object(decoded, "manifest")
-    _exact_fields(payload, {"schema_version", "revision", "commands", "editor"}, "manifest")
+    manifest_fields = {"schema_version", "revision", "commands", "editor"}
+    if "runner" in payload:
+        manifest_fields.add("runner")
+    _exact_fields(payload, manifest_fields, "manifest")
     if _integer(payload.get("schema_version"), "schema_version") != 1:
         raise CaptureError("schema_version: expected 1")
     revision = _string(payload.get("revision"), "revision")
@@ -486,12 +519,80 @@ def verify_evidence_manifest(
     else:
         editor = _parse_editor(editor_payload, root, revision)
         editor_blocker = None
+    runner_payload = payload.get("runner")
+    runner = (
+        _parse_runner(_object(runner_payload, "runner"), root, revision)
+        if runner_payload is not None
+        else None
+    )
     return EvidenceManifest(
         revision=revision,
         commands=commands,
         editor=editor,
         editor_blocker=editor_blocker,
+        runner=runner,
     )
+
+
+def _parse_runner(payload: dict[str, object], root: Path, revision: str) -> RunnerEvidenceLedger:
+    _exact_fields(payload, {"mode", "reason", "revision", "evidence"}, "runner")
+    mode_value = _string(payload.get("mode"), "runner.mode")
+    if mode_value not in {"accepted", "preflight-only"}:
+        raise CaptureError("runner.mode: expected 'accepted' or 'preflight-only'")
+    mode = cast(Literal["accepted", "preflight-only"], mode_value)
+    reason = _string(payload.get("reason"), "runner.reason")
+    runner_revision = _string(payload.get("revision"), "runner.revision")
+    if runner_revision != revision:
+        raise CaptureError("runner.revision: must match manifest revision")
+    evidence_values = _array(payload.get("evidence"), "runner.evidence")
+    evidence = tuple(
+        _parse_runner_evidence_file(
+            _object(value, f"runner.evidence[{index}]"),
+            f"runner.evidence[{index}]",
+            root,
+        )
+        for index, value in enumerate(evidence_values)
+    )
+    names = tuple(record.path.name for record in evidence)
+    if len(names) != len(set(names)) or set(names) != set(RUNNER_EVIDENCE_NAMES):
+        raise CaptureError("runner.evidence: expected each required runner record exactly once")
+    outcome_path = next(record.path for record in evidence if record.path.name == "outcome.json")
+    try:
+        outcome_raw = outcome_path.read_bytes()
+        outcome_value: object = json.loads(outcome_raw)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CaptureError("runner.evidence: outcome.json is unavailable or invalid") from exc
+    outcome = _object(outcome_value, "runner.evidence.outcome")
+    if (
+        outcome.get("mode") != mode
+        or outcome.get("accepted") is not (mode == "accepted")
+        or outcome.get("revision") != revision
+        or outcome.get("reason") != reason
+    ):
+        raise CaptureError("runner: ledger does not match promoted outcome.json")
+    return RunnerEvidenceLedger(
+        mode=mode,
+        reason=reason,
+        revision=runner_revision,
+        evidence=evidence,
+    )
+
+
+def _parse_runner_evidence_file(
+    payload: dict[str, object], field: str, root: Path
+) -> RunnerEvidenceFile:
+    _exact_fields(payload, {"path", "sha256"}, field)
+    relative_path = _string(payload.get("path"), f"{field}.path")
+    path = _owned_relative_path(root, relative_path, f"{field}.path")
+    _require_below(path, (root / RUNNER_EVIDENCE_ROOT).resolve(), f"{field}.path")
+    expected_hash = _hash(payload.get("sha256"), f"{field}.sha256")
+    try:
+        actual_hash = _digest(path.read_bytes())
+    except OSError as exc:
+        raise CaptureError(f"{field}.path: evidence could not be read") from exc
+    if actual_hash != expected_hash:
+        raise CaptureError(f"{field}.sha256: promoted runner evidence bytes changed")
+    return RunnerEvidenceFile(path=path, sha256=expected_hash)
 
 
 def _parse_command_evidence(

@@ -1,0 +1,10 @@
+{
+	"accepted": false,
+	"artifacts": [],
+	"checks_run": [],
+	"mode": "preflight-only",
+	"outcome": "Blocked",
+	"reason": "runner execution exited 40; expected 0: Codex invalid_json_schema: response schema requires additionalProperties to be false",
+	"revision": "6fc73b94e5279928a4e37216592f3272ab2ae03b",
+	"summary": "Guarded runner capture did not reach accepted execution."
+}

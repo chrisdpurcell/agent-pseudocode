@@ -1,0 +1,35 @@
+{
+	"assertions": {
+		"branch": true,
+		"current_focus_bullet": true,
+		"session_context": true,
+		"short_commit": true
+	},
+	"branch": "HEAD",
+	"config_command": "\"$(git rev-parse --show-toplevel)/.agents/hooks/agent-handoff/session_start.py\"",
+	"config_path": ".codex/config.toml",
+	"configured_hook_mode": "0o755",
+	"configured_hook_path": ".agents/hooks/agent-handoff/session_start.py",
+	"current_focus_bullet": "- Raise coverage from 62% to 85%; `check.yml` is the only red gate.",
+	"cwd": ".",
+	"exit_status": 0,
+	"input": "{\"hook_event_name\":\"SessionStart\",\"source\":\"startup\",\"cwd\":\".\"}",
+	"interpreter": {
+		"resolved_path": "/home/chris/.local/share/uv/python/cpython-3.14.4-linux-x86_64-gnu/bin/python3.14",
+		"shebang": "/usr/bin/env python3",
+		"version": "Python 3.14.4",
+		"version_info": [3, 14, 4]
+	},
+	"output_sha256": "a3ba643b790bb93def188afe002591d21be0e14184df28ed961019f4a51e506b",
+	"reason": "configured SessionStart hook passed",
+	"shell_argv": [
+		"/bin/bash",
+		"-lc",
+		"\"$(git rev-parse --show-toplevel)/.agents/hooks/agent-handoff/session_start.py\""
+	],
+	"short_commit": "6fc73b9",
+	"state_sha256": "5bc8a55834f2b5a5f8020a0f92602c9e6685a7bdc6b78985f4cb94b63bbe714f",
+	"status": "passed",
+	"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+	"stdout_sha256": "a3ba643b790bb93def188afe002591d21be0e14184df28ed961019f4a51e506b"
+}

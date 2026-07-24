@@ -1,0 +1,21 @@
+{
+	"argv": [
+		"codex",
+		"exec",
+		"--cd",
+		"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/dist/video/work/capture-clone-f0bfkvyr",
+		"--json",
+		"--output-last-message",
+		"/tmp/apseudo-run-a4iwiap1/final-message.json",
+		"--output-schema",
+		"/tmp/apseudo-run-a4iwiap1/outcome.schema.json",
+		"--sandbox",
+		"read-only",
+		"-"
+	],
+	"cwd": "/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/dist/video/work/capture-clone-f0bfkvyr",
+	"env_overrides": {},
+	"output_last_message_path": "/tmp/apseudo-run-a4iwiap1/final-message.json",
+	"schema_path": "/tmp/apseudo-run-a4iwiap1/outcome.schema.json",
+	"stdin": "You are executing an Agent Pseudocode script.\n\nExecution contract:\n- Treat the pseudocode as the control-flow source of truth.\n- Follow all guards, branches, bounded loops, stop conditions, and terminal outcomes.\n- Do not convert bounded loops into unbounded loops.\n- Do not bypass repository hooks, validation, CI, or safety checks.\n- If the pseudocode conflicts with repository instructions or reality, stop and return NeedsUserDecision or Blocked.\n- Before returning Accepted, run the verification actions required by the pseudocode.\n- Return exactly one JSON object matching the outcome schema; do not wrap it in Markdown.\n\nRunner policy:\n- project_context: True\n- hermetic: False\n- no_hooks_requested: False\n- hooks_required: False\n- mcp_required: False\n- require_no_diff: True\n- expect_diff: False\n- post_checks: [\"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/python3 -m apseudo_lint.cli docs/apseudo-docs/examples/runner/review-spec.apseudo\"]\n- additional_write_dirs: []\n\nInvocation:\n- toolkit_version: 0.6.1\n- script_path: /home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/dist/video/work/capture-clone-f0bfkvyr/docs/apseudo-docs/examples/runner/review-spec.apseudo\n- selected_agent: codex\n- execution_mode: review\n- workspace: /home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/dist/video/work/capture-clone-f0bfkvyr\n- metadata: {\"allow_dirty_git\": false, \"default_agent\": \"claude\", \"description\": \"Review one specification file and return structured findings.\", \"mode\": \"review\", \"name\": \"review_spec\", \"requires_clean_git\": false, \"workspace\": \"git_root\"}\n- script_args: {\"spec_path\": \"docs/specs/repository-explainer-video.md\"}\n- passthrough_args: []\n\nAllowed terminal outcomes:\n- Accepted: the requested process completed and verification passed.\n- Blocked: the process cannot continue without violating the contract or because verification failed.\n- NeedsUserDecision: user input or approval is required before continuing.\n\nOutcome JSON schema:\n```json\n{\n  \"additionalProperties\": true,\n  \"properties\": {\n    \"artifacts\": {\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"type\": \"array\"\n    },\n    \"checks_run\": {\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"type\": \"array\"\n    },\n    \"evidence\": {\n      \"type\": \"string\"\n    },\n    \"outcome\": {\n      \"enum\": [\n        \"Accepted\",\n        \"Blocked\",\n        \"NeedsUserDecision\"\n      ],\n      \"type\": \"string\"\n    },\n    \"reason\": {\n      \"type\": \"string\"\n    },\n    \"summary\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"outcome\",\n    \"reason\",\n    \"summary\",\n    \"checks_run\"\n  ],\n  \"type\": \"object\"\n}\n```\n\nPseudocode:\n```apseudo\n\nprocess review_spec(spec_path):\n    if spec_path is None:\n        return NeedsUserDecision(reason=\"spec_path argument is missing\")\n\n    spec = read_file(spec_path)\n\n    if spec.empty:\n        return Blocked(reason=\"spec file is empty\")\n\n    findings = review_against_project_standards(spec)\n\n    if findings.blockers:\n        return Blocked(reason=\"blocking spec findings found\", evidence=findings.summary)\n\n    else:\n        return Accepted(reason=\"spec review passed\")\n```\n\nReturn only the final JSON outcome object.\n"
+}

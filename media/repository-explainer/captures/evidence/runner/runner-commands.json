@@ -1,0 +1,184 @@
+{
+	"base_argv": [
+		"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/apseudo-run",
+		"--agent",
+		"codex",
+		"--workspace",
+		".",
+		"--sandbox",
+		"read-only",
+		"--require-no-diff",
+		"--post-check",
+		"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/python3 -m apseudo_lint.cli docs/apseudo-docs/examples/runner/review-spec.apseudo",
+		"--run-dir",
+		"dist/video/work/runner-runs",
+		"--set",
+		"spec_path=docs/specs/repository-explainer-video.md",
+		"docs/apseudo-docs/examples/runner/review-spec.apseudo"
+	],
+	"cwd": ".",
+	"display": {
+		"aliases": {
+			"apseudo-lint": [
+				"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/python3",
+				"-m",
+				"apseudo_lint.cli"
+			],
+			"apseudo-run": [
+				"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/apseudo-run"
+			]
+		},
+		"command": "apseudo-run --agent codex --workspace . --sandbox read-only --require-no-diff --post-check 'apseudo-lint docs/apseudo-docs/examples/runner/review-spec.apseudo' --run-dir dist/video/work/runner-runs --set spec_path=docs/specs/repository-explainer-video.md docs/apseudo-docs/examples/runner/review-spec.apseudo"
+	},
+	"post_check": "/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/python3 -m apseudo_lint.cli docs/apseudo-docs/examples/runner/review-spec.apseudo",
+	"prompt_assertions": {
+		"hooks_required: False": true,
+		"no_hooks_requested: False": true
+	},
+	"rendered_prompt": "You are executing an Agent Pseudocode script.\n\nExecution contract:\n- Treat the pseudocode as the control-flow source of truth.\n- Follow all guards, branches, bounded loops, stop conditions, and terminal outcomes.\n- Do not convert bounded loops into unbounded loops.\n- Do not bypass repository hooks, validation, CI, or safety checks.\n- If the pseudocode conflicts with repository instructions or reality, stop and return NeedsUserDecision or Blocked.\n- Before returning Accepted, run the verification actions required by the pseudocode.\n- Return exactly one JSON object matching the outcome schema; do not wrap it in Markdown.\n\nRunner policy:\n- project_context: True\n- hermetic: False\n- no_hooks_requested: False\n- hooks_required: False\n- mcp_required: False\n- require_no_diff: True\n- expect_diff: False\n- post_checks: [\"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/python3 -m apseudo_lint.cli docs/apseudo-docs/examples/runner/review-spec.apseudo\"]\n- additional_write_dirs: []\n\nInvocation:\n- toolkit_version: 0.6.1\n- script_path: /home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/dist/video/work/capture-clone-f0bfkvyr/docs/apseudo-docs/examples/runner/review-spec.apseudo\n- selected_agent: codex\n- execution_mode: review\n- workspace: /home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/dist/video/work/capture-clone-f0bfkvyr\n- metadata: {\"allow_dirty_git\": false, \"default_agent\": \"claude\", \"description\": \"Review one specification file and return structured findings.\", \"mode\": \"review\", \"name\": \"review_spec\", \"requires_clean_git\": false, \"workspace\": \"git_root\"}\n- script_args: {\"spec_path\": \"docs/specs/repository-explainer-video.md\"}\n- passthrough_args: []\n\nAllowed terminal outcomes:\n- Accepted: the requested process completed and verification passed.\n- Blocked: the process cannot continue without violating the contract or because verification failed.\n- NeedsUserDecision: user input or approval is required before continuing.\n\nOutcome JSON schema:\n```json\n{\n  \"additionalProperties\": true,\n  \"properties\": {\n    \"artifacts\": {\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"type\": \"array\"\n    },\n    \"checks_run\": {\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"type\": \"array\"\n    },\n    \"evidence\": {\n      \"type\": \"string\"\n    },\n    \"outcome\": {\n      \"enum\": [\n        \"Accepted\",\n        \"Blocked\",\n        \"NeedsUserDecision\"\n      ],\n      \"type\": \"string\"\n    },\n    \"reason\": {\n      \"type\": \"string\"\n    },\n    \"summary\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"outcome\",\n    \"reason\",\n    \"summary\",\n    \"checks_run\"\n  ],\n  \"type\": \"object\"\n}\n```\n\nPseudocode:\n```apseudo\n\nprocess review_spec(spec_path):\n    if spec_path is None:\n        return NeedsUserDecision(reason=\"spec_path argument is missing\")\n\n    spec = read_file(spec_path)\n\n    if spec.empty:\n        return Blocked(reason=\"spec file is empty\")\n\n    findings = review_against_project_standards(spec)\n\n    if findings.blockers:\n        return Blocked(reason=\"blocking spec findings found\", evidence=findings.summary)\n\n    else:\n        return Accepted(reason=\"spec review passed\")\n```\n\nReturn only the final JSON outcome object.\n",
+	"resolved_execution_provider_vector": [
+		"codex",
+		"exec",
+		"--cd",
+		"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/dist/video/work/capture-clone-f0bfkvyr",
+		"--json",
+		"--output-last-message",
+		"/tmp/apseudo-run-a4iwiap1/final-message.json",
+		"--output-schema",
+		"/tmp/apseudo-run-a4iwiap1/outcome.schema.json",
+		"--sandbox",
+		"read-only",
+		"-"
+	],
+	"resolved_provider_vector": [
+		"codex",
+		"exec",
+		"--cd",
+		"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/dist/video/work/capture-clone-f0bfkvyr",
+		"--json",
+		"--output-last-message",
+		"/tmp/apseudo-run-preview-2jwonch2/final-message.json",
+		"--output-schema",
+		"/tmp/apseudo-run-preview-2jwonch2/outcome.schema.json",
+		"--sandbox",
+		"read-only",
+		"-"
+	],
+	"revision": "6fc73b94e5279928a4e37216592f3272ab2ae03b",
+	"runtime": {
+		"console_entrypoint": "apseudo_lint.runner_cli:main",
+		"console_sha256": "2f68c1dd19ad3876b7ce1957c0866221a93d781e7f54fcbf4ba16e84e66294f0",
+		"module_path": "/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/src/apseudo_lint/__init__.py",
+		"module_sha256": "82329eab15ce2223ee4c8e7c228c22dc698bd0b371b31479cf89eefc30c1d7bc",
+		"operator_apseudo_run": "/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/apseudo-run",
+		"operator_python": "/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/python3",
+		"provider_status": 0,
+		"provider_status_argv": ["codex", "login", "status"],
+		"sync_argv": ["uv", "sync", "--locked", "--all-groups"],
+		"sync_status": 0,
+		"toolkit_version": "0.6.1"
+	},
+	"vectors": [
+		{
+			"action": "check",
+			"argv": [
+				"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/apseudo-run",
+				"--check",
+				"--agent",
+				"codex",
+				"--workspace",
+				".",
+				"--sandbox",
+				"read-only",
+				"--require-no-diff",
+				"--post-check",
+				"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/python3 -m apseudo_lint.cli docs/apseudo-docs/examples/runner/review-spec.apseudo",
+				"--run-dir",
+				"dist/video/work/runner-runs",
+				"--set",
+				"spec_path=docs/specs/repository-explainer-video.md",
+				"docs/apseudo-docs/examples/runner/review-spec.apseudo"
+			],
+			"exit_status": 0,
+			"status": "completed",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stdout_sha256": "6898c5629c85ed104e4ea2cf1fe4ac08bbefc11c68cb3079616f070fa14ec932"
+		},
+		{
+			"action": "render-prompt",
+			"argv": [
+				"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/apseudo-run",
+				"--render-prompt",
+				"--agent",
+				"codex",
+				"--workspace",
+				".",
+				"--sandbox",
+				"read-only",
+				"--require-no-diff",
+				"--post-check",
+				"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/python3 -m apseudo_lint.cli docs/apseudo-docs/examples/runner/review-spec.apseudo",
+				"--run-dir",
+				"dist/video/work/runner-runs",
+				"--set",
+				"spec_path=docs/specs/repository-explainer-video.md",
+				"docs/apseudo-docs/examples/runner/review-spec.apseudo"
+			],
+			"exit_status": 0,
+			"status": "completed",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stdout_sha256": "bee9a2c2178ced9f4c19da515c80d53c41f32b7821917a01592ea26d118cfbbc"
+		},
+		{
+			"action": "print-command",
+			"argv": [
+				"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/apseudo-run",
+				"--print-command",
+				"--agent",
+				"codex",
+				"--workspace",
+				".",
+				"--sandbox",
+				"read-only",
+				"--require-no-diff",
+				"--post-check",
+				"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/python3 -m apseudo_lint.cli docs/apseudo-docs/examples/runner/review-spec.apseudo",
+				"--run-dir",
+				"dist/video/work/runner-runs",
+				"--set",
+				"spec_path=docs/specs/repository-explainer-video.md",
+				"docs/apseudo-docs/examples/runner/review-spec.apseudo"
+			],
+			"exit_status": 0,
+			"status": "completed",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stdout_sha256": "71ca625e8ec63e455290fed514a367904ae0f57fda18c73484ee9e3e0a62c9a3"
+		},
+		{
+			"action": "execute",
+			"argv": [
+				"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/apseudo-run",
+				"--agent",
+				"codex",
+				"--workspace",
+				".",
+				"--sandbox",
+				"read-only",
+				"--require-no-diff",
+				"--post-check",
+				"/home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/.venv/bin/python3 -m apseudo_lint.cli docs/apseudo-docs/examples/runner/review-spec.apseudo",
+				"--run-dir",
+				"dist/video/work/runner-runs",
+				"--set",
+				"spec_path=docs/specs/repository-explainer-video.md",
+				"docs/apseudo-docs/examples/runner/review-spec.apseudo"
+			],
+			"diagnostic": "Codex invalid_json_schema: response schema requires additionalProperties to be false",
+			"exit_status": 40,
+			"output_excerpt": "codex command failed with exit status 1\n\nCommand: codex exec --cd /home/chris/projects/agent-pseudocode/.worktrees/repository-explainer-video/dist/video/work/capture-clone-f0bfkvyr --json --output-last-message /tmp/apseudo-run-a4iwiap1/final-message.json --output-schema /tmp/apseudo-run-a4iwiap1/outcome.schema.json --sandbox read-only -\n\nSTDOUT:\n{\"type\":\"thread.started\",\"thread_id\":\"019f9232-ec47-71a3-bea8-8da9f5e403ba\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"error\",\"message\":\"{\\n  \\\"type\\\": \\\"error\\\",\\n  \\\"error\\\": {\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"code\\\": \\\"invalid_json_schema\\\",\\n    \\\"message\\\": \\\"Invalid schema for response_format 'codex_output_schema': In context=(), 'additionalProperties' is required to be supplied and to be false.\\\",\\n    \\\"param\\\": \\\"text.format.schema\\\"\\n  },\\n  \\\"status\\\": 400\\n}\"}\n{\"type\":\"turn.failed\",\"error\":{\"message\":\"{\\n  \\\"type\\\": \\\"error\\\",\\n  \\\"error\\\": {\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"code\\\": \\\"invalid_json_schema\\\",\\n    \\\"message\\\": \\\"Invalid schema for response_format 'codex_output_schema': In context=(), 'additionalProperties' is required to be supplied and to be false.\\\",\\n    \\\"param\\\": \\\"text.format.schema\\\"\\n  },\\n  \\\"status\\\": 400\\n}\"}}\n\n\nSTDERR:",
+			"status": "completed",
+			"stderr_sha256": "b4af5a29153d036b48b87c06bc98217be38132f6a2501479854a666e8466b999",
+			"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		}
+	]
+}

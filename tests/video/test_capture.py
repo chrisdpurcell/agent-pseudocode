@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import struct
 import subprocess
+import tempfile
 from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -438,3 +440,60 @@ def test_committed_command_evidence__hashes_and_paths_resolve_without_secrets() 
     assert teaching.stdin_source == DEFECT_PATH
     assert teaching.source_path == DEFECT_PATH
     assert teaching.source_sha256 == teaching.stdin_sha256
+
+
+def test_runner_evidence_ledger__resolves_after_clone_deletion_and_preserves_t3() -> None:
+    manifest = verify_evidence_manifest(
+        CAPTURE_MANIFEST,
+        repository_root=REPOSITORY_ROOT,
+        allow_blocked_editor=True,
+    )
+
+    assert manifest.runner is not None
+    assert manifest.runner.mode == "preflight-only"
+    assert "invalid_json_schema" in manifest.runner.reason
+    assert manifest.runner.revision == PINNED_CAPTURE_REVISION
+    assert {record.path.name for record in manifest.runner.evidence} == {
+        "hook-preflight.json",
+        "runner-commands.json",
+        "run-manifest.json",
+        "agent-command.json",
+        "validation-before.json",
+        "post-checks.json",
+        "changed-files.json",
+        "outcome.json",
+    }
+    for record in manifest.runner.evidence:
+        assert record.path.is_relative_to(
+            REPOSITORY_ROOT / "media" / "repository-explainer" / "captures" / "evidence" / "runner"
+        )
+        assert record.path.is_file()
+        assert hashlib.sha256(record.path.read_bytes()).hexdigest() == record.sha256
+
+
+def test_runner_evidence_ledger__legacy_manifest_remains_valid_and_unknown_fields_fail() -> None:
+    payload = json.loads(CAPTURE_MANIFEST.read_text(encoding="utf-8"))
+    work_root = REPOSITORY_ROOT / "dist/video/work"
+    work_root.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(dir=work_root) as raw_temporary:
+        temporary = Path(raw_temporary)
+        legacy_path = temporary / "legacy.json"
+        del payload["runner"]
+        legacy_path.write_text(json.dumps(payload), encoding="utf-8")
+        legacy = verify_evidence_manifest(
+            legacy_path,
+            repository_root=REPOSITORY_ROOT,
+            allow_blocked_editor=True,
+        )
+        assert legacy.runner is None
+
+        payload["runner"] = {"unexpected": True}
+        unknown_path = temporary / "unknown.json"
+        unknown_path.write_text(json.dumps(payload), encoding="utf-8")
+        with pytest.raises(CaptureError, match="runner: fields differ"):
+            verify_evidence_manifest(
+                unknown_path,
+                repository_root=REPOSITORY_ROOT,
+                allow_blocked_editor=True,
+            )
