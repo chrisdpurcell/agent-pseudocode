@@ -42,7 +42,7 @@ PROJECTED_COST_PER_TAKE_USD = Decimal("0.045")
 MIN_BOUNDARY_GAP_SECONDS = Decimal("0.05")
 LOCK_WAIT_SECONDS = 5.0
 TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 502, 503, 504})
-PERMISSION_DENIAL_STATUSES = frozenset({401, 403})
+PERMISSION_DENIAL_STATUSES = frozenset({403})
 PROJECT_KEY_DENIAL_CLASSES = ("Files", "Fine-tuning", "Assistants")
 PERMISSION_PROBE_CONTRACT = (
     ("Files", "GET", "/v1/files"),
@@ -260,7 +260,7 @@ def generate_narration(
     package = load_narration(narration_path, project)
     script = build_locked_script(package)
     series_hash = _series_hash(script, package)
-    canonical_manifest = _canonical_take_manifest(project, series_hash)
+    canonical_manifest = _canonical_take_manifest(series_hash)
     if manifest_path is not None and manifest_path != canonical_manifest:
         raise SpeechTerminalError(
             "caller-supplied manifest_path must equal the canonical narration state path"
@@ -453,7 +453,7 @@ def run_permission_smoke(
     package = load_narration(narration_path, project)
     script = build_locked_script(package)
     series_hash = _series_hash(script, package)
-    smoke_state_path = _canonical_smoke_state(project, series_hash)
+    smoke_state_path = _canonical_smoke_state(series_hash)
     with _exclusive_file_lock(smoke_state_path):
         return _run_permission_smoke_locked(
             narration_path=narration_path,
@@ -522,7 +522,7 @@ def _run_permission_smoke_locked(
         status="running",
     )
 
-    manifest_path = _canonical_take_manifest(project, series_hash)
+    manifest_path = _canonical_take_manifest(series_hash)
     with _exclusive_file_lock(manifest_path):
         ledger = _load_take_ledger(manifest_path)
         take_count = _series_take_count(ledger, series_hash)
@@ -707,14 +707,24 @@ def _series_hash(script: str, package: NarrationPackage) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
-def _canonical_take_manifest(project: ProjectManifest, series_hash: str) -> Path:
+def _trusted_production_work_root() -> Path:
+    """Return the work root owned by this repository checkout.
+
+    Caller-controlled output destinations must not relocate paid-call guard
+    state, because an alternate render directory would otherwise reset the cap.
+    """
+    repository_root = Path(__file__).resolve().parents[3]
+    return repository_root / "dist" / "video" / "work"
+
+
+def _canonical_take_manifest(series_hash: str) -> Path:
     """Return the repository-owned ledger path for one immutable request series."""
-    return project.output.root / "work" / "narration-series" / f"{series_hash}.json"
+    return _trusted_production_work_root() / "narration-series" / f"{series_hash}.json"
 
 
-def _canonical_smoke_state(project: ProjectManifest, series_hash: str) -> Path:
+def _canonical_smoke_state(series_hash: str) -> Path:
     """Return the repository-owned one-shot permission-smoke state path."""
-    return project.output.root / "work" / "permission-smoke" / f"{series_hash}.json"
+    return _trusted_production_work_root() / "permission-smoke" / f"{series_hash}.json"
 
 
 def _projected_series_bound(policy: SpeechPolicy) -> Decimal:

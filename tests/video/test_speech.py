@@ -18,6 +18,7 @@ from typing import ClassVar, cast
 
 import pytest
 
+from video_pipeline import speech as speech_module
 from video_pipeline.captions import load_narration
 from video_pipeline.manifest import load_project
 from video_pipeline.models import ProjectManifest
@@ -50,6 +51,19 @@ PERMISSION_PROBES = (
     PermissionProbe("Fine-tuning", "GET", "/v1/fine_tuning/jobs"),
     PermissionProbe("Assistants", "GET", "/v1/assistants"),
 )
+_test_work_root = REPOSITORY_ROOT / "dist" / "video" / "work"
+
+
+@pytest.fixture(autouse=True)
+def _isolate_trusted_work_root(  # pyright: ignore[reportUnusedFunction]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Generator[None]:
+    monkeypatch.setattr(
+        speech_module,
+        "_trusted_production_work_root",
+        lambda: _test_work_root,
+    )
+    yield
 
 
 @dataclass
@@ -152,6 +166,8 @@ class _ConcurrentSmokeTransport:
 
 
 def _project(tmp_path: Path, namespace: str) -> ProjectManifest:
+    global _test_work_root
+    _test_work_root = tmp_path / namespace / "trusted-work"
     project = load_project(PROJECT_PATH, repository_root=REPOSITORY_ROOT)
     root = tmp_path / namespace / "dist" / "video"
     output = replace(
@@ -217,8 +233,8 @@ def _speech_response(wav_bytes: bytes, *, status: int = 200) -> HttpResponse:
     return HttpResponse(status=status, headers={"content-type": "audio/wav"}, body=wav_bytes)
 
 
-def _only_series_manifest(project: ProjectManifest) -> Path:
-    manifests = tuple((project.output.root / "work" / "narration-series").glob("*.json"))
+def _only_series_manifest() -> Path:
+    manifests = tuple((_test_work_root / "narration-series").glob("*.json"))
     assert len(manifests) == 1
     return manifests[0]
 
@@ -269,10 +285,14 @@ def test_tc_t6_001__local_http_contract_and_permission_smoke__record_narrow_evid
             transport=transport,
             sleep=lambda _: None,
         )
+        forged_output_root = replace(
+            project,
+            output=replace(project.output, root=tmp_path / "caller-selected-output"),
+        )
         with pytest.raises(TakeLimitError, match="three-take cap"):
             generate_narration(
                 narration_path=NARRATION_PATH,
-                project=project,
+                project=forged_output_root,
                 output_dir=output_dir,
                 api_key=SECRET_SHAPED_VALUE,
                 transport=transport,
@@ -295,7 +315,7 @@ def test_tc_t6_001__local_http_contract_and_permission_smoke__record_narrow_evid
     assert result.selected_wav.read_bytes() == wav_bytes
     assert len(result.segment_wavs) == len(package.segments)
     assert result.take_count == 1
-    assert result.manifest_path.parent == project.output.root / "work" / "narration-series"
+    assert result.manifest_path.parent == _test_work_root / "narration-series"
     assert result.manifest_path.name == f"{result.series_hash}.json"
     assert third_result.take_count == 3
     assert json.loads(result.manifest_path.read_text(encoding="utf-8"))["take_count"] == 3
@@ -428,6 +448,37 @@ def test_tc_t6_001__local_http_contract_and_permission_smoke__record_narrow_evid
             b"",
         ),
     ]
+
+    authentication_anomaly = _ScriptedTransport(
+        deque(
+            (
+                _speech_response(wav_bytes),
+                HttpResponse(status=401, headers={}, body=b"not a permission denial"),
+                HttpResponse(status=403, headers={}, body=b"denied"),
+                HttpResponse(status=403, headers={}, body=b"denied"),
+            )
+        )
+    )
+    with pytest.raises(SpeechTerminalError, match="permission smoke failed"):
+        run_permission_smoke(
+            narration_path=NARRATION_PATH,
+            project=_project(tmp_path, "authentication-anomaly"),
+            evidence_path=tmp_path / "authentication-anomaly-evidence.json",
+            api_key="test-key",
+            transport=authentication_anomaly,
+            checked_date="2026-07-23",
+            probes=PERMISSION_PROBES,
+            mode="permission-smoke",
+        )
+    anomaly_evidence = json.loads(
+        (tmp_path / "authentication-anomaly-evidence.json").read_text(encoding="utf-8")
+    )
+    assert anomaly_evidence["project_key_denial_probes"]["requests"][0] == {
+        "dashboard_permission": "Files",
+        "date": "2026-07-23",
+        "status": 401,
+        "pass": False,
+    }
 
     failed_smoke_path = tmp_path / "failed-evidence.json"
     failed_smoke_transport = _ScriptedTransport(
@@ -573,9 +624,9 @@ def test_tc_t6_002__full_wav_guards__bound_takes_retries_and_spend(tmp_path: Pat
             transport=unavailable,
             sleep=lambda _: None,
         )
-    assert json.loads(_only_series_manifest(unavailable_project).read_text(encoding="utf-8"))[
-        "outcome"
-    ] == ("AW-004: blocked")
+    assert json.loads(_only_series_manifest().read_text(encoding="utf-8"))["outcome"] == (
+        "AW-004: blocked"
+    )
 
     package = load_narration(NARRATION_PATH, project)
     first_budget = package.segments[0].end_frame - package.segments[0].start_frame
@@ -684,10 +735,7 @@ def test_tc_t6_002__full_wav_guards__bound_takes_retries_and_spend(tmp_path: Pat
         thread.join(timeout=5)
     assert all(not thread.is_alive() for thread in mixed_threads)
     assert sum(request.path == "/v1/audio/speech" for request in mixed_transport.requests) == 3
-    assert (
-        json.loads(_only_series_manifest(mixed_project).read_text(encoding="utf-8"))["take_count"]
-        == 3
-    )
+    assert json.loads(_only_series_manifest().read_text(encoding="utf-8"))["take_count"] == 3
     assert len(mixed_exceptions) in {3, 4}
 
     with pytest.raises(SpendLimitError, match="USD 1"):
@@ -721,7 +769,7 @@ def test_tc_t6_003__evidence_and_dry_run__exclude_secrets_and_itemized_billing(
             sleep=lambda _: None,
         )
 
-    manifest_text = _only_series_manifest(project).read_text(encoding="utf-8")
+    manifest_text = _only_series_manifest().read_text(encoding="utf-8")
     summary = dry_run_summary(NARRATION_PATH, project)
     combined = "\n".join((manifest_text, caplog.text, summary))
     assert json.loads(summary) == {
