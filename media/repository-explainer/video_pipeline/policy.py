@@ -8,6 +8,8 @@ from pathlib import Path
 
 from .errors import ManifestError
 
+_GIT_STDERR_LIMIT = 512
+
 
 def trusted_output_root(repository_root: Path, configured_root: Path | None) -> Path:
     """Return the caller-authorized output root, never a root chosen by manifest data."""
@@ -27,7 +29,9 @@ def resolve_authorized_output_root(
     resolved = _resolve_relative(value, repository_root, "output.root")
     if resolved != authorized_root:
         raise ManifestError("output.root: must equal the trusted authorized output root")
-    if not _is_git_ignored(resolved, repository_root, "output.root"):
+    if not _is_git_ignored(
+        resolved / ".video-pipeline-ignore-probe", repository_root, "output.root"
+    ):
         raise ManifestError("output.root: trusted output root must be Git-ignored")
     return resolved
 
@@ -39,6 +43,8 @@ def resolve_exact_output_target(
     resolved = _resolve_relative(value, output_root, field)
     if resolved != expected:
         raise ManifestError(f"{field}: must equal its authorized generated target")
+    if not _is_git_ignored(resolved, repository_root, field):
+        raise ManifestError(f"{field}: generated target must be Git-ignored")
     if _is_git_tracked(resolved, repository_root, field):
         raise ManifestError(f"{field}: generated target must not be Git-tracked")
     return resolved
@@ -82,7 +88,7 @@ def _resolve(path: Path, field: str) -> Path:
 
 
 def _is_git_ignored(path: Path, repository_root: Path, field: str) -> bool:
-    relative = f"{path.relative_to(repository_root).as_posix()}/.video-pipeline-ignore-probe"
+    relative = path.relative_to(repository_root).as_posix()
     return (
         _git_exit_code(
             ["check-ignore", "--quiet", "--", relative], repository_root, field, "ignore evaluation"
@@ -109,7 +115,7 @@ def _git_exit_code(args: list[str], repository_root: Path, field: str, operation
             check=False,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             timeout=10,
         )
     except FileNotFoundError as exc:
@@ -119,5 +125,20 @@ def _git_exit_code(args: list[str], repository_root: Path, field: str, operation
     except OSError as exc:
         raise ManifestError(f"{field}: Git {operation} could not start") from exc
     if completed.returncode not in {0, 1}:
-        raise ManifestError(f"{field}: Git {operation} failed")
+        diagnostic = _safe_git_diagnostic(completed.stderr)
+        raise ManifestError(
+            f"{field}: Git {operation} failed (exit {completed.returncode}; {diagnostic})"
+        )
     return completed.returncode
+
+
+def _safe_git_diagnostic(stderr: bytes | None) -> str:
+    """Classify bounded Git diagnostics without exposing user-controlled content."""
+    if not stderr:
+        return "no diagnostic"
+    diagnostic = stderr[:_GIT_STDERR_LIMIT].decode("utf-8", errors="replace").casefold()
+    if "not a git repository" in diagnostic:
+        return "not a Git repository"
+    if "unknown option" in diagnostic or "invalid option" in diagnostic:
+        return "invalid Git invocation"
+    return "diagnostic redacted"

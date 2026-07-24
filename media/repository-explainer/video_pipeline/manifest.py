@@ -69,6 +69,8 @@ def load_project(
         text = manifest_path.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
         raise ManifestError("manifest: file not found") from exc
+    except UnicodeDecodeError as exc:
+        raise ManifestError("manifest: invalid UTF-8") from exc
     except OSError as exc:
         raise ManifestError("manifest: could not be read") from exc
     try:

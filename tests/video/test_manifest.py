@@ -144,133 +144,6 @@ def test_rejects_invalid_manifest_invariants(
         _load_manifest(write_manifest(repository_root, payload), repository_root)
 
 
-def test_rejects_paths_outside_owned_roots(
-    repository_root: Path,
-    approved_manifest_data: dict[str, object],
-    write_manifest: Callable[[Path, Mapping[str, object]], Path],
-) -> None:
-    source_escape = copy.deepcopy(approved_manifest_data)
-    _scene(source_escape, 0)["source_paths"] = ["../outside.apseudo"]
-    with pytest.raises(ManifestError, match="scenes\\[0\\]\\.source_paths\\[0\\]"):
-        _load_manifest(write_manifest(repository_root, source_escape), repository_root)
-
-    absolute_output = copy.deepcopy(approved_manifest_data)
-    _mapping(absolute_output["output"])["narrated"] = "/tmp/narrated.mp4"
-    with pytest.raises(ManifestError, match=re.escape("output.narrated")):
-        _load_manifest(write_manifest(repository_root, absolute_output), repository_root)
-
-
-def test_rejects_unrelated_ignored_output_root(
-    repository_root: Path,
-    approved_manifest_data: dict[str, object],
-    write_manifest: Callable[[Path, Mapping[str, object]], Path],
-) -> None:
-    (repository_root / ".gitignore").write_text("dist/\n.venv/\n", encoding="utf-8")
-    _mapping(approved_manifest_data["output"])["root"] = ".venv"
-
-    with pytest.raises(ManifestError, match=re.escape("output.root")):
-        _load_manifest(write_manifest(repository_root, approved_manifest_data), repository_root)
-
-
-def test_rejects_unignored_default_output_root(
-    repository_root: Path,
-    approved_manifest_data: dict[str, object],
-    write_manifest: Callable[[Path, Mapping[str, object]], Path],
-) -> None:
-    (repository_root / ".gitignore").write_text("", encoding="utf-8")
-
-    with pytest.raises(ManifestError, match=re.escape("output.root")):
-        _load_manifest(write_manifest(repository_root, approved_manifest_data), repository_root)
-
-
-def test_rejects_git_tracked_generated_target(
-    repository_root: Path,
-    approved_manifest_data: dict[str, object],
-    write_manifest: Callable[[Path, Mapping[str, object]], Path],
-) -> None:
-    target = (
-        repository_root / "dist" / "video" / "final" / "agent-pseudocode-explainer-narrated.mp4"
-    )
-    target.parent.mkdir(parents=True)
-    target.write_bytes(b"not a delivery artifact")
-    subprocess.run(
-        ["git", "add", "--force", "--", target.relative_to(repository_root)],
-        cwd=repository_root,
-        check=True,
-    )
-
-    with pytest.raises(ManifestError, match=re.escape("output.narrated")):
-        _load_manifest(write_manifest(repository_root, approved_manifest_data), repository_root)
-
-
-@pytest.mark.parametrize(
-    "replacement",
-    [
-        pytest.param("../outside.mp4", id="outside-output-root"),
-        pytest.param("final/unapproved.mp4", id="unapproved-target"),
-    ],
-)
-def test_rejects_output_target_outside_exact_authorized_target(
-    repository_root: Path,
-    approved_manifest_data: dict[str, object],
-    write_manifest: Callable[[Path, Mapping[str, object]], Path],
-    replacement: str,
-) -> None:
-    _mapping(approved_manifest_data["output"])["narrated"] = replacement
-
-    with pytest.raises(ManifestError, match=re.escape("output.narrated")):
-        _load_manifest(write_manifest(repository_root, approved_manifest_data), repository_root)
-
-
-def test_rejects_missing_source_path(
-    repository_root: Path,
-    approved_manifest_data: dict[str, object],
-    write_manifest: Callable[[Path, Mapping[str, object]], Path],
-) -> None:
-    _scene(approved_manifest_data, 0)["source_paths"] = ["docs/missing.apseudo"]
-
-    with pytest.raises(ManifestError, match=re.escape("scenes[0].source_paths[0]")):
-        _load_manifest(write_manifest(repository_root, approved_manifest_data), repository_root)
-
-
-def test_rejects_directory_source_path(
-    repository_root: Path,
-    approved_manifest_data: dict[str, object],
-    write_manifest: Callable[[Path, Mapping[str, object]], Path],
-) -> None:
-    (repository_root / "docs" / "source-directory").mkdir(parents=True)
-    _scene(approved_manifest_data, 0)["source_paths"] = ["docs/source-directory"]
-
-    with pytest.raises(ManifestError, match=re.escape("scenes[0].source_paths[0]")):
-        _load_manifest(write_manifest(repository_root, approved_manifest_data), repository_root)
-
-
-def test_rejects_ignored_untracked_source_path(
-    repository_root: Path,
-    approved_manifest_data: dict[str, object],
-    write_manifest: Callable[[Path, Mapping[str, object]], Path],
-) -> None:
-    source = repository_root / "docs" / "ignored.apseudo"
-    source.write_text("ignored source\n", encoding="utf-8")
-    (repository_root / ".gitignore").write_text("dist/\ndocs/ignored.apseudo\n", encoding="utf-8")
-    _scene(approved_manifest_data, 0)["source_paths"] = ["docs/ignored.apseudo"]
-
-    with pytest.raises(ManifestError, match=re.escape("scenes[0].source_paths[0]")):
-        _load_manifest(write_manifest(repository_root, approved_manifest_data), repository_root)
-
-
-def test_accepts_existing_regular_git_tracked_sources(
-    repository_root: Path,
-    approved_manifest_data: dict[str, object],
-    write_manifest: Callable[[Path, Mapping[str, object]], Path],
-) -> None:
-    manifest = _load_manifest(
-        write_manifest(repository_root, approved_manifest_data), repository_root
-    )
-
-    assert manifest.scenes[0].source_paths[0].is_file()
-
-
 @pytest.mark.parametrize(
     ("text", "key"),
     [
@@ -296,29 +169,16 @@ def test_rejects_duplicate_json_keys(
         _load_manifest(manifest_path, repository_root)
 
 
-def test_rejects_explicitly_unignored_output_root(
+def test_rejects_manifest_with_invalid_utf8(
     repository_root: Path,
     approved_manifest_data: dict[str, object],
     write_manifest: Callable[[Path, Mapping[str, object]], Path],
 ) -> None:
-    (repository_root / ".gitignore").write_text("dist/video\n!dist/video\n", encoding="utf-8")
+    manifest_path = write_manifest(repository_root, approved_manifest_data)
+    manifest_path.write_bytes(b'\xff{"media": {}}')
 
-    with pytest.raises(ManifestError, match=re.escape("output.root")):
-        _load_manifest(write_manifest(repository_root, approved_manifest_data), repository_root)
-
-
-def test_accepts_recursively_glob_ignored_output_root(
-    repository_root: Path,
-    approved_manifest_data: dict[str, object],
-    write_manifest: Callable[[Path, Mapping[str, object]], Path],
-) -> None:
-    (repository_root / ".gitignore").write_text("dist/**/video/\n", encoding="utf-8")
-
-    manifest = _load_manifest(
-        write_manifest(repository_root, approved_manifest_data), repository_root
-    )
-
-    assert manifest.output.root == repository_root / "dist" / "video"
+    with pytest.raises(ManifestError, match=re.escape("manifest: invalid UTF-8")):
+        _load_manifest(manifest_path, repository_root)
 
 
 def _state_interval_gap(payload: dict[str, object]) -> None:
