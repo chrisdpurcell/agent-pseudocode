@@ -10,10 +10,12 @@ import json
 import math
 import subprocess
 import sys
+import time
 import wave
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import cast
+from typing import Protocol, cast
 
 import pytest
 
@@ -59,6 +61,41 @@ class _Fixture:
 
 
 type _RenderedFixture = tuple[_Fixture, RenderConfig, RenderResult]
+type _CacheKey = Callable[[Mapping[str, object]], str]
+type _CacheContract = Callable[[RenderCapabilities, RenderConfig], dict[str, object]]
+type _RunChecked = Callable[[Sequence[str], str], None]
+type _MediaProbe = Callable[[Path, RenderCapabilities], dict[str, object]]
+
+
+class _HashCommandOutput(Protocol):
+    def __call__(
+        self,
+        argv: Sequence[str],
+        label: str,
+        *,
+        timeout_seconds: float,
+        max_output_bytes: int,
+    ) -> tuple[str, int]: ...
+
+
+class _AtomicWriteJson(Protocol):
+    def __call__(
+        self,
+        path: Path,
+        payload: Mapping[str, object],
+        *,
+        temporary_root: Path | None = None,
+    ) -> None: ...
+
+
+class _AudioBoundaryValidator(Protocol):
+    def __call__(
+        self,
+        probe: Mapping[str, object],
+        *,
+        audio_stream_index: int,
+        total_samples: int,
+    ) -> dict[str, object]: ...
 
 
 def _require_render_api() -> None:
@@ -191,11 +228,11 @@ def _fixture(tmp_path: Path) -> _Fixture:
     )
 
 
-@pytest.fixture(scope="module")
-def render_capabilities() -> RenderCapabilities:
+@pytest.fixture
+def render_capabilities(tmp_path: Path) -> RenderCapabilities:
     from video_pipeline.render import probe_render_capabilities
 
-    return probe_render_capabilities()
+    return probe_render_capabilities(work_root=tmp_path / "dist" / "video" / "work")
 
 
 @pytest.fixture
@@ -344,6 +381,129 @@ def test_tc_t7_000a__capability_probe__rejects_every_used_graph_filter() -> None
             validate_required_filters(listing_without_filter)
 
 
+def test_tc_t7_000b__cache_keys__include_every_toolchain_identity_and_option(
+    render_capabilities: RenderCapabilities,
+) -> None:
+    from video_pipeline import render as render_module
+    from video_pipeline.render import RenderConfig
+
+    cache_key = cast(_CacheKey, render_module.__dict__["_cache_key"])
+    concat_contract = cast(
+        _CacheContract,
+        render_module.__dict__["_concat_options_manifest"],
+    )
+    scene_contract = cast(
+        _CacheContract,
+        render_module.__dict__["_scene_options_manifest"],
+    )
+
+    config = RenderConfig.fixture(
+        width=320,
+        height=180,
+        fps=30,
+        total_frames=42,
+        caption_size=18,
+        video_bitrate="400k",
+    )
+    baseline_state = cache_key(scene_contract(render_capabilities, config))
+    baseline_timeline = cache_key(concat_contract(render_capabilities, config))
+    first_font, *other_fonts = render_capabilities.fonts
+    mutations = (
+        replace(render_capabilities, ffmpeg_sha256="0" * 64),
+        replace(render_capabilities, ffprobe_sha256="0" * 64),
+        replace(render_capabilities, fontconfig_sha256="0" * 64),
+        replace(
+            render_capabilities,
+            librsvg=replace(render_capabilities.librsvg, sha256="0" * 64),
+        ),
+        replace(
+            render_capabilities,
+            encoder_library=replace(
+                render_capabilities.encoder_library,
+                sha256="0" * 64,
+            ),
+        ),
+        replace(
+            render_capabilities,
+            audio_encoder_library=replace(
+                render_capabilities.audio_encoder_library,
+                sha256="0" * 64,
+            ),
+        ),
+        replace(
+            render_capabilities,
+            fonts=(replace(first_font, sha256="0" * 64), *other_fonts),
+        ),
+        replace(render_capabilities, encoder_help_sha256="0" * 64),
+        replace(render_capabilities, aac_help_sha256="0" * 64),
+    )
+    for mutated in mutations:
+        assert cache_key(scene_contract(mutated, config)) != baseline_state
+        assert cache_key(concat_contract(mutated, config)) != baseline_timeline
+
+    audio_option_mutation = replace(config, audio_bitrate="193k")
+    assert cache_key(scene_contract(render_capabilities, audio_option_mutation)) != baseline_state
+    assert (
+        cache_key(concat_contract(render_capabilities, audio_option_mutation)) != baseline_timeline
+    )
+
+
+def test_tc_t7_000c__stream_hash__bounds_output_and_kills_stalled_process_group(
+    tmp_path: Path,
+) -> None:
+    from video_pipeline import render as render_module
+    from video_pipeline.render import RenderError
+
+    hash_command_output = cast(
+        _HashCommandOutput,
+        render_module.__dict__["_hash_command_output"],
+    )
+
+    with pytest.raises(RenderError, match="output limit"):
+        hash_command_output(
+            (
+                sys.executable,
+                "-c",
+                "import sys; sys.stdout.buffer.write(b'x' * 2048)",
+            ),
+            "oversized test output",
+            timeout_seconds=2,
+            max_output_bytes=1024,
+        )
+
+    child_pid_path = tmp_path / "stalled-child.pid"
+    child_program = (
+        "import os, pathlib, signal, sys, time; "
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+        "pathlib.Path(sys.argv[1]).write_text(str(os.getpid()), encoding='utf-8'); "
+        "time.sleep(60)"
+    )
+    parent_program = (
+        "import subprocess, sys, time; "
+        "subprocess.Popen([sys.executable, '-c', sys.argv[2], sys.argv[1]]); "
+        "time.sleep(60)"
+    )
+    with pytest.raises(RenderError, match="timed out"):
+        hash_command_output(
+            (
+                sys.executable,
+                "-c",
+                parent_program,
+                str(child_pid_path),
+                child_program,
+            ),
+            "stalled process tree",
+            timeout_seconds=0.5,
+            max_output_bytes=1024,
+        )
+    assert child_pid_path.is_file()
+    child_pid = int(child_pid_path.read_text(encoding="utf-8"))
+    deadline = time.monotonic() + 2
+    while Path(f"/proc/{child_pid}").exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert not Path(f"/proc/{child_pid}").exists()
+
+
 def test_tc_t7_001__short_real_fixture__renders_matching_picture_variants(
     rendered_fixture: _RenderedFixture,
 ) -> None:
@@ -480,6 +640,11 @@ def test_tc_t7_003__cache_selected_wav_and_manifest__are_exact(
     fixture, config, first = rendered_fixture
     assert len(first.rebuilt_states) == 14
     assert first.timeline_rebuilt is True
+    cold_manifest = fixture.project.output.render_manifest.read_bytes()
+    cold_output_hashes = {
+        path: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in (fixture.project.output.narrated, fixture.project.output.speaker)
+    }
     second = render_timeline(
         repository_root=REPOSITORY_ROOT,
         project=fixture.project,
@@ -492,6 +657,12 @@ def test_tc_t7_003__cache_selected_wav_and_manifest__are_exact(
     )
     assert second.rebuilt_states == ()
     assert second.timeline_rebuilt is False
+    assert fixture.project.output.render_manifest.read_bytes() == cold_manifest
+    assert b"cache_status" not in cold_manifest
+    assert {
+        path: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in (fixture.project.output.narrated, fixture.project.output.speaker)
+    } == cold_output_hashes
 
     with pytest.raises(RenderError, match="selected narration WAV checksum"):
         render_timeline(
@@ -576,3 +747,112 @@ def test_tc_t7_003__cache_selected_wav_and_manifest__are_exact(
         production.fps,
         production.total_frames,
     ) == (1920, 1080, 30, 4050)
+
+
+def test_tc_t7_004__orchestration__keeps_every_temporary_under_owned_work_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from video_pipeline import render as render_module
+
+    fixture = _fixture(tmp_path)
+    config = render_module.RenderConfig.fixture(
+        width=320,
+        height=180,
+        fps=30,
+        total_frames=42,
+        caption_size=18,
+        video_bitrate="400k",
+    )
+    output_root = fixture.project.output.root.resolve()
+    work_root = output_root / "work"
+    capabilities = render_module.probe_render_capabilities(work_root=work_root)
+    observed_media_paths: list[Path] = []
+    manifest_temporary_roots: list[Path | None] = []
+    original_run_checked = cast(
+        _RunChecked,
+        render_module.__dict__["_run_checked"],
+    )
+    original_atomic_write_json = cast(
+        _AtomicWriteJson,
+        render_module.__dict__["_atomic_write_json"],
+    )
+
+    def record_run_checked(argv: Sequence[str], label: str) -> None:
+        observed_media_paths.extend(
+            Path(argument).resolve() for argument in argv if argument.endswith(".mp4")
+        )
+        original_run_checked(argv, label)
+
+    def record_atomic_write_json(
+        path: Path,
+        payload: Mapping[str, object],
+        *,
+        temporary_root: Path | None = None,
+    ) -> None:
+        if path == fixture.project.output.render_manifest:
+            manifest_temporary_roots.append(temporary_root)
+        if temporary_root is None:
+            original_atomic_write_json(path, payload)
+        else:
+            original_atomic_write_json(
+                path,
+                payload,
+                temporary_root=temporary_root,
+            )
+
+    monkeypatch.setattr(render_module, "_run_checked", record_run_checked)
+    monkeypatch.setattr(render_module, "_atomic_write_json", record_atomic_write_json)
+    render_module.render_timeline(
+        repository_root=REPOSITORY_ROOT,
+        project=fixture.project,
+        states=fixture.states,
+        captions_path=fixture.captions,
+        selected_wav=fixture.selected_wav,
+        selected_wav_sha256=fixture.selected_wav_sha256,
+        config=config,
+        capabilities=capabilities,
+    )
+
+    assert observed_media_paths
+    assert all(path.is_relative_to(work_root) for path in observed_media_paths)
+    assert manifest_temporary_roots == [work_root / "staging"]
+    assert not [
+        path
+        for path in output_root.rglob("*")
+        if path.is_file()
+        and not path.is_relative_to(work_root)
+        and path
+        not in {
+            fixture.project.output.narrated,
+            fixture.project.output.speaker,
+            fixture.project.output.render_manifest,
+        }
+    ]
+    assert not list(output_root.glob("**/*.tmp"))
+    assert not list(output_root.glob("**/*.tmp.mp4"))
+
+
+def test_tc_t7_005__audio_boundary__rejects_non_sample_packet_time_base(
+    rendered_fixture: _RenderedFixture,
+    render_capabilities: RenderCapabilities,
+) -> None:
+    from video_pipeline import render as render_module
+    from video_pipeline.render import RenderError
+
+    fixture, _, _ = rendered_fixture
+    media_probe = cast(_MediaProbe, render_module.__dict__["_ffprobe"])
+    validate_audio_boundary = cast(
+        _AudioBoundaryValidator,
+        render_module.__dict__["_validate_audio_packet_boundary"],
+    )
+    probe = media_probe(fixture.project.output.narrated, render_capabilities)
+    streams = cast(list[dict[str, object]], probe["streams"])
+    audio = next(stream for stream in streams if stream["codec_type"] == "audio")
+    audio["time_base"] = "1/1000"
+    with pytest.raises(RenderError, match="time base"):
+        validate_audio_boundary(
+            probe,
+            audio_stream_index=cast(int, audio["index"]),
+            total_samples=67_200,
+        )

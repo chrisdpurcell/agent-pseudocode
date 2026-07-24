@@ -21,10 +21,14 @@ import hashlib
 import json
 import os
 import re
+import selectors
 import shutil
+import signal
 import subprocess
 import tempfile
+import time
 from collections.abc import Mapping, Sequence
+from contextlib import suppress
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, cast
@@ -356,6 +360,7 @@ def validate_capability_evidence(
 
 def probe_render_capabilities(
     *,
+    work_root: Path,
     ffmpeg: str = "ffmpeg",
     ffprobe: str = "ffprobe",
     fontconfig: str = "fc-match",
@@ -363,6 +368,7 @@ def probe_render_capabilities(
     ldd: str = "ldd",
 ) -> RenderCapabilities:
     """Run the bounded toolchain preflight and verify both real encoders."""
+    owned_work_root = _prepare_owned_work_root(work_root)
     ffmpeg_path = _resolve_executable(ffmpeg, "ffmpeg")
     ffprobe_path = _resolve_executable(ffprobe, "ffprobe")
     fontconfig_path = _resolve_executable(fontconfig, "fontconfig")
@@ -434,7 +440,7 @@ def probe_render_capabilities(
         ),
         f"{capabilities.encoder} verification",
     )
-    _verify_aac_encoder(capabilities)
+    _verify_aac_encoder(capabilities, work_root=owned_work_root)
     return replace(
         capabilities,
         encoder_verified=True,
@@ -442,10 +448,15 @@ def probe_render_capabilities(
     )
 
 
-def _verify_aac_encoder(capabilities: RenderCapabilities) -> None:
+def _verify_aac_encoder(capabilities: RenderCapabilities, *, work_root: Path) -> None:
     """Verify the approved AAC profile preserves an exact sample boundary."""
     verification_samples = AAC_FRAME_LENGTH * 2
-    with tempfile.TemporaryDirectory(prefix="apseudo-aac-probe-") as temporary_directory:
+    probe_root = work_root / "probes"
+    probe_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(
+        dir=probe_root,
+        prefix="aac-",
+    ) as temporary_directory:
         output = Path(temporary_directory) / "verification.mp4"
         _run_checked(
             (
@@ -498,6 +509,8 @@ def _verify_aac_encoder(capabilities: RenderCapabilities) -> None:
                 "-",
             ),
             f"{AAC_ENCODER} decoded verification",
+            timeout_seconds=30,
+            max_output_bytes=verification_samples * 2 * 2,
         )
     if byte_count != verification_samples * 2 * 2:
         raise RenderError(f"{AAC_ENCODER} did not preserve the exact decoded sample boundary")
@@ -667,18 +680,23 @@ def render_timeline(
     if actual_wav_sha256 != selected_wav_sha256:
         raise RenderError("selected narration WAV checksum does not match")
     captions_sha256 = _sha256_file(captions_path, "captions SRT")
-    selected_capabilities = capabilities or probe_render_capabilities()
+    output_root = project.output.root.resolve()
+    owned_work_root = _prepare_owned_work_root(output_root / "work")
+    selected_capabilities = capabilities or probe_render_capabilities(
+        work_root=owned_work_root,
+    )
     if not selected_capabilities.encoder_verified:
         raise RenderError("H.264 encoder must pass a real verification encode")
     if not selected_capabilities.audio_encoder_verified:
         raise RenderError("AAC encoder must pass an exact-boundary verification encode")
 
-    output_root = project.output.root.resolve()
-    work_root = output_root / "work" / "render-cache"
+    work_root = owned_work_root / "render-cache"
+    staging_root = owned_work_root / "staging"
     state_root = work_root / "states"
     timeline_root = work_root / "timelines"
     state_root.mkdir(parents=True, exist_ok=True)
     timeline_root.mkdir(parents=True, exist_ok=True)
+    staging_root.mkdir(parents=True, exist_ok=True)
     state_records: list[dict[str, object]] = []
     rebuilt_states: list[str] = []
     clips: list[Path] = []
@@ -732,10 +750,16 @@ def render_timeline(
     project.output.narrated.parent.mkdir(parents=True, exist_ok=True)
     project.output.speaker.parent.mkdir(parents=True, exist_ok=True)
     project.output.render_manifest.parent.mkdir(parents=True, exist_ok=True)
-    temporary_narrated = project.output.narrated.with_name(
-        f".{project.output.narrated.name}.tmp.mp4"
+    temporary_narrated = _staging_path(
+        staging_root,
+        "narrated",
+        ".mp4",
     )
-    temporary_speaker = project.output.speaker.with_name(f".{project.output.speaker.name}.tmp.mp4")
+    temporary_speaker = _staging_path(
+        staging_root,
+        "speaker",
+        ".mp4",
+    )
     temporary_project = replace(
         project,
         output=replace(
@@ -830,12 +854,15 @@ def render_timeline(
         base_probe=base_probe,
         base_picture_sha256=base_picture_sha256,
         timeline_key=timeline_key,
-        timeline_rebuilt=timeline_rebuilt,
         output_probes=output_probes,
         decoded_picture=decoded_picture,
         decoded_pcm_records=decoded_pcm_records,
     )
-    _atomic_write_json(project.output.render_manifest, manifest)
+    _atomic_write_json(
+        project.output.render_manifest,
+        manifest,
+        temporary_root=staging_root,
+    )
     return RenderResult(
         base_video=base_video,
         narrated=project.output.narrated,
@@ -859,10 +886,10 @@ def render_production(
 ) -> RenderResult:
     """Compose real production states and render without any fixture fallback."""
     root = repository_root.resolve()
-    capabilities = probe_render_capabilities()
-    states = compose_scene_states(root)
     production_root = root / "media" / "repository-explainer"
     project = load_project(production_root / "project.json", repository_root=root)
+    capabilities = probe_render_capabilities(work_root=project.output.root / "work")
+    states = compose_scene_states(root)
     return render_timeline(
         repository_root=root,
         project=project,
@@ -991,7 +1018,6 @@ def _render_state_clip(
             "source_sha256": source_sha256,
             "cache_key": key,
             "clip_sha256": _sha256_file(clip, "state clip"),
-            "cache_status": "rebuilt" if rebuilt else "reused",
             "references": [
                 {
                     "kind": reference.kind,
@@ -1023,7 +1049,6 @@ def _render_manifest(
     base_probe: Mapping[str, object],
     base_picture_sha256: str,
     timeline_key: str,
-    timeline_rebuilt: bool,
     output_probes: Mapping[str, Mapping[str, object]],
     decoded_picture: Mapping[str, str],
     decoded_pcm_records: Mapping[str, Mapping[str, object]],
@@ -1099,7 +1124,6 @@ def _render_manifest(
         "shared_picture": {
             "path": _manifest_path(repository_root, base_video),
             "cache_key": timeline_key,
-            "cache_status": "rebuilt" if timeline_rebuilt else "reused",
             "sha256": _sha256_file(base_video, "shared picture"),
             "decoded_video_sha256": base_picture_sha256,
             "probe": base_probe,
@@ -1170,8 +1194,9 @@ def _toolchain_manifest(
             },
         },
         "options": {
-            "state_clip": _scene_options_manifest(capabilities, config),
-            "concat": _concat_options_manifest(capabilities, config),
+            "render_config": _render_config_manifest(config),
+            "state_clip": _scene_command_manifest(capabilities, config),
+            "concat": _concat_command_manifest(capabilities, config),
             "variants": {
                 "video": list(_encoded_video_options(capabilities, config)),
                 "audio": list(_encoded_audio_options(config)),
@@ -1413,6 +1438,8 @@ def _decoded_video_hash(path: Path, capabilities: RenderCapabilities) -> str:
             "-",
         ),
         "decoded video semantic hash",
+        timeout_seconds=600,
+        max_output_bytes=64 * 1024 * 1024,
     )
     return digest
 
@@ -1437,6 +1464,8 @@ def _decoded_pcm_record(
             "-",
         ),
         "decoded PCM semantic hash",
+        timeout_seconds=600,
+        max_output_bytes=total_samples * 2 * 2,
     )
     bytes_per_sample_frame = 2 * 2
     if byte_count % bytes_per_sample_frame != 0:
@@ -1459,6 +1488,17 @@ def _validate_audio_packet_boundary(
     audio_stream_index: int,
     total_samples: int,
 ) -> dict[str, object]:
+    streams = cast(list[dict[str, object]], probe.get("streams", []))
+    audio_stream = next(
+        (
+            stream
+            for stream in streams
+            if stream.get("index") == audio_stream_index and stream.get("codec_type") == "audio"
+        ),
+        None,
+    )
+    if audio_stream is None or audio_stream.get("time_base") != f"1/{AUDIO_SAMPLE_RATE}":
+        raise RenderError("AAC packet time base must be exactly one audio sample")
     packets = [
         packet
         for packet in cast(list[dict[str, object]], probe.get("packets", []))
@@ -1537,6 +1577,15 @@ def _scene_options_manifest(
     capabilities: RenderCapabilities, config: RenderConfig
 ) -> dict[str, object]:
     return {
+        "command": _scene_command_manifest(capabilities, config),
+        "render_toolchain": _toolchain_manifest(capabilities, config),
+    }
+
+
+def _scene_command_manifest(
+    capabilities: RenderCapabilities, config: RenderConfig
+) -> dict[str, object]:
+    return {
         "decoder": LIBRSVG_DECODER,
         "width": config.width,
         "height": config.height,
@@ -1552,11 +1601,41 @@ def _concat_options_manifest(
     capabilities: RenderCapabilities, config: RenderConfig
 ) -> dict[str, object]:
     return {
+        "command": _concat_command_manifest(capabilities, config),
+        "render_toolchain": _toolchain_manifest(capabilities, config),
+    }
+
+
+def _concat_command_manifest(
+    capabilities: RenderCapabilities, config: RenderConfig
+) -> dict[str, object]:
+    return {
         "state_count": 14,
         "filter": f"concat=n=14:v=1:a=0,setpts=N/({config.fps}*TB)",
         "total_frames": config.total_frames,
         "video_options": list(_encoded_video_options(capabilities, config)),
         "container_options": list(_deterministic_mp4_options(config)),
+    }
+
+
+def _render_config_manifest(config: RenderConfig) -> dict[str, object]:
+    return {
+        "mode": config.mode,
+        "width": config.width,
+        "height": config.height,
+        "fps": config.fps,
+        "total_frames": config.total_frames,
+        "caption_size": config.caption_size,
+        "video_bitrate": config.video_bitrate,
+        "audio_sample_rate": config.audio_sample_rate,
+        "audio_bitrate": config.audio_bitrate,
+        "cue_frequency": config.cue_frequency,
+        "cue_samples": config.cue_samples,
+        "cue_fade_start_sample": config.cue_fade_start_sample,
+        "cue_fade_samples": config.cue_fade_samples,
+        "bed_frequency": config.bed_frequency,
+        "bed_volume": config.bed_volume,
+        "cue_volume": config.cue_volume,
     }
 
 
@@ -1791,36 +1870,89 @@ def _run_checked(argv: Sequence[str], label: str) -> None:
         raise RenderError(f"{label} failed: {_safe_stderr(completed.stderr)}")
 
 
-def _hash_command_output(argv: Sequence[str], label: str) -> tuple[str, int]:
+def _hash_command_output(
+    argv: Sequence[str],
+    label: str,
+    *,
+    timeout_seconds: float,
+    max_output_bytes: int,
+) -> tuple[str, int]:
+    if timeout_seconds <= 0:
+        raise RenderError(f"{label} timeout must be positive")
+    if max_output_bytes <= 0:
+        raise RenderError(f"{label} output limit must be positive")
     digest = hashlib.sha256()
     byte_count = 0
-    with tempfile.TemporaryFile() as stderr:
-        try:
-            process = subprocess.Popen(
-                tuple(argv),
-                stdout=subprocess.PIPE,
-                stderr=stderr,
-            )
-        except OSError as exc:
-            raise RenderError(f"{label} could not start") from exc
-        if process.stdout is None:
-            process.kill()
-            raise RenderError(f"{label} did not expose decoded output")
-        with process.stdout:
-            while chunk := process.stdout.read(1024 * 1024):
-                digest.update(chunk)
-                byte_count += len(chunk)
-        try:
-            returncode = process.wait(timeout=600)
-        except subprocess.TimeoutExpired as exc:
-            process.kill()
-            process.wait()
-            raise RenderError(f"{label} timed out") from exc
+    stderr_tail = b""
+    try:
+        process = subprocess.Popen(
+            tuple(argv),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+        )
+    except OSError as exc:
+        raise RenderError(f"{label} could not start") from exc
+    if process.stdout is None or process.stderr is None:
+        _terminate_process_group(process)
+        raise RenderError(f"{label} did not expose decoded output")
+    deadline = time.monotonic() + timeout_seconds
+    selector = selectors.DefaultSelector()
+    selector.register(process.stdout, selectors.EVENT_READ, "stdout")
+    selector.register(process.stderr, selectors.EVENT_READ, "stderr")
+    try:
+        while selector.get_map():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(tuple(argv), timeout_seconds)
+            events = selector.select(remaining)
+            if not events:
+                raise subprocess.TimeoutExpired(tuple(argv), timeout_seconds)
+            for key, _ in events:
+                chunk = os.read(key.fd, 1024 * 1024)
+                if not chunk:
+                    selector.unregister(key.fileobj)
+                    continue
+                if key.data == "stdout":
+                    byte_count += len(chunk)
+                    if byte_count > max_output_bytes:
+                        raise RenderError(
+                            f"{label} exceeded its {max_output_bytes}-byte output limit"
+                        )
+                    digest.update(chunk)
+                else:
+                    stderr_tail = (stderr_tail + chunk)[-65_536:]
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(tuple(argv), timeout_seconds)
+        returncode = process.wait(timeout=remaining)
         if returncode != 0:
-            stderr.seek(0)
-            detail = stderr.read().decode("utf-8", errors="replace")
+            detail = stderr_tail.decode("utf-8", errors="replace")
             raise RenderError(f"{label} failed: {_safe_stderr(detail)}")
+    except subprocess.TimeoutExpired as exc:
+        _terminate_process_group(process)
+        raise RenderError(f"{label} timed out after {timeout_seconds:g} seconds") from exc
+    except BaseException:
+        _terminate_process_group(process)
+        raise
+    finally:
+        selector.close()
+        process.stdout.close()
+        process.stderr.close()
     return digest.hexdigest(), byte_count
+
+
+def _terminate_process_group(process: subprocess.Popen[bytes]) -> None:
+    # Waiting for the leader does not prove its descendants exited: a helper can
+    # ignore SIGTERM after the leader is already reaped and keep the pipe open.
+    with suppress(ProcessLookupError):
+        os.killpg(process.pid, signal.SIGTERM)
+    with suppress(subprocess.TimeoutExpired):
+        process.wait(timeout=1)
+    with suppress(ProcessLookupError):
+        os.killpg(process.pid, signal.SIGKILL)
+    if process.poll() is None:
+        process.wait()
 
 
 def _safe_stderr(stderr: str) -> str:
@@ -1843,17 +1975,30 @@ def _sha256_bytes(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
-def _atomic_write_json(path: Path, payload: Mapping[str, object]) -> None:
+def _atomic_write_json(
+    path: Path,
+    payload: Mapping[str, object],
+    *,
+    temporary_root: Path | None = None,
+) -> None:
     _atomic_write_bytes(
         path,
         (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        temporary_root=temporary_root,
     )
 
 
-def _atomic_write_bytes(path: Path, payload: bytes) -> None:
+def _atomic_write_bytes(
+    path: Path,
+    payload: bytes,
+    *,
+    temporary_root: Path | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    selected_temporary_root = temporary_root or path.parent
+    selected_temporary_root.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
-        dir=path.parent,
+        dir=selected_temporary_root,
         prefix=f".{path.name}.",
         suffix=".tmp",
     )
@@ -1867,6 +2012,17 @@ def _atomic_write_bytes(path: Path, payload: bytes) -> None:
     except BaseException:
         temporary_path.unlink(missing_ok=True)
         raise
+
+
+def _staging_path(root: Path, label: str, suffix: str) -> Path:
+    _validate_identifier(label, "staging label")
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=root,
+        prefix=f"{label}-",
+        suffix=suffix,
+    )
+    os.close(descriptor)
+    return Path(temporary_name)
 
 
 def _validate_identifier(value: str, label: str) -> None:
@@ -1884,6 +2040,18 @@ def _require_within(path: Path, root: Path, label: str) -> None:
         path.relative_to(root)
     except ValueError as exc:
         raise RenderError(f"{label} escapes its owned root") from exc
+
+
+def _prepare_owned_work_root(path: Path) -> Path:
+    resolved = path.resolve()
+    if (
+        resolved.name,
+        resolved.parent.name,
+        resolved.parent.parent.name,
+    ) != ("work", "video", "dist"):
+        raise RenderError("render work root must be exactly dist/video/work")
+    resolved.mkdir(parents=True, exist_ok=True)
+    return resolved
 
 
 def _manifest_path(repository_root: Path, path: Path) -> str:
