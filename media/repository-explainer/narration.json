@@ -1,0 +1,58 @@
+{
+	"delivery": {
+		"model": "gpt-4o-mini-tts",
+		"voice": "marin",
+		"instructions": "Use a calm, precise technical delivery. Speak clearly, leave measured pauses between ideas, and avoid sales emphasis.",
+		"disclosure": "AI-generated narration."
+	},
+	"segments": [
+		{
+			"scene_id": "problem",
+			"start_frame": 15,
+			"end_frame": 435,
+			"narration": "Agent instructions often hide decisions in dense prose. What will the agent actually do?",
+			"caption": "What will the agent actually do?",
+			"mute_safe_copy": "Make agent behavior visible."
+		},
+		{
+			"scene_id": "visible-workflow",
+			"start_frame": 465,
+			"end_frame": 1035,
+			"narration": "Pythonic Agent Pseudocode makes the workflow readable: a bounded loop, named checks, and an explicit result.",
+			"caption": "Readable workflow: bounded checks and explicit results.",
+			"mute_safe_copy": "Readable workflow. Bounded checks. Explicit results."
+		},
+		{
+			"scene_id": "caught-defect",
+			"start_frame": 1065,
+			"end_frame": 1785,
+			"narration": "The linter catches an unbounded loop with APSEUDO-WHILE-001, then points toward a bounded workflow.",
+			"caption": "Catch ambiguity with APSEUDO-WHILE-001.",
+			"mute_safe_copy": "Catch ambiguity before an agent runs."
+		},
+		{
+			"scene_id": "shared-policy",
+			"start_frame": 1815,
+			"end_frame": 2535,
+			"narration": "The same policy core reaches editor tools, MCP, the runner, hooks, pre-commit, and continuous integration.",
+			"caption": "One shared policy for tools, agents, hooks, and CI.",
+			"mute_safe_copy": "One shared policy across the delivery path."
+		},
+		{
+			"scene_id": "guarded-execution",
+			"start_frame": 2565,
+			"end_frame": 3435,
+			"narration": "Before execution, preflights and no-diff checks keep a bounded read-only task honest.",
+			"caption": "Guarded execution: preflights, read-only work, no diff.",
+			"mute_safe_copy": "Run bounded tasks with visible guardrails."
+		},
+		{
+			"scene_id": "promise",
+			"start_frame": 3465,
+			"end_frame": 4035,
+			"narration": "Behavior you can read. Work you can run. This film uses AI-generated narration.",
+			"caption": "Behavior you can read. Work you can run. AI-generated narration.",
+			"mute_safe_copy": "Behavior you can read. Work you can run. AI-generated narration."
+		}
+	]
+}

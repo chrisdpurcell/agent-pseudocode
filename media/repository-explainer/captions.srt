@@ -1,0 +1,27 @@
+1
+00:00:00,500 --> 00:00:14,500
+What will the agent actually do?
+
+2
+00:00:15,500 --> 00:00:34,500
+Readable workflow: bounded checks and
+explicit results.
+
+3
+00:00:35,500 --> 00:00:59,500
+Catch ambiguity with APSEUDO-WHILE-001.
+
+4
+00:01:00,500 --> 00:01:24,500
+One shared policy for tools, agents,
+hooks, and CI.
+
+5
+00:01:25,500 --> 00:01:54,500
+Guarded execution: preflights, read-only
+work, no diff.
+
+6
+00:01:55,500 --> 00:02:14,500
+Behavior you can read. Work you can run.
+AI-generated narration.
