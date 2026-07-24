@@ -101,7 +101,7 @@ exclude = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "media/repository-explainer"]
 testpaths = ["tests"]
 minversion = "9.0"
 addopts = ["-ra", "--strict-markers", "--strict-config"]
@@ -119,7 +119,7 @@ fail_under = 85
 [tool.ruff]
 target-version = "py314"
 line-length = 100
-src = ["src", "tests"]
+src = ["src", "tests", "media/repository-explainer"]
 extend-exclude = [".claude", ".agents", ".codex", ".continue"]
 
 [tool.ruff.lint]
@@ -135,7 +135,8 @@ indent-style = "space"
 docstring-code-format = true
 
 [tool.basedpyright]
-include = ["src", "tests"]
+include = ["src", "tests", "media/repository-explainer/video_pipeline"]
+extraPaths = ["media/repository-explainer"]
 typeCheckingMode = "strict"
 pythonVersion = "3.14"
 pythonPlatform = "All"
