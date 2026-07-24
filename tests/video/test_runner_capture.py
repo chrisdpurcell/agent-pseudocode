@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
-from collections.abc import Generator, Mapping
+from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
@@ -42,6 +42,7 @@ from video_pipeline.runner_capture import (
     validation_record_passed,
 )
 from video_pipeline.runner_runtime import environment_digest
+from video_pipeline.runner_security import ProcessResult
 
 REVIEW_SCRIPT = "docs/apseudo-docs/examples/runner/review-spec.apseudo"
 SPEC_PATH = "docs/specs/repository-explainer-video.md"
@@ -215,7 +216,13 @@ if mode == "execution-partial-nonzero":
 
 run_root = pathlib.Path(args[args.index("--run-dir") + 1])
 run_record = run_root / "fixture-run"
-run_record.mkdir(parents=True)
+if mode == "run-record-root-symlink":
+    external_record = run_root.parent / "external-fixture-run"
+    external_record.mkdir(parents=True)
+    run_record.parent.mkdir(parents=True, exist_ok=True)
+    run_record.symlink_to(external_record.resolve(), target_is_directory=True)
+else:
+    run_record.mkdir(parents=True)
 post_check = args[args.index("--post-check") + 1]
 workspace = str(pathlib.Path.cwd())
 schema_path = str(run_record / "outcome-schema.json")
@@ -1179,6 +1186,12 @@ def test_accepts_only_exact_clean_guarded_codex_run(tmp_path: Path) -> None:
         ),
         pytest.param("", "post-check-nonzero", "post-check failed", id="nonzero-post-check"),
         pytest.param("", "changed-files", "workspace changed", id="changed-files"),
+        pytest.param(
+            "",
+            "run-record-root-symlink",
+            "runner record root is a symlink",
+            id="run-record-root-symlink",
+        ),
     ],
 )
 def test_falls_back_to_verified_preflight(
@@ -1432,6 +1445,78 @@ def test_capture__timeout__records_complete_preflight(
         )
 
     _assert_preflight_bundle(result, evidence_root, "SessionStart hook preflight: timed out")
+
+
+@pytest.mark.parametrize(
+    ("failed_operation", "expected_hook_status"),
+    [
+        pytest.param(
+            "SessionStart hook preflight",
+            "failed",
+            id="hook-process-failure",
+        ),
+        pytest.param(
+            "runner check",
+            "passed",
+            id="runner-failure-after-hook",
+        ),
+    ],
+)
+def test_capture__operational_failure__records_truthful_hook_stage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failed_operation: str,
+    expected_hook_status: str,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        runtime = prepare_runner_runtime(
+            repository,
+            revision=revision,
+            operator_python=runner.parent / "python",
+            operator_apseudo_run=runner,
+            environment=environment,
+        )
+        original_run = runner_capture_module.run_capture_process
+
+        def fail_selected_operation(
+            argv: Sequence[str],
+            *,
+            cwd: Path,
+            environment: Mapping[str, str],
+            timeout: int,
+            operation: str,
+            input_text: str | None = None,
+            screen_output: bool = True,
+        ) -> ProcessResult:
+            if operation == failed_operation:
+                raise RunnerOperationalError(f"{operation}: timed out")
+            return original_run(
+                argv,
+                cwd=cwd,
+                environment=environment,
+                timeout=timeout,
+                operation=operation,
+                input_text=input_text,
+                screen_output=screen_output,
+            )
+
+        monkeypatch.setattr(
+            runner_capture_module,
+            "run_capture_process",
+            fail_selected_operation,
+        )
+        evidence_root = tmp_path / "promoted"
+        result = capture_guarded_runner(
+            repository,
+            revision=revision,
+            runtime=runtime,
+            evidence_root=evidence_root,
+            environment=environment,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, f"{failed_operation}: timed out")
+    hook = _json_object(evidence_root / "hook-preflight.json")
+    assert hook["status"] == expected_hook_status
 
 
 def test_capture__missing_focus__records_complete_preflight(

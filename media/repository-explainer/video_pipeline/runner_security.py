@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import os
 import re
+import signal
 import subprocess
 import threading
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,6 +15,10 @@ from typing import BinaryIO, cast
 
 MAX_PROCESS_OUTPUT_BYTES = 1_048_576
 MAX_EVIDENCE_FILE_BYTES = 1_048_576
+_PROCESS_POLL_SECONDS = 0.05
+_PROCESS_TERM_SECONDS = 0.5
+_PROCESS_KILL_SECONDS = 0.5
+_READER_JOIN_SECONDS = 0.5
 
 _CHILD_ENVIRONMENT_KEYS = frozenset(
     {
@@ -185,6 +191,7 @@ def run_capture_process(
             stdin=subprocess.PIPE if input_text is not None else subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            start_new_session=True,
         )
     except FileNotFoundError as exc:
         raise RunnerOperationalError(f"{operation}: executable was not found") from exc
@@ -215,16 +222,39 @@ def run_capture_process(
             process.stdin.close()
         except BrokenPipeError:
             pass
-    try:
-        returncode = process.wait(timeout=timeout)
-    except subprocess.TimeoutExpired as exc:
-        process.kill()
-        process.wait()
-        for thread in threads:
-            thread.join()
-        raise RunnerOperationalError(f"{operation}: timed out") from exc
-    for thread in threads:
-        thread.join()
+    deadline = time.monotonic() + timeout
+    failure: RunnerOperationalError | None = None
+    while True:
+        if exceeded.is_set():
+            failure = RunnerOperationalError(
+                f"{operation}: output exceeded {MAX_PROCESS_OUTPUT_BYTES} bytes"
+            )
+            break
+        observed_returncode = process.poll()
+        if observed_returncode is not None:
+            break
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            failure = RunnerOperationalError(f"{operation}: timed out")
+            break
+        exceeded.wait(min(_PROCESS_POLL_SECONDS, remaining))
+    if failure is not None:
+        _terminate_process_group(process)
+        _finish_reader_threads(process, threads)
+        raise failure
+    returncode = process.poll()
+    if returncode is None:
+        _terminate_process_group(process)
+        _finish_reader_threads(process, threads)
+        raise RunnerOperationalError(f"{operation}: process state became unavailable")
+    if not _join_reader_threads(threads, _READER_JOIN_SECONDS):
+        _terminate_process_group(process)
+        _finish_reader_threads(process, threads)
+        if exceeded.is_set():
+            raise RunnerOperationalError(
+                f"{operation}: output exceeded {MAX_PROCESS_OUTPUT_BYTES} bytes"
+            )
+        raise RunnerOperationalError(f"{operation}: descendant process retained output pipes")
     if exceeded.is_set():
         raise RunnerOperationalError(
             f"{operation}: output exceeded {MAX_PROCESS_OUTPUT_BYTES} bytes"
@@ -255,10 +285,69 @@ def _drain_stream(
 ) -> None:
     if stream is None:
         return
-    with stream:
-        while chunk := stream.read(65_536):
-            remaining = MAX_PROCESS_OUTPUT_BYTES + 1 - len(buffer)
-            if remaining > 0:
-                buffer.extend(chunk[:remaining])
-            if len(buffer) > MAX_PROCESS_OUTPUT_BYTES or len(chunk) > remaining:
-                exceeded.set()
+    try:
+        with stream:
+            while chunk := os.read(stream.fileno(), 65_536):
+                remaining = MAX_PROCESS_OUTPUT_BYTES + 1 - len(buffer)
+                if remaining > 0:
+                    buffer.extend(chunk[:remaining])
+                if len(buffer) > MAX_PROCESS_OUTPUT_BYTES or len(chunk) > remaining:
+                    exceeded.set()
+    except OSError:
+        return
+
+
+def _terminate_process_group(process: subprocess.Popen[bytes]) -> None:
+    process_group = process.pid
+    _signal_process_group(process_group, signal.SIGTERM)
+    if not _wait_process_group(process_group, _PROCESS_TERM_SECONDS):
+        _signal_process_group(process_group, signal.SIGKILL)
+        _wait_process_group(process_group, _PROCESS_KILL_SECONDS)
+    try:
+        process.wait(timeout=_PROCESS_KILL_SECONDS)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        try:
+            process.wait(timeout=_PROCESS_KILL_SECONDS)
+        except subprocess.TimeoutExpired:
+            return
+
+
+def _signal_process_group(process_group: int, selected_signal: signal.Signals) -> None:
+    try:
+        os.killpg(process_group, selected_signal)
+    except ProcessLookupError:
+        return
+
+
+def _wait_process_group(process_group: int, timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            os.killpg(process_group, 0)
+        except ProcessLookupError:
+            return True
+        time.sleep(_PROCESS_POLL_SECONDS)
+    return False
+
+
+def _join_reader_threads(
+    threads: Sequence[threading.Thread],
+    timeout: float,
+) -> bool:
+    deadline = time.monotonic() + timeout
+    for thread in threads:
+        thread.join(max(0.0, deadline - time.monotonic()))
+    return all(not thread.is_alive() for thread in threads)
+
+
+def _finish_reader_threads(
+    process: subprocess.Popen[bytes],
+    threads: Sequence[threading.Thread],
+) -> None:
+    if _join_reader_threads(threads, _READER_JOIN_SECONDS):
+        return
+    for stream in (process.stdout, process.stderr):
+        if stream is not None:
+            stream.close()
+    _join_reader_threads(threads, _READER_JOIN_SECONDS)
