@@ -1,0 +1,26 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="480"
+  height="480"
+  viewBox="0 0 480 480"
+  role="img"
+  aria-label="Procedural Pythonic Agent Pseudocode workflow mark"
+>
+  <rect width="480" height="480" rx="96" fill="#132238" />
+  <path
+    d="M120 142h148c51 0 92 41 92 92s-41 92-92 92h-56"
+    fill="none"
+    stroke="#72B7FF"
+    stroke-width="28"
+    stroke-linecap="round"
+  />
+  <path
+    d="M120 142v196m0 0 58-58m-58 58-58-58"
+    fill="none"
+    stroke="#6EE7B7"
+    stroke-width="28"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="268" cy="234" r="28" fill="#FF8A80" />
+</svg>

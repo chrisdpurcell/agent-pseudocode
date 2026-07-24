@@ -1,0 +1,31 @@
+{
+	"schema_version": 1,
+	"canvas": { "width": 1920, "height": 1080 },
+	"colors": {
+		"ink": "#08111C",
+		"surface": "#132238",
+		"surface_alt": "#1B304C",
+		"paper": "#F5F7FA",
+		"blue": "#72B7FF",
+		"mint": "#6EE7B7",
+		"coral": "#FF8A80"
+	},
+	"contrast_pairs": [
+		["paper", "ink"],
+		["paper", "surface"],
+		["blue", "ink"],
+		["mint", "ink"],
+		["coral", "ink"]
+	],
+	"fonts": {
+		"sans": { "family": "Noto Sans", "asset_id": "noto-sans-regular" },
+		"mono": { "family": "Noto Sans Mono", "asset_id": "noto-sans-mono-regular" }
+	},
+	"text_sizes": { "title": 72, "copy": 56, "caption": 44, "code": 32, "label": 32 },
+	"rectangles": {
+		"title_safe": [96, 54, 1728, 972],
+		"copy": [240, 270, 1440, 540],
+		"caption": [96, 864, 1728, 162]
+	},
+	"mute_safe_frames": 60
+}

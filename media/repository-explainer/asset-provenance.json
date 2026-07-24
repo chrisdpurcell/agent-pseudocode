@@ -1,0 +1,45 @@
+{
+	"schema_version": 1,
+	"assets": [
+		{
+			"id": "apseudo-mark",
+			"kind": "graphic",
+			"repository_path": "media/repository-explainer/assets/apseudo-mark.svg",
+			"system_path": null,
+			"source": "Procedurally authored from SVG paths and primitive shapes for this repository",
+			"license_id": "MIT",
+			"generation_method": "Deterministic hand-authored SVG primitives; no external graphic input",
+			"sha256": "8dcfcd4dd2a8a5f5cb20e7ae53c20b04f039a91bb31312ee9d317926c4a35a01"
+		},
+		{
+			"id": "policy-map",
+			"kind": "graphic",
+			"repository_path": "media/repository-explainer/assets/policy-map.svg",
+			"system_path": null,
+			"source": "Procedurally authored from SVG paths, rectangles, and text for this repository",
+			"license_id": "MIT",
+			"generation_method": "Deterministic hand-authored SVG primitives; no external graphic input",
+			"sha256": "ea01cffe8abd2aff0941039285057c427342a25bea42eb3422635a2667fb1db1"
+		},
+		{
+			"id": "noto-sans-regular",
+			"kind": "font",
+			"repository_path": null,
+			"system_path": "/usr/share/fonts/google-noto/NotoSans-Regular.ttf",
+			"source": "Fedora google-noto-sans-fonts package; Noto Sans upstream",
+			"license_id": "OFL-1.1",
+			"generation_method": null,
+			"sha256": "478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823"
+		},
+		{
+			"id": "noto-sans-mono-regular",
+			"kind": "font",
+			"repository_path": null,
+			"system_path": "/usr/share/fonts/google-noto/NotoSansMono-Regular.ttf",
+			"source": "Fedora google-noto-sans-mono-fonts package; Noto Sans Mono upstream",
+			"license_id": "OFL-1.1",
+			"generation_method": null,
+			"sha256": "65b5e2b2c4a1fba9ae8be1f026cb35b03dcb8886d9b2a4147054fde12f7e767d"
+		}
+	]
+}
