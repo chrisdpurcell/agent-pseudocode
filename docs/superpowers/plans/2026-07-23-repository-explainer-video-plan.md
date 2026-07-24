@@ -241,7 +241,7 @@ Each Verify Task pass runs its targeted tests, nearest regression tests, Ruff ch
 | T10 | Lock approved content and real captures | P4 | T5, T9 | FR-001–FR-005, FR-008, FR-010, NFR-003, NFR-004, NFR-006, NFR-008, NFR-010, C-001–C-003, C-006, C-008, IR-001, IR-004, DR-005 | `uv run pytest tests/video/test_content.py` |
 | T11 | Generate narration and both final candidates | P4 | T10 | FR-006–FR-009, NFR-001, NFR-002, NFR-005, NFR-007, NFR-009, C-004, C-007, IR-002, IR-003, DR-002 | `uv run --project ../.. --directory media/repository-explainer python -m video_pipeline all --output ../../dist/video/candidate` |
 | T12 | Accept and deliver the verified film | P4 | T11 | FR-001, FR-002, FR-006–FR-011, NFR-001–NFR-010, C-001, C-002, C-004–C-005, C-007–C-009, IR-005, DR-001–DR-003, DR-005 | `uv run --project ../.. --directory media/repository-explainer python -m video_pipeline verify --output ../../dist/video/final` |
-| T13 | Replace strict assurance with quick-demo verification and CLI | P5 | T7 | FR-009, FR-010, NFR-001, NFR-002, NFR-005, NFR-007, NFR-008, C-005, C-008, IR-003 | `uv run pytest tests/video/test_verify.py tests/video/test_cli.py` |
+| T13 | Add quick-demo verification and CLI beside dormant strict assurance | P5 | T7 | FR-009, FR-010, NFR-001, NFR-002, NFR-005, NFR-007, NFR-008, C-005, C-008, IR-003 | `uv run pytest tests/video/test_quick_verify.py tests/video/test_cli.py` |
 | T14 | Capture, narrate, and render the real quick demo | P5 | T13 | FR-001–FR-008, FR-010, FR-011, NFR-001–NFR-004, NFR-006–NFR-010, C-001–C-008, IR-001–IR-004, DR-001–DR-005 | `uv run --project ../.. --directory media/repository-explainer python -m video_pipeline all` |
 | T15 | Package, review, document, and close the local delivery | P5 | T14 | FR-001, FR-002, FR-006–FR-011, NFR-001–NFR-010, C-001, C-002, C-004, C-005, C-007–C-009, IR-005, DR-001–DR-003, DR-005 | `uv run --project ../.. --directory media/repository-explainer python -m video_pipeline verify --output ../../dist/video/final` |
 
@@ -516,7 +516,7 @@ Use frozen, slotted dataclasses and explicit JSON decoding. Reject unknown field
 
 Tasks T8–T12 are skipped in the live checklist because their assurance scope exceeded the owner's quick-demo intent. T13–T15 are the only remaining execution path.
 
-### T13: Replace Strict Assurance with Quick-Demo Verification and CLI
+### T13: Add Quick-Demo Verification and CLI Beside Dormant Strict Assurance
 
 - **goal:** A small local CLI renders or verifies the demo without a provider call when given the selected WAV, and reports only actionable media, disclosure, targeted credential-safety, and checksum results.
 - **phase:** P5
@@ -524,14 +524,14 @@ Tasks T8–T12 are skipped in the live checklist because their assurance scope e
 <!-- prettier-ignore -->
 - **requirements:** [FR-009, FR-010, NFR-001, NFR-002, NFR-005, NFR-007, NFR-008, C-005, C-008, IR-003]
 - **priority:** must
-- **files:** `media/repository-explainer/video_pipeline/verify.py` (replace), `media/repository-explainer/video_pipeline/cli.py` (create), `media/repository-explainer/video_pipeline/__main__.py` (modify), `media/repository-explainer/README.md` (create), `tests/video/test_verify.py` (replace), `tests/video/test_cli.py` (create)
+- **files:** `media/repository-explainer/video_pipeline/quick_verify.py` (create), `media/repository-explainer/video_pipeline/cli.py` (create), `media/repository-explainer/video_pipeline/__main__.py` (modify), `media/repository-explainer/README.md` (create), `tests/video/test_quick_verify.py` (create), `tests/video/test_cli.py` (create)
 - **acceptance:** verification reads the two MP4s directly with FFprobe, checks 1920×1080, 30 fps, H.264/AAC stereo, 4050 frames, approximately 135 seconds, variant loudness targets, captions/disclosure, targeted source/log credential patterns, and SHA-256 inventory (TC-T13-001); the CLI exposes `check`, `capture`, `narrate`, `render`, `verify`, and `all`, keeps transient work below `dist/video/work`, and accepts the selected WAV for rerendering without another Speech call (TC-T13-002).
 - **sub-tasks:**
-  - **T13.1 RED** — replace adversarial verifier tests with direct media and CLI contract tests; expected failure: the existing verifier and entry point do not expose the quick-demo contract.
+  - **T13.1 RED** — add direct media and CLI contract tests; expected failure: the quick verifier and production entry point do not exist.
   - **T13.2 Verify RED** — run the focused tests and confirm failures name the missing simple contract.
   - **T13.3 GREEN** — implement the smallest verifier and orchestration CLI that satisfy the acceptance criteria.
   - **T13.4 Verify GREEN** — run a short fixture render through `verify` and `all --dry-run`.
-  - **T13.5 REFACTOR** — remove unused strict-assurance implementation and keep orchestration readable.
+  - **T13.5 REFACTOR** — keep quick orchestration readable and leave the strict-assurance verifier dormant and unchanged for possible future use.
   - **T13.6 Verify Task** — run T7, T13, Ruff, scoped BasedPyright, and `git diff --check`; commit with IDs.
 
 ### T14: Capture, Narrate, and Render the Real Quick Demo
