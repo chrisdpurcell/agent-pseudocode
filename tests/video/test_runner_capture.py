@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -18,16 +19,24 @@ from typing import cast
 
 import pytest
 
+from video_pipeline import runner_capture as runner_capture_module
+from video_pipeline import runner_evidence
 from video_pipeline.runner_capture import (
+    MAX_EVIDENCE_FILE_BYTES,
+    MAX_PROCESS_OUTPUT_BYTES,
     REQUIRED_EVIDENCE_NAMES,
+    EvidencePromotionError,
     RunnerCaptureError,
     RunnerCaptureResult,
+    RunnerOperationalError,
     UnsafeRunnerCaptureError,
+    build_child_environment,
     capture_guarded_runner,
     expand_display_command,
     expected_console_wrapper_bytes,
     prepare_and_capture_guarded_runner,
     prepare_runner_runtime,
+    promote_evidence_bundle,
     reject_credential_evidence,
     validation_record_passed,
 )
@@ -99,22 +108,33 @@ else:
 
 def _fake_runner_body() -> str:
     body = """\
+import hashlib
 import json
 import os
 import pathlib
 import shlex
 import subprocess
 import sys
+import apseudo_lint
 
 args = sys.argv[1:]
 mode = os.environ.get("APSEUDO_TEST_RUNNER_MODE", "accepted")
+prompt = (
+    "Runner policy:\\n"
+    "- no_hooks_requested: False\\n"
+    "- hooks_required: False\\n"
+    "spec_path: docs/specs/repository-explainer-video.md\\n"
+)
 
 if args and args[0] == "--check":
     if mode == "raw-secret-output":
         print(json.dumps({"PASSWORD": "opaque"}))
         raise SystemExit(0)
+    if mode == "oversized-output":
+        print("x" * (int(os.environ["APSEUDO_TEST_OUTPUT_LIMIT"]) + 1))
+        raise SystemExit(0)
     if mode == "mutate-runtime-after-check":
-        module_path = pathlib.Path(__file__)
+        module_path = pathlib.Path(__file__).with_name("runner.py")
         module_path.write_text(
             module_path.read_text(encoding="utf-8") + "\\n# changed between vectors\\n",
             encoding="utf-8",
@@ -122,13 +142,29 @@ if args and args[0] == "--check":
     print("apseudo-run: script validation passed.")
     raise SystemExit(0)
 if args and args[0] == "--render-prompt":
-    print("Runner policy:")
-    print("- no_hooks_requested: False")
-    print("- hooks_required: False")
-    print("spec_path: docs/specs/repository-explainer-video.md")
+    print(prompt, end="")
     raise SystemExit(0)
 if args and args[0] == "--print-command":
-    print(shlex.join(["codex", "exec", "--cd", str(pathlib.Path.cwd()), "--sandbox", "read-only", "-"]))
+    preview_root = pathlib.Path.cwd() / ".preview"
+    preview_sandbox = "workspace-write" if mode == "provider-preview-mismatch" else "read-only"
+    print(
+        shlex.join(
+            [
+                "codex",
+                "exec",
+                "--cd",
+                str(pathlib.Path.cwd()),
+                "--json",
+                "--output-last-message",
+                str(preview_root / "outcome.json"),
+                "--output-schema",
+                str(preview_root / "schema.json"),
+                "--sandbox",
+                preview_sandbox,
+                "-",
+            ]
+        )
+    )
     print("# stdin: rendered prompt")
     raise SystemExit(0)
 if mode == "execution-nonzero":
@@ -163,6 +199,23 @@ run_root = pathlib.Path(args[args.index("--run-dir") + 1])
 run_record = run_root / "fixture-run"
 run_record.mkdir(parents=True)
 post_check = args[args.index("--post-check") + 1]
+workspace = str(pathlib.Path.cwd())
+schema_path = str(run_record / "outcome-schema.json")
+last_message_path = str(run_record / "outcome-last-message.json")
+provider_argv = [
+    "codex",
+    "exec",
+    "--cd",
+    workspace,
+    "--json",
+    "--output-last-message",
+    last_message_path,
+    "--output-schema",
+    schema_path,
+    "--sandbox",
+    "read-only",
+    "-",
+]
 post_result = subprocess.run(
     shlex.split(post_check),
     cwd=pathlib.Path.cwd(),
@@ -187,8 +240,17 @@ write_json(
     "manifest.json",
     {
         "run_id": "fixture-run",
+        "started_at": "2026-07-24T00:00:00+00:00",
+        "ended_at": "2026-07-24T00:00:01+00:00",
+        "toolkit_version": apseudo_lint.__version__,
+        "script_path": str(pathlib.Path.cwd() / "docs/apseudo-docs/examples/runner/review-spec.apseudo"),
+        "script_name": "review_spec",
         "agent": "codex",
-        "workspace": str(pathlib.Path.cwd()),
+        "mode": "review",
+        "workspace": workspace,
+        "args": {"spec_path": "docs/specs/repository-explainer-video.md"},
+        "passthrough": [],
+        "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
         "git_head": subprocess.run(
             ["git", "rev-parse", "HEAD"],
             check=True,
@@ -197,15 +259,18 @@ write_json(
         ).stdout.strip(),
         "exit_code": exit_code,
         "outcome": outcome_name,
+        "reason": "fixture result",
     },
 )
 write_json(
     "agent-command.json",
     {
-        "argv": ["codex", "exec", "--cd", str(pathlib.Path.cwd()), "--sandbox", "read-only", "-"],
-        "cwd": str(pathlib.Path.cwd()),
+        "argv": provider_argv,
+        "cwd": workspace,
         "env_overrides": {},
-        "stdin": "rendered prompt",
+        "stdin": prompt,
+        "schema_path": schema_path,
+        "output_last_message_path": last_message_path,
     },
 )
 write_json(
@@ -237,6 +302,51 @@ write_json(
         "artifacts": [],
     },
 )
+if mode == "manifest-git-mismatch":
+    payload = json.loads((run_record / "manifest.json").read_text(encoding="utf-8"))
+    payload["git_head"] = "0" * 40
+    write_json("manifest.json", payload)
+if mode == "manifest-exit-string":
+    payload = json.loads((run_record / "manifest.json").read_text(encoding="utf-8"))
+    payload["exit_code"] = "0"
+    write_json("manifest.json", payload)
+if mode == "manifest-script-mismatch":
+    payload = json.loads((run_record / "manifest.json").read_text(encoding="utf-8"))
+    payload["script_path"] = str(pathlib.Path.cwd() / "wrong.apseudo")
+    write_json("manifest.json", payload)
+if mode == "manifest-spec-mismatch":
+    payload = json.loads((run_record / "manifest.json").read_text(encoding="utf-8"))
+    payload["args"]["spec_path"] = "docs/specs/wrong.md"
+    write_json("manifest.json", payload)
+if mode == "agent-argv-nonstring":
+    payload = json.loads((run_record / "agent-command.json").read_text(encoding="utf-8"))
+    payload["argv"][1] = 7
+    write_json("agent-command.json", payload)
+if mode == "agent-cwd-mismatch":
+    payload = json.loads((run_record / "agent-command.json").read_text(encoding="utf-8"))
+    payload["cwd"] = "/wrong/workspace"
+    write_json("agent-command.json", payload)
+if mode == "agent-prompt-mismatch":
+    payload = json.loads((run_record / "agent-command.json").read_text(encoding="utf-8"))
+    payload["stdin"] = "different prompt"
+    write_json("agent-command.json", payload)
+if mode == "agent-sandbox-mismatch":
+    payload = json.loads((run_record / "agent-command.json").read_text(encoding="utf-8"))
+    payload["argv"][payload["argv"].index("read-only")] = "workspace-write"
+    write_json("agent-command.json", payload)
+if mode == "post-returncode-string":
+    payload = json.loads((run_record / "post-checks.json").read_text(encoding="utf-8"))
+    payload[0]["returncode"] = "0"
+    write_json("post-checks.json", payload)
+if mode == "outcome-checks-nonstring":
+    payload = json.loads((run_record / "outcome.json").read_text(encoding="utf-8"))
+    payload["checks_run"] = [7]
+    write_json("outcome.json", payload)
+if mode == "oversized-artifact":
+    (run_record / "manifest.json").write_text(
+        "x" * (int(os.environ["APSEUDO_TEST_FILE_LIMIT"]) + 1),
+        encoding="utf-8",
+    )
 print(
     json.dumps(
         {
@@ -262,10 +372,20 @@ raise SystemExit(0)
 """
 
 
-def _fake_status_body(message: str, failure_variable: str) -> str:
+def _fake_status_body(
+    message: str,
+    failure_variable: str,
+    *,
+    message_variable: str | None = None,
+) -> str:
+    rendered_message = (
+        repr(message)
+        if message_variable is None
+        else f"os.environ.get({message_variable!r}, {message!r})"
+    )
     return (
         "import os\n"
-        f"print({message!r})\n"
+        f"print({rendered_message})\n"
         f"raise SystemExit(int(os.environ.get({failure_variable!r}, '0')))\n"
     )
 
@@ -275,6 +395,7 @@ def _runner_repository(
     tmp_path: Path,
     *,
     hook_command: str = HOOK_COMMAND,
+    hook_shebang: str = "/usr/bin/env python3",
 ) -> Generator[tuple[Path, str, Path, dict[str, str]]]:
     repository = tmp_path / "repository"
     repository.mkdir(parents=True)
@@ -302,7 +423,7 @@ def _runner_repository(
     _write_executable(
         repository / ".agents/hooks/agent-handoff/session_start.py",
         _fake_hook_body(),
-        shebang="/usr/bin/env python3",
+        shebang=hook_shebang,
     )
     state = repository / "docs/handoff/state.md"
     state.parent.mkdir(parents=True)
@@ -375,10 +496,32 @@ def _runner_repository(
         _fake_linter_body(),
         encoding="utf-8",
     )
+    (module_target.parent / "cli.py").write_text(
+        _fake_linter_body(),
+        encoding="utf-8",
+    )
+    fake_policy_module = "# complete-package-closure fixture\\n"
+    (runtime_package / "runner.py").write_text(fake_policy_module, encoding="utf-8")
+    (module_target.parent / "runner.py").write_text(fake_policy_module, encoding="utf-8")
 
     operator_python = repository / "operator/bin/python"
     operator_python.parent.mkdir(parents=True)
     operator_python.symlink_to(Path(sys.executable).resolve())
+    (operator_python.parents[1] / "pyvenv.cfg").write_text(
+        f"home = {Path(sys.executable).resolve().parents[1]}\\n"
+        "include-system-site-packages = false\\n"
+        f"version = {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}\\n",
+        encoding="utf-8",
+    )
+    site_packages = (
+        operator_python.parents[1]
+        / "lib"
+        / f"python{sys.version_info.major}.{sys.version_info.minor}"
+        / "site-packages"
+        / "apseudo_lint"
+    )
+    site_packages.parent.mkdir(parents=True)
+    shutil.copytree(runtime_package, site_packages)
     runner = repository / "operator/bin/apseudo-run"
     runner.write_bytes(
         expected_console_wrapper_bytes(
@@ -397,7 +540,11 @@ def _runner_repository(
     )
     _write_executable(
         fake_bin / "codex",
-        _fake_status_body("Logged in using fixture", "APSEUDO_TEST_LOGIN_STATUS"),
+        _fake_status_body(
+            "Logged in using fixture",
+            "APSEUDO_TEST_LOGIN_STATUS",
+            message_variable="APSEUDO_TEST_LOGIN_MESSAGE",
+        ),
         shebang=str(Path(sys.executable).resolve()),
     )
 
@@ -406,7 +553,6 @@ def _runner_repository(
     revision = _git(repository, "rev-parse", "HEAD")
     environment = {
         "PATH": f"{fake_bin}:{os.environ['PATH']}",
-        "PYTHONPATH": str(fake_runtime),
     }
     yield repository, revision, runner, environment
 
@@ -675,7 +821,7 @@ def test_capture__environment_changes_after_preparation__records_preflight_only(
             revision=revision,
             runtime=runtime,
             evidence_root=evidence_root,
-            environment={**environment, "PYTHONPATH": str(tmp_path / "changed-runtime")},
+            environment={**environment, "LANG": "fr_FR.UTF-8"},
         )
 
     _assert_preflight_bundle(result, evidence_root, "operator environment changed")
@@ -695,7 +841,7 @@ def test_capture__runtime_changes_between_vectors__records_preflight_only(
             evidence_root,
         )
 
-    _assert_preflight_bundle(result, evidence_root, "operator entrypoint module changed")
+    _assert_preflight_bundle(result, evidence_root, "operator package closure changed")
 
 
 def test_capture__runtime_identity_emits_secret__raises_unsafe_error(
@@ -870,7 +1016,14 @@ def test_prepare_and_capture__genuine_precondition_failure__promotes_bundle(
 ) -> None:
     with _runner_repository(tmp_path) as (repository, revision, runner, environment):
         if mutate_module:
-            module = Path(environment["PYTHONPATH"]) / "apseudo_lint/__init__.py"
+            module = (
+                runner.parents[1]
+                / "lib"
+                / f"python{sys.version_info.major}.{sys.version_info.minor}"
+                / "site-packages"
+                / "apseudo_lint"
+                / "__init__.py"
+            )
             module.write_bytes(module.read_bytes() + b"# mismatched module\n")
         evidence_root = tmp_path / "promoted"
 
@@ -1111,3 +1264,348 @@ def test_post_check__uses_synced_operator_interpreter_and_bound_spec(tmp_path: P
             "stdout": "apseudo-lint: checked 1 file(s); no diagnostics.\n",
         }
     ]
+
+
+def _promotion_bundle(marker: str) -> dict[str, object]:
+    return {name: {"name": name, "marker": marker} for name in REQUIRED_EVIDENCE_NAMES}
+
+
+def test_child_environment__inherited_credentials__are_not_forwarded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "inherited-api-value")
+    monkeypatch.setenv("DATABASE_PASSWORD", "inherited-password-value")
+    monkeypatch.setenv("UNRELATED_PARENT_STATE", "not-allowed")
+
+    child = build_child_environment(
+        {"PATH": "/usr/bin", "HOME": "/tmp/fixture-home"},
+        auth_environment={"OPENAI_API_KEY": "explicit-api-value"},
+    )
+
+    assert child["OPENAI_API_KEY"] == "explicit-api-value"
+    assert "DATABASE_PASSWORD" not in child
+    assert "UNRELATED_PARENT_STATE" not in child
+    assert "inherited-api-value" not in child.values()
+
+
+def test_capture__explicit_auth_is_not_logged_in_evidence(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        evidence_root = tmp_path / "promoted"
+        result = prepare_and_capture_guarded_runner(
+            repository,
+            revision=revision,
+            operator_python=runner.parent / "python",
+            operator_apseudo_run=runner,
+            evidence_root=evidence_root,
+            environment=environment,
+            auth_environment={"OPENAI_API_KEY": "explicit-api-value"},
+        )
+
+    assert result.mode == "accepted"
+    assert all(b"explicit-api-value" not in path.read_bytes() for path in evidence_root.iterdir())
+
+
+def test_prepare_and_capture__not_logged_in_text__records_preflight(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        evidence_root = tmp_path / "promoted"
+        result = _prepare_and_capture(
+            repository,
+            revision,
+            runner,
+            {**environment, "APSEUDO_TEST_LOGIN_MESSAGE": "Not logged in"},
+            evidence_root,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "did not confirm a configured login")
+
+
+def test_capture__env_shebang_without_exact_python3__records_preflight(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path, hook_shebang="/usr/bin/env python") as (
+        repository,
+        revision,
+        runner,
+        environment,
+    ):
+        evidence_root = tmp_path / "promoted"
+        result = _prepare_and_capture(
+            repository,
+            revision,
+            runner,
+            environment,
+            evidence_root,
+        )
+
+    _assert_preflight_bundle(
+        result,
+        evidence_root,
+        "configured hook env shebang must be exactly /usr/bin/env python3",
+    )
+
+
+def test_prepare_and_capture__process_start_failure__records_complete_preflight(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        evidence_root = tmp_path / "promoted"
+        result = prepare_and_capture_guarded_runner(
+            repository,
+            revision=revision,
+            operator_python=runner.parent / "python",
+            operator_apseudo_run=runner,
+            evidence_root=evidence_root,
+            environment=environment,
+            sync_argv=("missing-runner-capture-command",),
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "executable was not found")
+
+
+def test_capture__timeout__records_complete_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def timed_out_hook(
+        _clone: Path,
+        _environment: Mapping[str, str],
+    ) -> tuple[dict[str, object], str | None]:
+        raise RunnerOperationalError("SessionStart hook preflight: timed out")
+
+    monkeypatch.setattr(runner_capture_module, "_capture_hook", timed_out_hook)
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        evidence_root = tmp_path / "promoted"
+        result = _prepare_and_capture(
+            repository,
+            revision,
+            runner,
+            environment,
+            evidence_root,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "SessionStart hook preflight: timed out")
+
+
+def test_capture__missing_focus__records_complete_preflight(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, _revision, runner, environment):
+        state = repository / "docs/handoff/state.md"
+        state.write_text(
+            "# Session state\n\n## Current focus\n\n## Active incidents\n", encoding="utf-8"
+        )
+        _git(repository, "add", state.relative_to(repository).as_posix())
+        _git(repository, "commit", "--quiet", "-m", "remove current focus")
+        revision = _git(repository, "rev-parse", "HEAD")
+        evidence_root = tmp_path / "promoted"
+        result = _prepare_and_capture(
+            repository,
+            revision,
+            runner,
+            environment,
+            evidence_root,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "has no current-focus bullet")
+
+
+def test_capture__oversized_process_output__records_complete_preflight(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        evidence_root = tmp_path / "promoted"
+        result = _prepare_and_capture(
+            repository,
+            revision,
+            runner,
+            {
+                **environment,
+                "APSEUDO_TEST_RUNNER_MODE": "oversized-output",
+                "APSEUDO_TEST_OUTPUT_LIMIT": str(MAX_PROCESS_OUTPUT_BYTES),
+            },
+            evidence_root,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "output exceeded")
+
+
+def test_capture__oversized_artifact__records_complete_preflight(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        evidence_root = tmp_path / "promoted"
+        result = _prepare_and_capture(
+            repository,
+            revision,
+            runner,
+            {
+                **environment,
+                "APSEUDO_TEST_RUNNER_MODE": "oversized-artifact",
+                "APSEUDO_TEST_FILE_LIMIT": str(MAX_EVIDENCE_FILE_BYTES),
+            },
+            evidence_root,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "exceeds the read limit")
+
+
+def test_capture__git_report_failure__records_complete_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def failed_git_report(_repository: Path) -> list[str]:
+        raise RunnerOperationalError("Git changed-file report failed")
+
+    monkeypatch.setattr(runner_capture_module, "_git_changed_files", failed_git_report)
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        evidence_root = tmp_path / "promoted"
+        result = _prepare_and_capture(
+            repository,
+            revision,
+            runner,
+            environment,
+            evidence_root,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "Git changed-file report failed")
+
+
+@pytest.mark.parametrize(
+    "runner_mode",
+    [
+        "manifest-git-mismatch",
+        "manifest-exit-string",
+        "manifest-script-mismatch",
+        "manifest-spec-mismatch",
+        "agent-argv-nonstring",
+        "agent-cwd-mismatch",
+        "agent-prompt-mismatch",
+        "agent-sandbox-mismatch",
+        "provider-preview-mismatch",
+        "post-returncode-string",
+        "outcome-checks-nonstring",
+    ],
+)
+def test_capture__mutated_runner_artifact__cannot_be_accepted(
+    tmp_path: Path,
+    runner_mode: str,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        evidence_root = tmp_path / "promoted"
+        result = _prepare_and_capture(
+            repository,
+            revision,
+            runner,
+            {**environment, "APSEUDO_TEST_RUNNER_MODE": runner_mode},
+            evidence_root,
+        )
+
+    assert result.mode == "preflight-only"
+    assert set(result.evidence_hashes) == set(REQUIRED_EVIDENCE_NAMES)
+
+
+def test_capture__unexecuted_runner_module_mutation__records_preflight(
+    tmp_path: Path,
+) -> None:
+    with _runner_repository(tmp_path) as (repository, revision, runner, environment):
+        runtime = prepare_runner_runtime(
+            repository,
+            revision=revision,
+            operator_python=runner.parent / "python",
+            operator_apseudo_run=runner,
+            environment=environment,
+        )
+        runtime_runner = runtime.module_path.with_name("runner.py")
+        runtime_runner.write_text(
+            runtime_runner.read_text(encoding="utf-8") + "# post-prepare mutation\n",
+            encoding="utf-8",
+        )
+        evidence_root = tmp_path / "promoted"
+        result = capture_guarded_runner(
+            repository,
+            revision=revision,
+            runtime=runtime,
+            evidence_root=evidence_root,
+            environment=environment,
+        )
+
+    _assert_preflight_bundle(result, evidence_root, "operator package closure changed")
+
+
+def test_promotion__new_or_identical_bundle__is_exact_and_idempotent(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "evidence"
+    bundle = _promotion_bundle("first")
+
+    first = promote_evidence_bundle(destination, bundle)
+    second = promote_evidence_bundle(destination, bundle)
+
+    assert first == second
+    assert {path.name for path in destination.iterdir()} == set(REQUIRED_EVIDENCE_NAMES)
+    assert all(path.is_file() and not path.is_symlink() for path in destination.iterdir())
+
+
+def test_promotion__different_existing_bundle__requires_recapture_authority(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "evidence"
+    original = _promotion_bundle("original")
+    replacement = _promotion_bundle("replacement")
+    original_hashes = promote_evidence_bundle(destination, original)
+
+    with pytest.raises(EvidencePromotionError, match="explicit recapture authority"):
+        promote_evidence_bundle(destination, replacement)
+
+    assert promote_evidence_bundle(destination, original) == original_hashes
+
+
+def test_promotion__authorized_recapture__removes_stale_ninth_file(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "evidence"
+    promote_evidence_bundle(destination, _promotion_bundle("original"))
+    (destination / "stale.json").write_text("{}\n", encoding="utf-8")
+
+    promote_evidence_bundle(
+        destination,
+        _promotion_bundle("replacement"),
+        allow_recapture=True,
+    )
+
+    assert {path.name for path in destination.iterdir()} == set(REQUIRED_EVIDENCE_NAMES)
+
+
+def test_promotion__mid_commit_failure__restores_original_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    destination = tmp_path / "evidence"
+    original = _promotion_bundle("original")
+    promote_evidence_bundle(destination, original)
+    original_bytes = {path.name: path.read_bytes() for path in destination.iterdir()}
+    real_replace = runner_evidence.replace_evidence_path
+    stage_commit_attempted = False
+
+    def fail_stage_commit(source: Path, target: Path) -> None:
+        nonlocal stage_commit_attempted
+        if target == destination and ".stage-" in source.name:
+            stage_commit_attempted = True
+            raise OSError("injected directory commit failure")
+        real_replace(source, target)
+
+    monkeypatch.setattr(runner_evidence, "replace_evidence_path", fail_stage_commit)
+
+    with pytest.raises(EvidencePromotionError, match="directory commit failed"):
+        promote_evidence_bundle(
+            destination,
+            _promotion_bundle("replacement"),
+            allow_recapture=True,
+        )
+
+    assert stage_commit_attempted
+    assert {path.name: path.read_bytes() for path in destination.iterdir()} == original_bytes
